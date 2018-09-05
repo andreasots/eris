@@ -1,0 +1,28 @@
+[package]
+name = "eris"
+version = "0.1.0"
+authors = ["Andreas Ots <qrpth@qrpth.eu>"]
+
+[dependencies]
+log = { version = "0.4.4", features = ["max_level_debug", "release_max_level_debug"] }
+simple_logger = "0.5.0"
+
+byteorder = "1.2.4"
+bytes = "0.4.9"
+chrono = "0.4.5"
+chrono-tz = "0.5.0"
+clap = "2.32.0"
+diesel = { version = "1.3.2", features = ["postgres", "r2d2"] }
+egg-mode = "0.12.0"
+failure = "0.1.2"
+futures = "0.1.23"
+reqwest = "0.8.7"
+rust-ini = "0.12.2"
+serde = "1.0.71"
+serde_derive = "1.0.71"
+serde_json = "1.0.24"
+serenity = "0.5.7"
+tokio = "0.1.8"
+
+tower-service = { git = "https://github.com/tower-rs/tower" }
+tower-reconnect = { git = "https://github.com/tower-rs/tower" }
