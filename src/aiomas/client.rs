@@ -1,7 +1,6 @@
 use tokio::prelude::*;
 use super::codec::{ClientCodec, Request, Exception};
 use tokio::codec::Framed;
-use tower_reconnect::Reconnect;
 use tower_service::{NewService, Service};
 use std::path::PathBuf;
 use failure::{self, Error, Fail, ResultExt};
@@ -75,17 +74,17 @@ pub struct Client {
 
 impl Client {
     #[cfg(unix)]
-    pub fn new<P: Into<PathBuf>>(path: P) -> Reconnect<NewClient> {
-        Reconnect::new(NewClient {
+    pub fn new<P: Into<PathBuf>>(path: P) -> NewClient {
+        NewClient {
             path: path.into()
-        })
+        }
     }
 
     #[cfg(not(unix))]
-    pub fn new(port: u16) -> Reconnect<NewClient> {
-        Reconnect::new(NewClient {
+    pub fn new(port: u16) -> NewClient {
+        NewClient {
             port,
-        })
+        }
     }
 
     fn from_stream<S: AsyncRead + AsyncWrite + Send + 'static>(stream: S) -> Client {
@@ -126,7 +125,7 @@ impl Service for Client {
     fn call(&mut self, req: Self::Request) -> Self::Future {
         let (tx, rx) = oneshot::channel();
 
-        Box::new(self.channel.clone().send((req, tx)).map_err(|_| broken_pipe("failed to send to dispatcher")).and_then(|_| rx.map_err(|_| broken_pipe("dispatcher closed"))))
+        Box::new(self.channel.clone().send((req, tx)).map_err(|_| broken_pipe("failed to send to dispatcher")).and_then(|_| rx.map_err(|_| broken_pipe("dispatcher closed")))) as Self::Future
     }
 }
 
