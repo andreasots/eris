@@ -13,9 +13,10 @@ extern crate serde;
 extern crate serenity;
 extern crate tokio;
 extern crate tower_service;
-extern crate tower_reconnect;
 
 extern crate simple_logger;
+
+#![feature(rust_2018_preview)]
 
 #[macro_use]
 extern crate serde_derive;
