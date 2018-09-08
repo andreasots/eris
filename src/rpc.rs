@@ -5,7 +5,6 @@ use aiomas::{Client, NewClient};
 use std::collections::HashMap;
 use serde_json::{self, Value};
 use serde::{Deserialize, Deserializer};
-use tower_reconnect::{Reconnect, Error as ReconnectError};
 use tokio::prelude::*;
 use tower_service::Service;
 
@@ -34,17 +33,9 @@ pub struct HeaderInfo {
     pub current_show: Option<ShowId>,
     pub advice: Option<String>,
 }
-
+/*
 pub struct LRRbot {
     service: Reconnect<NewClient>,
-}
-
-fn from_reconnect_error(err: ReconnectError<Error, Error>) -> Error {
-    match err {
-        ReconnectError::Inner(err) => err,
-        ReconnectError::Connect(err) => err.context("connection failed").into(),
-        ReconnectError::NotReady => failure::err_msg("not ready"),
-    }
 }
 
 impl LRRbot {
@@ -74,3 +65,4 @@ impl LRRbot {
             .and_then(|value| Ok(serde_json::from_value(value).context("failed to deserialize the response")?))
     }
 }
+*/

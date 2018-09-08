@@ -1,3 +1,5 @@
+#![feature(rust_2018_preview)]
+
 extern crate byteorder;
 extern crate bytes;
 extern crate chrono_tz;
@@ -15,8 +17,6 @@ extern crate tokio;
 extern crate tower_service;
 
 extern crate simple_logger;
-
-#![feature(rust_2018_preview)]
 
 #[macro_use]
 extern crate serde_derive;
@@ -118,7 +118,7 @@ fn main() -> Result<(), failure::Error> {
     );
 
     let _handle = std::thread::spawn(channel_reaper::channel_reaper(config.clone()));
-    let _handle = std::thread::spawn(move || {
+    /*let _handle = std::thread::spawn(move || {
         let mut lrrbot = Some(rpc::LRRbot::new(config));
 
         tokio::run(tokio::timer::Interval::new_interval(std::time::Duration::from_secs(1))
@@ -137,7 +137,7 @@ fn main() -> Result<(), failure::Error> {
                     })
             })
         );
-    });
+    });*/
 
     client
         .start()
