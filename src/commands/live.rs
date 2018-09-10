@@ -1,12 +1,12 @@
-use config::Config;
+use crate::config::Config;
 use diesel::prelude::*;
-use models::User;
+use crate::models::User;
 use serenity::framework::standard::{Args, Command, CommandError};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
 use std::sync::Arc;
-use twitch::Kraken;
-use PgPool;
+use crate::twitch::Kraken;
+use crate::PgPool;
 
 pub struct Live {
     config: Arc<Config>,
@@ -27,7 +27,7 @@ impl Live {
 impl Command for Live {
     fn execute(&self, _: &mut Context, msg: &Message, _: Args) -> Result<(), CommandError> {
         let token = {
-            use schema::users::dsl::*;
+            use crate::schema::users::dsl::*;
 
             let conn = self.pg_pool.get()?;
 
@@ -78,7 +78,7 @@ impl Command for Live {
                     streams.join(", ")
                 ))?;
             }
-            Err(err) => {
+            Err(_err) => {
                 msg.reply("Failed to load fanstreams currently live.")?;
             }
         }

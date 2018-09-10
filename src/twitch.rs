@@ -1,4 +1,4 @@
-use config::Config;
+use crate::config::Config;
 use failure::{self, Error, ResultExt};
 use reqwest::header::{Authorization, Headers, Scheme};
 use reqwest::Error as ReqwestError;
@@ -8,6 +8,7 @@ use serde_json::{self, Value};
 use std::fmt;
 use std::str::FromStr;
 use std::sync::Arc;
+use serde_derive::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct Channel {

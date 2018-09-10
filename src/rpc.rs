@@ -1,12 +1,12 @@
 use std::sync::Arc;
-use config::Config;
+use crate::config::Config;
 use failure::{self, Error, ResultExt};
-use aiomas::{Client, NewClient};
+use crate::aiomas::{NewClient, Reconnect, Retry};
 use std::collections::HashMap;
 use serde_json::{self, Value};
 use serde::{Deserialize, Deserializer};
 use tokio::prelude::*;
-use tower_service::Service;
+use serde_derive::Deserialize;
 
 #[derive(Copy, Clone, Debug, Deserialize)]
 pub struct GameId {
@@ -33,26 +33,22 @@ pub struct HeaderInfo {
     pub current_show: Option<ShowId>,
     pub advice: Option<String>,
 }
-/*
+
 pub struct LRRbot {
-    service: Reconnect<NewClient>,
+    service: Retry,
 }
 
 impl LRRbot {
     pub fn new(config: Arc<Config>) -> LRRbot {
         #[cfg(unix)]
-        let client = Client::new(&config.lrrbot_socket);
+        let client = NewClient::new(&config.lrrbot_socket);
 
         #[cfg(not(unix))]
-        let client = Client::new(&config.lrrbot_port);
+        let client = NewClient::new(&config.lrrbot_port);
 
         LRRbot {
-            service: client,
+            service: Retry::new(Reconnect::new(client), 3),
         }
-    }
-
-    pub fn ready(self) -> impl Future<Item=LRRbot, Error=Error> {
-        self.service.ready().map(|service| LRRbot { service }).map_err(from_reconnect_error)
     }
 
     fn call(&mut self, name: String, args: Vec<Value>, kwargs: HashMap<String, Value>) -> impl Future<Item=Value, Error=Error> {
@@ -65,4 +61,3 @@ impl LRRbot {
             .and_then(|value| Ok(serde_json::from_value(value).context("failed to deserialize the response")?))
     }
 }
-*/

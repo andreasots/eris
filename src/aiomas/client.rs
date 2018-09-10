@@ -1,21 +1,19 @@
 use tokio::prelude::*;
 use super::codec::{ClientCodec, Request, Exception};
 use tokio::codec::Framed;
-use tower_service::{NewService, Service};
 use std::path::PathBuf;
 use failure::{self, Error, Fail, ResultExt};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::io::Error as IoError;
-use futures::sync::{mpsc, oneshot};
+use futures::channel::{mpsc, oneshot};
 use tokio;
 use std::mem;
 
 #[cfg(unix)]
-use tokio::net::unix::{ConnectFuture, UnixStream};
+use tokio::net::unix::UnixStream;
 
 #[cfg(not(unix))]
-use tokio::net::{ConnectFuture, TcpStream};
+use tokio::net::TcpStream;
 
 pub struct NewClient {
     #[cfg(unix)]
@@ -25,45 +23,32 @@ pub struct NewClient {
     port: u16,
 }
 
-pub struct Connect<F> {
-    future: F,
-}
-
-impl<S: AsyncRead + AsyncWrite + Send + 'static, F: Future<Item=S, Error=IoError>> Future for Connect<F> {
-    type Item = Client;
-    type Error = Error;
-
-    fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
-        match self.future.poll()? {
-            Async::Ready(stream) => Ok(Async::Ready(Client::from_stream(stream))),
-            Async::NotReady => Ok(Async::NotReady),
-        }
-    }
-}
-
-impl NewService for NewClient {
-    type Request = <Client as Service>::Request;
-    type Response = <Client as Service>::Response;
-    type Error = <Client as Service>::Error;
-    type Service = Client;
-    type InitError = Error;
-    type Future = Connect<ConnectFuture>;
-
-    #[cfg(unix)]
-    fn new_service(&self) -> Self::Future {
-        Connect {
-            future: UnixStream::connect(&self.path)
+#[cfg(unix)]
+impl NewClient {
+    pub fn new<P: Into<PathBuf>>(path: P) -> NewClient {
+        NewClient {
+            path: path.into()
         }
     }
 
-    #[cfg(not(unix))]
-    fn new_service(&self) -> Self::Future {
+    pub async fn new_client(&self) -> Result<Client, Error> {
+        Ok(Client::from_stream(await!(UnixStream::connect(&self.path))?))
+    }
+}
+
+#[cfg(not(unix))]
+impl NewClient {
+    pub fn new(port: u16) -> NewClient {
+        NewClient {
+            port,
+        }
+    }
+
+    async fn new_service(&self) -> Result<Client, Error> {
         use std::net::{IpAddr, Ipv6Addr, SocketAddr};
         
         let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), self.port);
-        Connect {
-            future: TcpStream::connect(&addr),
-        }
+        Ok(Client::from_stream(await!(TcpStream::connect(&addr))?))
     }
 }
 
@@ -73,20 +58,6 @@ pub struct Client {
 
 
 impl Client {
-    #[cfg(unix)]
-    pub fn new<P: Into<PathBuf>>(path: P) -> NewClient {
-        NewClient {
-            path: path.into()
-        }
-    }
-
-    #[cfg(not(unix))]
-    pub fn new(port: u16) -> NewClient {
-        NewClient {
-            port,
-        }
-    }
-
     fn from_stream<S: AsyncRead + AsyncWrite + Send + 'static>(stream: S) -> Client {
         let (tx, rx) = mpsc::channel(16);
 
@@ -104,28 +75,11 @@ impl Client {
             channel: tx,
         }
     }
-}
 
-fn broken_pipe(msg: &'static str) -> Error {
-    use std::io::{Error, ErrorKind};
-    
-    Error::new(ErrorKind::BrokenPipe, msg).into()
-}
-
-impl Service for Client {
-    type Request = Request;
-    type Response = Result<Value, String>;
-    type Error = Error;
-    type Future = Box<Future<Item = Self::Response, Error = Self::Error> + Send>;
-
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(Async::Ready(()))
-    }
-
-    fn call(&mut self, req: Self::Request) -> Self::Future {
+    pub async fn call(&mut self, req: Request) -> Result<Result<Value, Exception>, Error> {
         let (tx, rx) = oneshot::channel();
-
-        Box::new(self.channel.clone().send((req, tx)).map_err(|_| broken_pipe("failed to send to dispatcher")).and_then(|_| rx.map_err(|_| broken_pipe("dispatcher closed")))) as Self::Future
+        await!(self.channel.send((req, tx)))?;
+        Ok(await!(rx)?)
     }
 }
 

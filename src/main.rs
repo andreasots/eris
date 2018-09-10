@@ -1,25 +1,8 @@
-#![feature(rust_2018_preview)]
+#![feature(arbitrary_self_types, futures_api, pin, await_macro, existential_type, async_await, generic_associated_types)]
 
-extern crate byteorder;
-extern crate bytes;
-extern crate chrono_tz;
-extern crate chrono;
-extern crate clap;
-extern crate egg_mode;
-extern crate failure;
-extern crate ini;
-extern crate futures;
-extern crate reqwest;
-extern crate serde_json;
-extern crate serde;
-extern crate serenity;
-extern crate tokio;
-extern crate tower_service;
+// Remove when Diesel updates.
+#![allow(proc_macro_derive_resolution_fallback)]
 
-extern crate simple_logger;
-
-#[macro_use]
-extern crate serde_derive;
 #[macro_use]
 extern crate diesel;
 
@@ -34,6 +17,7 @@ mod models;
 mod rpc;
 mod schema;
 mod twitch;
+mod service;
 
 struct Handler;
 
@@ -118,7 +102,7 @@ fn main() -> Result<(), failure::Error> {
     );
 
     let _handle = std::thread::spawn(channel_reaper::channel_reaper(config.clone()));
-    /*let _handle = std::thread::spawn(move || {
+    let _handle = std::thread::spawn(move || {
         let mut lrrbot = Some(rpc::LRRbot::new(config));
 
         tokio::run(tokio::timer::Interval::new_interval(std::time::Duration::from_secs(1))
@@ -137,7 +121,7 @@ fn main() -> Result<(), failure::Error> {
                     })
             })
         );
-    });*/
+    });
 
     client
         .start()
