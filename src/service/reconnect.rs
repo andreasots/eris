@@ -1,51 +1,33 @@
-use crate::service::{NewService, Service};
-use std::future::Future;
+use crate::aiomas::{Client, Exception, NewClient, Request};
+use failure::Error;
+use serde_json::Value;
 
-pub enum Error<T: NewService> {
-    Connecting(T::InitError),
-    Service(<T::Service as Service>::Error),
-    NotReady,
+// FIXME: this should be generic over the factory but that requires generic associated types and
+// existential types.
+pub struct Reconnect {
+    factory: NewClient,
+    client: Option<Client>,
 }
 
-enum State<T: NewService> {
-    Idle,
-    Connecting(T::Future),
-    Connected(T::Service),
-}
-
-pub struct Reconnect<T: NewService> {
-    factory: T,
-    state: State<T>,
-}
-
-impl<T: NewService> Reconnect<T> {
-    pub fn new(factory: T) -> Reconnect<T> {
+impl Reconnect {
+    pub fn new(factory: NewClient) -> Reconnect {
         Reconnect {
             factory,
-            state: State::Idle,
-        }
-    }
-}
-
-impl<T: NewService> Service for Reconnect<T> {
-    type Request = <T::Service as Service>::Request;
-    type Response = <T::Service as Service>::Response;
-    type Error = Error<T>;
-    existential type ReadyFuture<'a>: Future<Output = Result<(), Self::Error>> + 'a;
-    existential type Future<'a>: Future<Output = Result<<T::Service as Service>::Response, Error<T>>> + 'a;
-
-    fn ready(&mut self) -> Self::ReadyFuture {
-        async {
-            Ok(())
+            client: None,
         }
     }
 
-    fn call(&mut self, req: Self::Request) -> Self::Future {
-        async {
-            match self.state {
-                State::Connected(service) => await!(service.call(req)).map_err(Error::Service),
-                _ => Err(Error::NotReady),
-            }
+    pub async fn call(&mut self, req: Request) -> Result<Result<Value, Exception>, Error> {
+        if self.client.is_none() {
+            self.client = Some(await!(self.factory.new_client())?);
         }
+
+        let res = await!(self.client.as_mut().unwrap().call(req));
+
+        if res.is_err() {
+            self.client = None;
+        }
+
+        res
     }
 }

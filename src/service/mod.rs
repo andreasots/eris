@@ -1,5 +1,5 @@
-mod service;
 mod reconnect;
+mod retry;
 
-pub use self::service::{NewService, Service};
 pub use self::reconnect::Reconnect;
+pub use self::retry::Retry;

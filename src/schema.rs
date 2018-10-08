@@ -1,4 +1,28 @@
 table! {
+    game_per_show_data (game_id, show_id) {
+        game_id -> Int4,
+        show_id -> Int4,
+        display_name -> Nullable<Text>,
+        verified -> Nullable<Bool>,
+    }
+}
+
+table! {
+    games (id) {
+        id -> Int4,
+        name -> Text,
+    }
+}
+
+table! {
+    shows (id) {
+        id -> Int4,
+        string_id -> Text,
+        name -> Text,
+    }
+}
+
+table! {
     state (key) {
         key -> Text,
         value -> Jsonb,
@@ -22,4 +46,7 @@ table! {
     }
 }
 
-allow_tables_to_appear_in_same_query!(state, users,);
+joinable!(game_per_show_data -> games (game_id));
+joinable!(game_per_show_data -> shows (show_id));
+
+allow_tables_to_appear_in_same_query!(game_per_show_data, games, shows, state, users,);

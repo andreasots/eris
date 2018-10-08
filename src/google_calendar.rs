@@ -1,0 +1,150 @@
+use chrono::Duration;
+use chrono::{DateTime, FixedOffset, TimeZone};
+use crate::config::Config;
+use failure::{Error, ResultExt};
+use futures::compat::Future01CompatExt;
+use reqwest::r#async::Client;
+use serde::{Deserialize, Deserializer};
+use serde_derive::{Deserialize, Serialize};
+use std::cmp;
+use std::sync::Arc;
+
+pub const LRR: &str = "loadingreadyrun.com_72jmf1fn564cbbr84l048pv1go@group.calendar.google.com";
+pub const FANSTREAMS: &str = "caffeinatedlemur@gmail.com";
+
+#[derive(Debug, Deserialize)]
+pub struct Event {
+    #[serde(deserialize_with = "deserialize_nested_datetime")]
+    pub start: DateTime<FixedOffset>,
+    pub summary: String,
+    #[serde(deserialize_with = "deserialize_nested_datetime")]
+    pub end: DateTime<FixedOffset>,
+    pub location: Option<String>,
+    pub description: Option<String>,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize)]
+#[serde(bound = "")]
+struct ListEventsRequest<'a, Tz: TimeZone> {
+    maxResults: usize,
+    orderBy: &'a str,
+    singleEvents: bool,
+    timeMin: DateTime<Tz>,
+    key: &'a str,
+}
+
+#[derive(Deserialize)]
+struct ListEventsResponse {
+    items: Vec<Event>,
+}
+
+fn deserialize_nested_datetime<'de, D>(deserializer: D) -> Result<DateTime<FixedOffset>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[allow(non_snake_case)]
+    #[derive(Deserialize)]
+    struct Nested {
+        dateTime: DateTime<FixedOffset>,
+    }
+
+    Ok(Nested::deserialize(deserializer)?.dateTime)
+}
+
+#[derive(Clone)]
+pub struct Calendar {
+    client: Client,
+    config: Arc<Config>,
+}
+
+impl Calendar {
+    pub fn new(client: Client, config: Arc<Config>) -> Calendar {
+        Calendar { client, config }
+    }
+
+    pub async fn get_upcoming_events<'a, Tz: TimeZone + 'a>(
+        &'a self,
+        calendar: &'a str,
+        after: DateTime<Tz>,
+    ) -> Result<Vec<Event>, Error> {
+        Ok(await!(
+            await!(
+                self.client
+                    .get(&format!(
+                        "https://www.googleapis.com/calendar/v3/calendars/{}/events",
+                        calendar
+                    ))
+                    .query(&ListEventsRequest {
+                        maxResults: 10,
+                        orderBy: "startTime",
+                        singleEvents: true,
+                        timeMin: after,
+                        key: &self.config.google_key,
+                    })
+                    .send()
+                    .compat()
+            )
+            .context("failed to get calendar events")?
+            .json::<ListEventsResponse>()
+            .compat()
+        )
+        .context("failed to parse calendar events")?
+        .items)
+    }
+
+    pub fn get_next_event<Tz: TimeZone>(
+        events: &[Event],
+        at: DateTime<Tz>,
+        include_current: bool,
+    ) -> &[Event] {
+        let at = at.with_timezone(&FixedOffset::west(0));
+        let mut first_future_event = None;
+
+        for (i, event) in events.iter().enumerate() {
+            let relevant_duration = cmp::min(event.end - event.start, Duration::hours(1));
+            let relevant_until = event.start + relevant_duration;
+            if relevant_until >= at {
+                first_future_event = Some(i);
+                break;
+            }
+        }
+
+        let first_future_event = match first_future_event {
+            Some(i) => i,
+            None => return &[],
+        };
+
+        let current_events_end = events[first_future_event].start + Duration::hours(1);
+
+        let mut start = events.len();
+        let mut end = 0;
+        for (i, event) in events.iter().enumerate() {
+            if (i >= first_future_event || include_current) && event.start < current_events_end {
+                start = cmp::min(start, i);
+                end = cmp::max(end, i);
+            }
+        }
+
+        &events[start..end + 1]
+    }
+
+    pub fn format_description(description: &str) -> String {
+        let lines = description.lines().collect::<Vec<_>>();
+        if lines.len() == 2 {
+            // Show info: first line is the game, the second line is the description.
+            let game = lines[0].trim();
+            let description = lines[1].trim();
+
+            if game == "-" {
+                lines[1].into()
+            } else if description.ends_with(|c: char| c.is_ascii_punctuation()) {
+                format!("{} Game: {}", description, game)
+            } else {
+                format!("{}. Game: {}", description, game)
+            }
+        } else {
+            lines.join("; ")
+        }
+    }
+}

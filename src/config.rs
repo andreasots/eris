@@ -26,6 +26,8 @@ pub struct Config {
     #[cfg(not(unix))]
     pub eris_port: u16,
 
+    pub google_key: String,
+
     pub twitch_client_id: String,
 
     pub discord_botsecret: String,
@@ -56,18 +58,29 @@ impl Config {
                 .context("failed to parse the timezone")?,
 
             #[cfg(unix)]
-            lrrbot_socket: ini.get_from(Some("lrrbot"), "socket_filename").unwrap_or("lrrbot.sock").into(),
+            lrrbot_socket: ini
+                .get_from(Some("lrrbot"), "socket_filename")
+                .unwrap_or("lrrbot.sock")
+                .into(),
             #[cfg(unix)]
-            event_socket: ini.get_from(Some("lrrbot"), "eventsocket").unwrap_or("/tmp/eventserver.sock").into(),
+            event_socket: ini
+                .get_from(Some("lrrbot"), "eventsocket")
+                .unwrap_or("/tmp/eventserver.sock")
+                .into(),
             #[cfg(unix)]
-            eris_socket: ini.get_from(Some("lrrbot"), "eris_socket").unwrap_or("eris.sock").into(),
-            
+            eris_socket: ini
+                .get_from(Some("lrrbot"), "eris_socket")
+                .unwrap_or("eris.sock")
+                .into(),
+
             #[cfg(not(unix))]
             lrrbot_port: Config::get_option_parsed(&ini, "socket_port")?.unwrap_or(49601),
             #[cfg(not(unix))]
             event_port: Config::get_option_parsed(&ini, "event_port")?.unwrap_or(49602),
             #[cfg(not(unix))]
             eris_port: Config::get_option_parsed(&ini, "eris_port")?.unwrap_or(49603),
+
+            google_key: Config::get_option_required(&ini, "google_key")?,
 
             twitch_client_id: Config::get_option_required(&ini, "twitch_clientid")?,
 

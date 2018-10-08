@@ -1,26 +1,28 @@
-use std::sync::Arc;
+use crate::aiomas::NewClient;
 use crate::config::Config;
+use crate::service::{Reconnect, Retry};
 use failure::{self, Error, ResultExt};
-use crate::aiomas::{NewClient, Reconnect, Retry};
-use std::collections::HashMap;
-use serde_json::{self, Value};
 use serde::{Deserialize, Deserializer};
-use tokio::prelude::*;
 use serde_derive::Deserialize;
+use serde_json::{self, Value};
+use std::collections::HashMap;
 
 #[derive(Copy, Clone, Debug, Deserialize)]
 pub struct GameId {
-    pub id: i64,
+    pub id: i32,
     pub is_override: bool,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize)]
 pub struct ShowId {
-    pub id: i64,
+    pub id: i32,
     pub is_override: bool,
 }
 
-fn option_bool_as_bool<'de, D>(deserializer: D) -> Result<bool, D::Error> where D: Deserializer<'de> {
+fn option_bool_as_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
     Ok(Option::<bool>::deserialize(deserializer)?.unwrap_or(false))
 }
 
@@ -39,7 +41,7 @@ pub struct LRRbot {
 }
 
 impl LRRbot {
-    pub fn new(config: Arc<Config>) -> LRRbot {
+    pub fn new(config: &Config) -> LRRbot {
         #[cfg(unix)]
         let client = NewClient::new(&config.lrrbot_socket);
 
@@ -51,13 +53,17 @@ impl LRRbot {
         }
     }
 
-    fn call(&mut self, name: String, args: Vec<Value>, kwargs: HashMap<String, Value>) -> impl Future<Item=Value, Error=Error> {
-        self.service.call((name, args, kwargs)).map_err(from_reconnect_error)
-            .and_then(|res| res.map_err(failure::err_msg))
+    async fn call(
+        &mut self,
+        name: String,
+        args: Vec<Value>,
+        kwargs: HashMap<String, Value>,
+    ) -> Result<Value, Error> {
+        await!(self.service.call((name, args, kwargs)))?.map_err(failure::err_msg)
     }
 
-    pub fn get_header_info(&mut self) -> impl Future<Item=HeaderInfo, Error=Error> {
-        self.call("get_header_info".into(), vec![], HashMap::new())
-            .and_then(|value| Ok(serde_json::from_value(value).context("failed to deserialize the response")?))
+    pub async fn get_header_info(&mut self) -> Result<HeaderInfo, Error> {
+        let value = await!(self.call("get_header_info".into(), vec![], HashMap::new()))?;
+        Ok(serde_json::from_value(value).context("failed to deserialize the response")?)
     }
 }

@@ -1,21 +1,23 @@
 use crate::config::Config;
-use diesel::prelude::*;
 use crate::models::User;
+use crate::twitch::Kraken;
+use crate::PgPool;
+use diesel::prelude::*;
+use futures::prelude::*;
 use serenity::framework::standard::{Args, Command, CommandError};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
 use std::sync::Arc;
-use crate::twitch::Kraken;
-use crate::PgPool;
+use tokio::runtime::current_thread::Runtime;
 
 pub struct Live {
     config: Arc<Config>,
-    kraken: Arc<Kraken>,
+    kraken: Kraken,
     pg_pool: PgPool,
 }
 
 impl Live {
-    pub fn new(config: Arc<Config>, pg_pool: PgPool, kraken: Arc<Kraken>) -> Live {
+    pub fn new(config: Arc<Config>, pg_pool: PgPool, kraken: Kraken) -> Live {
         Live {
             config,
             pg_pool,
@@ -38,7 +40,9 @@ impl Command for Live {
                 .ok_or("Twitch token missing")?
         };
 
-        match self.kraken.get_streams_followed(token) {
+        let mut runtime = Runtime::new()?;
+
+        match runtime.block_on(self.kraken.get_streams_followed(token).boxed().compat()) {
             Ok(ref streams) if streams.len() == 0 => {
                 msg.reply("No fanstreamers currently live.")?;
             }

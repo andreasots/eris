@@ -1,5 +1,12 @@
-#![feature(arbitrary_self_types, futures_api, pin, await_macro, existential_type, async_await, generic_associated_types)]
-
+#![feature(
+    arbitrary_self_types,
+    futures_api,
+    pin,
+    await_macro,
+    existential_type,
+    async_await,
+    never_type
+)]
 // Remove when Diesel updates.
 #![allow(proc_macro_derive_resolution_fallback)]
 
@@ -7,17 +14,21 @@
 extern crate diesel;
 
 use failure::ResultExt;
-use tokio::prelude::*;
+
+use futures::future::{FutureExt, TryFutureExt};
 
 mod aiomas;
+mod autotopic;
 mod channel_reaper;
 mod commands;
 mod config;
+mod google_calendar;
 mod models;
 mod rpc;
 mod schema;
-mod twitch;
 mod service;
+mod time;
+mod twitch;
 
 struct Handler;
 
@@ -49,13 +60,16 @@ fn main() -> Result<(), failure::Error> {
     let pg_pool: PgPool = diesel::r2d2::Pool::new(diesel::r2d2::ConnectionManager::<
         diesel::pg::PgConnection,
     >::new(&config.database_url[..]))
-        .context(
-        "failed to create the database pool",
-    )?;
+    .context("failed to create the database pool")?;
 
-    let kraken = std::sync::Arc::new(
-        twitch::Kraken::new(config.clone()).context("failed to create the Twitch v5 client")?,
-    );
+    let http_client = reqwest::r#async::ClientBuilder::new()
+        .build()
+        .context("failed to create the HTTP client")?;
+
+    let kraken = twitch::Kraken::new(http_client.clone(), config.clone());
+    let helix = twitch::Helix::new(http_client.clone(), config.clone());
+
+    let calendar = google_calendar::Calendar::new(http_client.clone(), config.clone());
 
     let mut client = serenity::Client::new(&config.discord_botsecret, Handler)
         .map_err(failure::SyncFailure::new)
@@ -103,24 +117,12 @@ fn main() -> Result<(), failure::Error> {
 
     let _handle = std::thread::spawn(channel_reaper::channel_reaper(config.clone()));
     let _handle = std::thread::spawn(move || {
-        let mut lrrbot = Some(rpc::LRRbot::new(config));
-
-        tokio::run(tokio::timer::Interval::new_interval(std::time::Duration::from_secs(1))
-            .map_err(|err| eprintln!("timer error: {}", err))
-            .for_each(move |_| {
-                lrrbot.take().unwrap().ready()
-                    .and_then(|mut lrrbot| {
-                        lrrbot.get_header_info()
-                            .then(|res| {
-                                println!("header: {:?}", res);
-                                Ok(())
-                            })
-                    })
-                    .map_err(|err| {
-                        eprintln!("error connecting: {:?}", err);
-                    })
-            })
-        );
+        tokio::run(
+            autotopic::autotopic(config, helix, calendar, pg_pool)
+                .unit_error()
+                .boxed()
+                .compat(),
+        )
     });
 
     client
