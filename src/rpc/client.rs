@@ -66,4 +66,14 @@ impl LRRbot {
         let value = await!(self.call("get_header_info".into(), vec![], HashMap::new()))?;
         Ok(serde_json::from_value(value).context("failed to deserialize the response")?)
     }
+
+    pub async fn get_game_id(&mut self) -> Result<Option<i32>, Error> {
+        let value = await!(self.call("get_game_id".into(), vec![], HashMap::new()))?;
+        Ok(serde_json::from_value(value).context("failed to deserialize the response")?)
+    }
+
+    pub async fn get_show_id(&mut self) -> Result<i32, Error> {
+        let value = await!(self.call("get_show_id".into(), vec![], HashMap::new()))?;
+        Ok(serde_json::from_value(value).context("failed to deserialize the response")?)
+    }
 }

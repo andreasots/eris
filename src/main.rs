@@ -29,6 +29,7 @@ mod schema;
 mod service;
 mod time;
 mod twitch;
+mod announcements;
 
 struct Handler;
 
@@ -115,7 +116,12 @@ fn main() -> Result<(), failure::Error> {
             }),
     );
 
+    let rpc_server = rpc::Server::new(config.clone(), pg_pool.clone())
+        .context("failed to create the RPC server")?;
+    let _handle = std::thread::spawn(move || tokio::run(rpc_server.serve().unit_error().boxed().compat()));
+
     let _handle = std::thread::spawn(channel_reaper::channel_reaper(config.clone()));
+
     let _handle = std::thread::spawn(move || {
         tokio::run(
             autotopic::autotopic(config, helix, calendar, pg_pool)
