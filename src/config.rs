@@ -1,10 +1,10 @@
 use chrono_tz::Tz;
+use egg_mode::KeyPair;
 use failure::{self, Error, Fail, ResultExt};
 use ini::Ini;
 use serenity::model::prelude::*;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use egg_mode::KeyPair;
 
 pub struct Config {
     pub username: String,
@@ -107,7 +107,10 @@ impl Config {
             guild: GuildId(
                 Config::get_option_parsed(&ini, "discord_serverid")?.unwrap_or(288920509272555520),
             ),
-            twitter_api_keys: KeyPair::new(Config::get_option_required(&ini, "twitter_api_key")?, Config::get_option_required(&ini, "twitter_api_secret")?),
+            twitter_api_keys: KeyPair::new(
+                Config::get_option_required(&ini, "twitter_api_key")?,
+                Config::get_option_required(&ini, "twitter_api_secret")?,
+            ),
             twitter_users: ini
                 .get_from(Some("lrrbot"), "twitter_users_to_monitor")
                 .unwrap_or("loadingreadyrun")

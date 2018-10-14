@@ -6,7 +6,7 @@
     existential_type,
     async_await,
     never_type,
-    transpose_result,
+    transpose_result
 )]
 // Remove when Diesel updates.
 #![allow(proc_macro_derive_resolution_fallback)]
@@ -119,11 +119,16 @@ fn main() -> Result<(), failure::Error> {
 
     #[cfg(unix)]
     std::fs::remove_file(&config.eris_socket)
-        .or_else(|err| if err.kind() == std::io::ErrorKind::NotFound { Ok(()) } else { Err(err) })
+        .or_else(|err| {
+            if err.kind() == std::io::ErrorKind::NotFound {
+                Ok(())
+            } else {
+                Err(err)
+            }
+        })
         .context("failed to remove the socket file")?;
 
-    let mut runtime = tokio::runtime::Runtime::new()
-        .context("failed to create a Tokio runtime")?;
+    let mut runtime = tokio::runtime::Runtime::new().context("failed to create a Tokio runtime")?;
 
     let rpc_server = rpc::Server::new(config.clone(), pg_pool.clone())
         .context("failed to create the RPC server")?;
@@ -135,14 +140,24 @@ fn main() -> Result<(), failure::Error> {
         let config = config.clone();
         let pg_pool = pg_pool.clone();
         std::thread::spawn(move || {
-            let mut core = tokio_core::reactor::Core::new()
-                .expect("failed to create a tokio-core reactor");
-            core.run(announcements::post_tweets(config, pg_pool, core.handle()).unit_error().boxed().compat())
-                .expect("failed to announce tweets");
+            let mut core =
+                tokio_core::reactor::Core::new().expect("failed to create a tokio-core reactor");
+            core.run(
+                announcements::post_tweets(config, pg_pool, core.handle())
+                    .unit_error()
+                    .boxed()
+                    .compat(),
+            )
+            .expect("failed to announce tweets");
         })
     };
 
-    runtime.spawn(autotopic::autotopic(config, helix, calendar, pg_pool).unit_error().boxed().compat());
+    runtime.spawn(
+        autotopic::autotopic(config, helix, calendar, pg_pool)
+            .unit_error()
+            .boxed()
+            .compat(),
+    );
 
     client
         .start()

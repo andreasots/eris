@@ -1,11 +1,11 @@
 use crate::config::Config;
+use crate::models::{Game, GameEntry, Show};
 use crate::rpc::server::Channel;
 use crate::rpc::LRRbot;
 use crate::PgPool;
-use failure::{Error, ResultExt, SyncFailure};
-use crate::models::{Game, GameEntry, Show};
-use std::fmt::{self, Display};
 use diesel::OptionalExtension;
+use failure::{Error, ResultExt, SyncFailure};
+use std::fmt::{self, Display};
 
 struct StreamUp {
     data: Channel,
@@ -29,7 +29,12 @@ impl Display for StreamUp {
     }
 }
 
-async fn stream_up_inner<'a>(config: &'a Config, lrrbot: &'a mut LRRbot, pg_pool: PgPool, data: Channel) -> Result<(), Error> {
+async fn stream_up_inner<'a>(
+    config: &'a Config,
+    lrrbot: &'a mut LRRbot,
+    pg_pool: PgPool,
+    data: Channel,
+) -> Result<(), Error> {
     let game_id = await!(lrrbot.get_game_id()).context("failed to get the game ID")?;
     let show_id = await!(lrrbot.get_show_id()).context("failed to get the show ID")?;
 
@@ -41,8 +46,7 @@ async fn stream_up_inner<'a>(config: &'a Config, lrrbot: &'a mut LRRbot, pg_pool
         .map(|game_id| Game::find(game_id, &conn))
         .transpose()
         .context("failed to load the game")?;
-    let show = Show::find(show_id, &conn)
-        .context("failed to load the show")?;
+    let show = Show::find(show_id, &conn).context("failed to load the show")?;
     let game_entry = game_id
         .map(|game_id| GameEntry::find(game_id, show_id, &conn))
         .transpose()
@@ -53,12 +57,20 @@ async fn stream_up_inner<'a>(config: &'a Config, lrrbot: &'a mut LRRbot, pg_pool
     let what = {
         let game = game.as_ref();
         let game_entry = game_entry.as_ref();
-        let game_display_name = game.map(|game| game_entry.and_then(|entry| entry.display_name.as_ref()).unwrap_or(&game.name));
+        let game_display_name = game.map(|game| {
+            game_entry
+                .and_then(|entry| entry.display_name.as_ref())
+                .unwrap_or(&game.name)
+        });
 
-        game_display_name.map(|name| format!("{} on {}", name, show.name)).unwrap_or(show.name)
+        game_display_name
+            .map(|name| format!("{} on {}", name, show.name))
+            .unwrap_or(show.name)
     };
 
-    config.announcements.say(format_args!("{}", StreamUp { data, what }))
+    config
+        .announcements
+        .say(format_args!("{}", StreamUp { data, what }))
         .map_err(SyncFailure::new)
         .context("failed to send the annoucement message")?;
 

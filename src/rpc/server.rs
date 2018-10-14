@@ -1,13 +1,13 @@
-use serde_derive::Deserialize;
 use chrono::{DateTime, FixedOffset};
 use crate::aiomas::Server as AiomasServer;
-use failure::{Error, ResultExt};
-use crate::config::Config;
 use crate::announcements;
-use std::sync::Arc;
+use crate::config::Config;
+use crate::PgPool;
+use failure::{Error, ResultExt};
+use serde_derive::Deserialize;
 use serde_json::{self, Value};
 use std::collections::HashMap;
-use crate::PgPool;
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct Channel {
@@ -35,29 +35,30 @@ impl Server {
         {
             let config = config.clone();
             let pg_pool = pg_pool.clone();
-            server.register("announcements/stream_up", move |mut args: Vec<Value>, kwargs: HashMap<String, Value>| {
-                let config = config.clone();
-                let pg_pool = pg_pool.clone();
+            server.register(
+                "announcements/stream_up",
+                move |mut args: Vec<Value>, kwargs: HashMap<String, Value>| {
+                    let config = config.clone();
+                    let pg_pool = pg_pool.clone();
 
-                async move {
-                    if args.len() != 1 || kwargs.len() != 0 {
-                        return Err(String::from("invalid number of arguments"))
+                    async move {
+                        if args.len() != 1 || kwargs.len() != 0 {
+                            return Err(String::from("invalid number of arguments"));
+                        }
+
+                        let data = serde_json::from_value::<Channel>(args.pop().unwrap())
+                            .context("failed to deserialize arguments")
+                            .map_err(|e| format!("{:?}", e))?;
+
+                        await!(announcements::stream_up(&config, pg_pool, data));
+
+                        Ok(serde_json::Value::Null)
                     }
-
-                    let data = serde_json::from_value::<Channel>(args.pop().unwrap())
-                        .context("failed to deserialize arguments")
-                        .map_err(|e| format!("{:?}", e))?;
-
-                    await!(announcements::stream_up(&config, pg_pool, data));
-
-                    Ok(serde_json::Value::Null)
-                }
-            });
+                },
+            );
         }
 
-        Ok(Server {
-            server,
-        })
+        Ok(Server { server })
     }
 
     pub async fn serve(self) {

@@ -1,10 +1,10 @@
 use crate::schema::*;
-use serde_json::Value;
-use diesel::prelude::*;
-use diesel::pg::Pg;
-use serde::{Deserialize, Serialize};
-use failure::Error;
 use diesel::pg::upsert::excluded;
+use diesel::pg::Pg;
+use diesel::prelude::*;
+use failure::Error;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Identifiable, Debug, Queryable)]
 #[primary_key(game_id, show_id)]
@@ -17,7 +17,11 @@ pub struct GameEntry {
 }
 
 impl GameEntry {
-    pub fn find<C: Connection<Backend = Pg>>(game_id: i32, show_id: i32, conn: &C) -> QueryResult<GameEntry> {
+    pub fn find<C: Connection<Backend = Pg>>(
+        game_id: i32,
+        show_id: i32,
+        conn: &C,
+    ) -> QueryResult<GameEntry> {
         game_per_show_data::table
             .find((game_id, show_id))
             .first::<GameEntry>(conn)
@@ -32,9 +36,7 @@ pub struct Game {
 
 impl Game {
     pub fn find<C: Connection<Backend = Pg>>(id: i32, conn: &C) -> QueryResult<Game> {
-        games::table
-            .find(id)
-            .first::<Game>(conn)
+        games::table.find(id).first::<Game>(conn)
     }
 }
 
@@ -47,9 +49,7 @@ pub struct Show {
 
 impl Show {
     pub fn find<C: Connection<Backend = Pg>>(id: i32, conn: &C) -> QueryResult<Show> {
-        shows::table
-            .find(id)
-            .first::<Show>(conn)
+        shows::table.find(id).first::<Show>(conn)
     }
 }
 
@@ -69,7 +69,10 @@ pub struct State {
 }
 
 impl State {
-    pub fn get<T: for<'de> Deserialize<'de>, C: Connection<Backend = Pg>>(key: &str, conn: &C) -> Result<Option<T>, Error> {
+    pub fn get<T: for<'de> Deserialize<'de>, C: Connection<Backend = Pg>>(
+        key: &str,
+        conn: &C,
+    ) -> Result<Option<T>, Error> {
         let value = state::table
             .find(key)
             .select(state::value)
@@ -82,7 +85,11 @@ impl State {
         }
     }
 
-    pub fn set<T: Serialize, C: Connection<Backend = Pg>>(key: &str, value: T, conn: &C) -> Result<(), Error> {
+    pub fn set<T: Serialize, C: Connection<Backend = Pg>>(
+        key: &str,
+        value: T,
+        conn: &C,
+    ) -> Result<(), Error> {
         diesel::insert_into(state::table)
             .values(NewState {
                 key,

@@ -8,6 +8,7 @@ use crate::time::HumanReadable;
 use crate::twitch::helix::User;
 use crate::twitch::Helix;
 use crate::PgPool;
+use diesel::OptionalExtension;
 use failure::{Error, ResultExt, SyncFailure};
 use futures::compat::Stream01CompatExt;
 use futures::prelude::*;
@@ -15,7 +16,6 @@ use std::fmt;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;
-use diesel::OptionalExtension;
 
 struct ShortDisplay<'a> {
     event: &'a Event,
@@ -101,22 +101,24 @@ impl Autotopic {
                 .get()
                 .context("failed to get a database connection from the pool")?;
 
-    
-            let game = header.current_game
+            let game = header
+                .current_game
                 .map(|game| Game::find(game.id, &conn))
                 .transpose()
                 .context("failed to load the game")?;
-            let show = header.current_show
+            let show = header
+                .current_show
                 .map(|show| Show::find(show.id, &conn))
                 .transpose()
                 .context("failed to load the show")?;
-            let game_entry = if let (Some(game), Some(show)) = (header.current_game, header.current_show) {
-                GameEntry::find(game.id, show.id, &conn)
-                    .optional()
-                    .context("failed to load the game entry")?
-            } else {
-                None
-            };
+            let game_entry =
+                if let (Some(game), Some(show)) = (header.current_game, header.current_show) {
+                    GameEntry::find(game.id, show.id, &conn)
+                        .optional()
+                        .context("failed to load the game entry")?
+                } else {
+                    None
+                };
 
             match (game, show) {
                 (Some(game), Some(show)) => {
