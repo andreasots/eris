@@ -8,7 +8,6 @@ use crate::time::HumanReadable;
 use crate::twitch::helix::User;
 use crate::twitch::Helix;
 use crate::PgPool;
-use diesel::prelude::*;
 use failure::{Error, ResultExt, SyncFailure};
 use futures::compat::Stream01CompatExt;
 use futures::prelude::*;
@@ -16,6 +15,7 @@ use std::fmt;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;
+use diesel::OptionalExtension;
 
 struct ShortDisplay<'a> {
     event: &'a Event,
@@ -61,7 +61,7 @@ pub async fn autotopic(config: Arc<Config>, helix: Helix, calendar: Calendar, pg
         calendar,
     };
 
-    let mut timer = Interval::new(Instant::now(), Duration::from_secs(10)).compat();
+    let mut timer = Interval::new(Instant::now(), Duration::from_secs(60)).compat();
 
     loop {
         match await!(timer.try_next()) {
@@ -101,45 +101,21 @@ impl Autotopic {
                 .get()
                 .context("failed to get a database connection from the pool")?;
 
-            let game = match header.current_game {
-                Some(game) => {
-                    use crate::schema::games::dsl::*;
-
-                    Some(
-                        games
-                            .find(game.id)
-                            .first::<Game>(&conn)
-                            .context("failed to load the game")?,
-                    )
-                }
-                None => None,
-            };
-
-            let show = match header.current_show {
-                Some(show) => {
-                    use crate::schema::shows::dsl::*;
-
-                    Some(
-                        shows
-                            .find(show.id)
-                            .first::<Show>(&conn)
-                            .context("failed to load the show")?,
-                    )
-                }
-                None => None,
-            };
-
-            let game_entry = match (header.current_game, header.current_show) {
-                (Some(game), Some(show)) => {
-                    use crate::schema::game_per_show_data::dsl::*;
-
-                    game_per_show_data
-                        .find((game.id, show.id))
-                        .first::<GameEntry>(&conn)
-                        .optional()
-                        .context("failed to load the game entry")?
-                }
-                _ => None,
+    
+            let game = header.current_game
+                .map(|game| Game::find(game.id, &conn))
+                .transpose()
+                .context("failed to load the game")?;
+            let show = header.current_show
+                .map(|show| Show::find(show.id, &conn))
+                .transpose()
+                .context("failed to load the show")?;
+            let game_entry = if let (Some(game), Some(show)) = (header.current_game, header.current_show) {
+                GameEntry::find(game.id, show.id, &conn)
+                    .optional()
+                    .context("failed to load the game entry")?
+            } else {
+                None
             };
 
             match (game, show) {

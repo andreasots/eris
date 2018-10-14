@@ -53,6 +53,9 @@ impl LRRbot {
         }
     }
 
+    // FIXME: `&mut self` prevents sending multiple requests at once. Maybe return the channel from
+    // `aiomas::Client::call` so that even though sending still requires a `&mut self` receiving
+    // doesn't and so multiple requests can be in flight at once.
     async fn call(
         &mut self,
         name: String,

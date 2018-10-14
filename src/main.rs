@@ -5,7 +5,8 @@
     await_macro,
     existential_type,
     async_await,
-    never_type
+    never_type,
+    transpose_result,
 )]
 // Remove when Diesel updates.
 #![allow(proc_macro_derive_resolution_fallback)]
@@ -18,6 +19,7 @@ use failure::ResultExt;
 use futures::future::{FutureExt, TryFutureExt};
 
 mod aiomas;
+mod announcements;
 mod autotopic;
 mod channel_reaper;
 mod commands;
@@ -29,7 +31,6 @@ mod schema;
 mod service;
 mod time;
 mod twitch;
-mod announcements;
 
 struct Handler;
 
@@ -116,20 +117,32 @@ fn main() -> Result<(), failure::Error> {
             }),
     );
 
+    #[cfg(unix)]
+    std::fs::remove_file(&config.eris_socket)
+        .or_else(|err| if err.kind() == std::io::ErrorKind::NotFound { Ok(()) } else { Err(err) })
+        .context("failed to remove the socket file")?;
+
+    let mut runtime = tokio::runtime::Runtime::new()
+        .context("failed to create a Tokio runtime")?;
+
     let rpc_server = rpc::Server::new(config.clone(), pg_pool.clone())
         .context("failed to create the RPC server")?;
-    let _handle = std::thread::spawn(move || tokio::run(rpc_server.serve().unit_error().boxed().compat()));
+    runtime.spawn(rpc_server.serve().unit_error().boxed().compat());
 
     let _handle = std::thread::spawn(channel_reaper::channel_reaper(config.clone()));
 
-    let _handle = std::thread::spawn(move || {
-        tokio::run(
-            autotopic::autotopic(config, helix, calendar, pg_pool)
-                .unit_error()
-                .boxed()
-                .compat(),
-        )
-    });
+    let _handle = {
+        let config = config.clone();
+        let pg_pool = pg_pool.clone();
+        std::thread::spawn(move || {
+            let mut core = tokio_core::reactor::Core::new()
+                .expect("failed to create a tokio-core reactor");
+            core.run(announcements::post_tweets(config, pg_pool, core.handle()).unit_error().boxed().compat())
+                .expect("failed to announce tweets");
+        })
+    };
+
+    runtime.spawn(autotopic::autotopic(config, helix, calendar, pg_pool).unit_error().boxed().compat());
 
     client
         .start()

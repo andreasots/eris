@@ -4,6 +4,7 @@ use ini::Ini;
 use serenity::model::prelude::*;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use egg_mode::KeyPair;
 
 pub struct Config {
     pub username: String,
@@ -32,8 +33,12 @@ pub struct Config {
 
     pub discord_botsecret: String,
     pub temp_channel_prefix: String,
+    pub announcements: ChannelId,
     pub voice_category: ChannelId,
     pub guild: GuildId,
+
+    pub twitter_api_keys: KeyPair,
+    pub twitter_users: Vec<String>,
 }
 
 impl Config {
@@ -91,6 +96,10 @@ impl Config {
                 .unwrap_or("[TEMP]")
                 .trim()
                 .into(),
+            announcements: ChannelId(
+                Config::get_option_parsed(&ini, "discord_channel_announcements")?
+                    .unwrap_or(322643668831961088),
+            ),
             voice_category: ChannelId(
                 Config::get_option_parsed(&ini, "discord_category_voice")?
                     .unwrap_or(360796352357072896),
@@ -98,6 +107,14 @@ impl Config {
             guild: GuildId(
                 Config::get_option_parsed(&ini, "discord_serverid")?.unwrap_or(288920509272555520),
             ),
+            twitter_api_keys: KeyPair::new(Config::get_option_required(&ini, "twitter_api_key")?, Config::get_option_required(&ini, "twitter_api_secret")?),
+            twitter_users: ini
+                .get_from(Some("lrrbot"), "twitter_users_to_monitor")
+                .unwrap_or("loadingreadyrun")
+                .trim()
+                .split(",")
+                .map(String::from)
+                .collect(),
         })
     }
 

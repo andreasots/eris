@@ -7,6 +7,7 @@ use crate::announcements;
 use std::sync::Arc;
 use serde_json::{self, Value};
 use std::collections::HashMap;
+use crate::PgPool;
 
 #[derive(Deserialize)]
 pub struct Channel {
@@ -16,6 +17,7 @@ pub struct Channel {
     pub status: Option<String>,
     pub stream_created_at: Option<DateTime<FixedOffset>>,
     pub live: bool,
+    pub url: String,
 }
 
 pub struct Server {
