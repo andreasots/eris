@@ -31,14 +31,14 @@ mod schema;
 mod service;
 mod time;
 mod twitch;
-
-struct Handler;
-
-impl serenity::client::EventHandler for Handler {}
+mod voice_channel_tracker;
 
 type PgPool = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<diesel::pg::PgConnection>>;
 
 fn main() -> Result<(), failure::Error> {
+    // TODO: determine if it should be something else. 10 ms is too short for some reason.
+    serenity::CACHE.write().settings_mut().cache_lock_time = None;
+
     simple_logger::init().unwrap();
 
     let matches = clap::App::new(env!("CARGO_PKG_NAME"))
@@ -73,7 +73,10 @@ fn main() -> Result<(), failure::Error> {
 
     let calendar = google_calendar::Calendar::new(http_client.clone(), config.clone());
 
-    let mut client = serenity::Client::new(&config.discord_botsecret, Handler)
+    let handler = voice_channel_tracker::VoiceChannelTracker::new(&config)
+        .context("failed to create the voice channel tracker")?;
+
+    let mut client = serenity::Client::new(&config.discord_botsecret, handler)
         .map_err(failure::SyncFailure::new)
         .context("failed to create the Discord client")?;
     client.with_framework(

@@ -39,6 +39,8 @@ pub struct Config {
 
     pub twitter_api_keys: KeyPair,
     pub twitter_users: Vec<String>,
+
+    pub voice_channel_data: PathBuf,
 }
 
 impl Config {
@@ -118,6 +120,11 @@ impl Config {
                 .split(",")
                 .map(String::from)
                 .collect(),
+
+            voice_channel_data: ini
+                .get_from(Some("lrrbot"), "voice_channel_data")
+                .unwrap_or("voice_channels.csv")
+                .into(),
         })
     }
 
