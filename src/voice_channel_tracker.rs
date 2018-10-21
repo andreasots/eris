@@ -1,15 +1,15 @@
-use serenity::prelude::*;
-use serenity::model::prelude::*;
-use crate::config::Config;
-use csv::{WriterBuilder, Writer};
-use failure::{Error, ResultExt, bail, format_err};
-use std::fs::{File, OpenOptions};
-use std::sync::{Arc, Mutex};
-use serenity::CACHE;
-use std::io::{Seek, SeekFrom};
-use serde_derive::Serialize;
 use chrono::{DateTime, Utc};
+use crate::config::Config;
+use csv::{Writer, WriterBuilder};
+use failure::{bail, format_err, Error, ResultExt};
+use serde_derive::Serialize;
+use serenity::model::prelude::*;
+use serenity::prelude::*;
+use serenity::CACHE;
 use std::collections::HashSet;
+use std::fs::{File, OpenOptions};
+use std::io::{Seek, SeekFrom};
+use std::sync::{Arc, Mutex};
 
 #[derive(Serialize)]
 enum Event {
@@ -41,11 +41,10 @@ impl VoiceChannelTracker {
             .create(true)
             .open(&config.voice_channel_data)
             .context("failed to open the voice channel data file")?;
-        let end = file.seek(SeekFrom::End(0))
+        let end = file
+            .seek(SeekFrom::End(0))
             .context("failed to determine file size")?;
-        let writer = WriterBuilder::new()
-            .has_headers(end == 0)
-            .from_writer(file);
+        let writer = WriterBuilder::new().has_headers(end == 0).from_writer(file);
 
         Ok(VoiceChannelTracker {
             writer: Mutex::new(writer),
@@ -77,7 +76,9 @@ fn log_error<F: FnOnce() -> Result<(), Error>>(f: F) {
 impl EventHandler for VoiceChannelTracker {
     fn guild_create(&self, _ctx: Context, guild: Guild, _is_new: bool) {
         log_error(|| {
-            let mut writer = self.writer.lock()
+            let mut writer = self
+                .writer
+                .lock()
                 .map_err(|err| format_err!("{}", err))
                 .context("writer is poisoned")?;
 
@@ -90,16 +91,18 @@ impl EventHandler for VoiceChannelTracker {
                     continue;
                 }
 
-                writer.serialize(Row {
-                    timestamp: now,
-                    channel_id: channel.id,
-                    channel_name: &channel.name,
-                    user_count: user_count_for(&guild, channel.id),
-                    event: Event::GuildReady,
-                })
+                writer
+                    .serialize(Row {
+                        timestamp: now,
+                        channel_id: channel.id,
+                        channel_name: &channel.name,
+                        user_count: user_count_for(&guild, channel.id),
+                        event: Event::GuildReady,
+                    })
                     .context("failed to append to the voice channel log")?;
             }
-            writer.flush()
+            writer
+                .flush()
                 .context("failed to flush the voice channel log")?;
 
             Ok(())
@@ -118,18 +121,22 @@ impl EventHandler for VoiceChannelTracker {
                 None => bail!("failed to get the guild for the channel {:?}", channel.name),
             };
 
-            let mut writer = self.writer.lock()
-                    .map_err(|err| format_err!("{}", err))
-                    .context("writer is poisoned")?;
-            writer.serialize(Row {
-                timestamp: Utc::now(),
-                channel_id: channel.id,
-                channel_name: &channel.name,
-                user_count: user_count_for(&guild.read(), channel.id),
-                event: Event::Create,
-            })
+            let mut writer = self
+                .writer
+                .lock()
+                .map_err(|err| format_err!("{}", err))
+                .context("writer is poisoned")?;
+            writer
+                .serialize(Row {
+                    timestamp: Utc::now(),
+                    channel_id: channel.id,
+                    channel_name: &channel.name,
+                    user_count: user_count_for(&guild.read(), channel.id),
+                    event: Event::Create,
+                })
                 .context("failed to append to the voice channel log")?;
-            writer.flush()
+            writer
+                .flush()
                 .context("failed to flush the voice channel log")?;
 
             Ok(())
@@ -154,21 +161,25 @@ impl EventHandler for VoiceChannelTracker {
                 None => bail!("failed to get the guild for the channel {:?}", channel.name),
             };
 
-            let mut writer = self.writer.lock()
-                    .map_err(|err| format_err!("{}", err))
-                    .context("writer is poisoned")?;
+            let mut writer = self
+                .writer
+                .lock()
+                .map_err(|err| format_err!("{}", err))
+                .context("writer is poisoned")?;
 
-            writer.serialize(Row {
-                timestamp: Utc::now(),
-                channel_id: channel.id,
-                channel_name: &channel.name,
-                user_count: user_count_for(&guild.read(), channel.id),
-                event: Event::Update,
-            })
+            writer
+                .serialize(Row {
+                    timestamp: Utc::now(),
+                    channel_id: channel.id,
+                    channel_name: &channel.name,
+                    user_count: user_count_for(&guild.read(), channel.id),
+                    event: Event::Update,
+                })
                 .context("failed to append to the voice channel log")?;
-            writer.flush()
+            writer
+                .flush()
                 .context("failed to flush the voice channel log")?;
-            
+
             Ok(())
         });
     }
@@ -185,29 +196,41 @@ impl EventHandler for VoiceChannelTracker {
                 None => bail!("failed to get the guild for the channel {:?}", channel.name),
             };
 
-            let mut writer = self.writer.lock()
-                    .map_err(|err| format_err!("{}", err))
-                    .context("writer is poisoned")?;
-            writer.serialize(Row {
-                timestamp: Utc::now(),
-                channel_id: channel.id,
-                channel_name: &channel.name,
-                user_count: user_count_for(&guild.read(), channel.id),
-                event: Event::Delete,
-            })
+            let mut writer = self
+                .writer
+                .lock()
+                .map_err(|err| format_err!("{}", err))
+                .context("writer is poisoned")?;
+            writer
+                .serialize(Row {
+                    timestamp: Utc::now(),
+                    channel_id: channel.id,
+                    channel_name: &channel.name,
+                    user_count: user_count_for(&guild.read(), channel.id),
+                    event: Event::Delete,
+                })
                 .context("failed to append to the voice channel log")?;
-            writer.flush()
+            writer
+                .flush()
                 .context("failed to flush the voice channel log")?;
 
             Ok(())
         });
     }
 
-    fn voice_state_update(&self, _ctx: Context, guild: Option<GuildId>, old: Option<VoiceState>, new: VoiceState) {
+    fn voice_state_update(
+        &self,
+        _ctx: Context,
+        guild: Option<GuildId>,
+        old: Option<VoiceState>,
+        new: VoiceState,
+    ) {
         log_error(|| {
-            let mut writer = self.writer.lock()
-                        .map_err(|err| format_err!("{}", err))
-                        .context("writer is poisoned")?;
+            let mut writer = self
+                .writer
+                .lock()
+                .map_err(|err| format_err!("{}", err))
+                .context("writer is poisoned")?;
 
             let guild = match guild {
                 Some(guild) => guild,
@@ -228,8 +251,8 @@ impl EventHandler for VoiceChannelTracker {
                     Some(guild) => guild,
                     None => {
                         eprintln!("failed to get the guild {:?}", guild);
-                        continue
-                    },
+                        continue;
+                    }
                 };
                 let guild = guild.read();
 
@@ -239,18 +262,20 @@ impl EventHandler for VoiceChannelTracker {
                 };
                 let channel = channel.read();
 
-                writer.serialize(Row {
-                    timestamp: now,
-                    channel_id,
-                    channel_name: &channel.name,
-                    user_count: user_count_for(&guild, channel_id),
-                    event: Event::StateUpdate,
-                })
+                writer
+                    .serialize(Row {
+                        timestamp: now,
+                        channel_id,
+                        channel_name: &channel.name,
+                        user_count: user_count_for(&guild, channel_id),
+                        event: Event::StateUpdate,
+                    })
                     .context("failed to append to the voice channel log")?;
             }
-            writer.flush()
-                    .context("failed to flush the voice channel log")?;
-            
+            writer
+                .flush()
+                .context("failed to flush the voice channel log")?;
+
             Ok(())
         });
     }
