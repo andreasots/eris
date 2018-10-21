@@ -5,6 +5,8 @@ use crate::rpc::LRRbot;
 use crate::PgPool;
 use diesel::OptionalExtension;
 use failure::{Error, ResultExt, SyncFailure};
+use slog::slog_error;
+use slog_scope::error;
 use std::fmt::{self, Display};
 
 struct StreamUp {
@@ -82,6 +84,6 @@ pub async fn stream_up(config: &Config, pg_pool: PgPool, data: Channel) {
 
     match await!(stream_up_inner(config, &mut lrrbot, pg_pool, data)) {
         Ok(()) => (),
-        Err(err) => eprintln!("failed to post a stream up announcement: {:?}", err),
+        Err(err) => error!("Failed to post a stream up announcement"; "error" => ?err),
     }
 }

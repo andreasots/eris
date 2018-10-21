@@ -5,6 +5,8 @@ use futures::compat::{Future01CompatExt, Stream01CompatExt};
 use futures::prelude::*;
 use futures::select;
 use serde_json::Value;
+use slog::slog_error;
+use slog_scope::error;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tokio;
@@ -106,7 +108,7 @@ impl Client {
                             sink = match await!(sink.send((request_id, request)).compat()) {
                                 Ok(sink) => sink,
                                 Err(err) => {
-                                    eprintln!("failed to send the request: {:?}", err);
+                                    error!("Failed to send the request"; "error" => ?err);
                                     return;
                                 },
                             };
@@ -122,7 +124,7 @@ impl Client {
                             }
                         },
                         Some(Err(err)) => {
-                            eprintln!("failed to read a response: {:?}", err);
+                            error!("Failed to read a response"; "error" => ?err);
                             return;
                         },
                         None => return,

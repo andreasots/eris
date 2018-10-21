@@ -5,6 +5,8 @@ use egg_mode::{Response, Token};
 use failure::{Error, ResultExt, SyncFailure};
 use futures::compat::{Future01CompatExt, Stream01CompatExt};
 use futures::prelude::*;
+use slog::slog_error;
+use slog_scope::error;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
@@ -130,7 +132,7 @@ pub async fn post_tweets(config: Arc<Config>, pg_pool: PgPool, handle: Handle) {
     let (token, users) = match await!(init(&config, &handle)) {
         Ok((token, users)) => (token, users),
         Err(err) => {
-            eprintln!("failed to initialize the tweet announcer: {:?}", err);
+            error!("failed to initialize the tweet announcer"; "error" => ?err);
             return;
         }
     };
@@ -141,10 +143,10 @@ pub async fn post_tweets(config: Arc<Config>, pg_pool: PgPool, handle: Handle) {
         match await!(timer.try_next()) {
             Ok(Some(_)) => match await!(inner(&config, &pg_pool, &handle, &token, &users)) {
                 Ok(()) => (),
-                Err(err) => eprintln!("failed to announce new tweets: {:?}", err),
+                Err(err) => error!("Failed to announce new tweets"; "error" => ?err),
             },
             Ok(None) => break,
-            Err(err) => eprintln!("timer error: {:?}", err),
+            Err(err) => error!("Timer error"; "error" => ?err),
         }
     }
 }

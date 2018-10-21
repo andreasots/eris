@@ -12,6 +12,8 @@ use diesel::OptionalExtension;
 use failure::{Error, ResultExt, SyncFailure};
 use futures::compat::Stream01CompatExt;
 use futures::prelude::*;
+use slog::slog_error;
+use slog_scope::error;
 use std::fmt;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -67,11 +69,11 @@ pub async fn autotopic(config: Arc<Config>, helix: Helix, calendar: Calendar, pg
         match await!(timer.try_next()) {
             Ok(Some(_)) => match await!(autotopic.update_topic()) {
                 Ok(()) => (),
-                Err(err) => eprintln!("failed to update the topic: {:?}", err),
+                Err(err) => error!("Failed to update the topic"; "error" => ?err),
             },
             Ok(None) => break,
             Err(err) => {
-                eprintln!("timer error: {:?}", err);
+                error!("Timer error"; "error" => ?err);
             }
         }
     }

@@ -17,6 +17,8 @@ extern crate diesel;
 use failure::ResultExt;
 
 use futures::future::{FutureExt, TryFutureExt};
+use slog::{o, slog_info, Drain};
+use slog_scope::info;
 
 mod aiomas;
 mod announcements;
@@ -29,6 +31,7 @@ mod models;
 mod rpc;
 mod schema;
 mod service;
+mod stdlog;
 mod time;
 mod twitch;
 mod voice_channel_tracker;
@@ -36,10 +39,47 @@ mod voice_channel_tracker;
 type PgPool = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<diesel::pg::PgConnection>>;
 
 fn main() -> Result<(), failure::Error> {
+    let decorator = slog_term::TermDecorator::new().build();
+    let term_drain = slog_term::FullFormat::new(decorator)
+        .build()
+        .filter_level(slog::Level::Info)
+        .fuse();
+
+    let limited_log = std::fs::OpenOptions::new()
+        .write(true)
+        .append(true)
+        .create(true)
+        .open("eris.log")
+        .context("failed to open the log file")?;
+    let debug_log = std::fs::OpenOptions::new()
+        .write(true)
+        .append(true)
+        .create(true)
+        .open("eris.debug.log")
+        .context("failed to open the debug log file")?;
+
+    let decorator = slog_term::PlainDecorator::new(limited_log);
+    let limited_drain = slog_term::FullFormat::new(decorator)
+        .build()
+        .filter_level(slog::Level::Info)
+        .fuse();
+
+    let decorator = slog_term::PlainDecorator::new(debug_log);
+    let full_drain = slog_term::FullFormat::new(decorator).build().fuse();
+    let file_drain = slog::Duplicate::new(limited_drain, full_drain);
+
+    let drain = slog::Duplicate::new(term_drain, file_drain).fuse();
+    let drain = slog_async::Async::new(drain).build().fuse();
+    let logger = slog::Logger::root(drain, o!());
+    let _handle = slog_scope::set_global_logger(logger);
+    log::set_logger(&stdlog::LOGGER)
+        .context("failed to redirect logs from the standard log crate")?;
+    log::set_max_level(log::LevelFilter::max());
+
+    info!("aaaa"; "max_log_level" => ?log::max_level());
+
     // TODO: determine if it should be something else. 10 ms is too short for some reason.
     serenity::CACHE.write().settings_mut().cache_lock_time = None;
-
-    simple_logger::init().unwrap();
 
     let matches = clap::App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
@@ -88,7 +128,13 @@ fn main() -> Result<(), failure::Error> {
                     .case_insensitivity(true)
             })
             .before(|_, message, command_name| {
-                println!("Got {:?} from {}", command_name, message.author.name);
+                info!("Command received";
+                    "command_name" => ?command_name,
+                    "message" => ?&message.content,
+                    "from.id" => ?message.author.id.0,
+                    "from.name" => ?&message.author.name,
+                    "from.discriminator" => ?message.author.discriminator,
+                );
                 true
             })
             .help(serenity::framework::standard::help_commands::with_embeds)

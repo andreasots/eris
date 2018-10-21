@@ -6,6 +6,8 @@ use serde_derive::Serialize;
 use serenity::model::prelude::*;
 use serenity::prelude::*;
 use serenity::CACHE;
+use slog::slog_error;
+use slog_scope::error;
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{Seek, SeekFrom};
@@ -69,7 +71,7 @@ fn user_count_for(guild: &Guild, channel: ChannelId) -> u64 {
 fn log_error<F: FnOnce() -> Result<(), Error>>(f: F) {
     match f() {
         Ok(()) => (),
-        Err(err) => eprintln!("error in event handler: {:?}", err),
+        Err(err) => error!("Error in event handler"; "error" => ?err),
     }
 }
 
@@ -250,7 +252,7 @@ impl EventHandler for VoiceChannelTracker {
                 let guild = match cache.guilds.get(&guild) {
                     Some(guild) => guild,
                     None => {
-                        eprintln!("failed to get the guild {:?}", guild);
+                        error!("Failed to get the guild"; "guild" => ?guild.0);
                         continue;
                     }
                 };

@@ -5,6 +5,8 @@ use futures::compat::{Future01CompatExt, Stream01CompatExt};
 use futures::future::FutureObj;
 use futures::prelude::*;
 use serde_json::Value;
+use slog::slog_error;
+use slog_scope::error;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
@@ -100,7 +102,7 @@ impl Server {
                     );
                 }
                 Ok(None) => return,
-                Err(err) => eprintln!("failed to accept an incoming connection: {:?}", err),
+                Err(err) => error!("Failed to accept an incoming connection"; "error" => ?err),
             }
         }
     }
@@ -126,7 +128,7 @@ impl Server {
                             sink = match await!(sink.send(response).compat()) {
                                 Ok(sink) => sink,
                                 Err(err) => {
-                                    eprintln!("failed to send a response: {:?}", err);
+                                    error!("Failed to send a response"; "error" => ?err);
                                     break;
                                 }
                             };
@@ -166,7 +168,7 @@ impl Server {
                 }
                 Ok(None) => break,
                 Err(err) => {
-                    eprintln!("failed to read a request: {:?}", err);
+                    error!("Failed to read a request"; "error" => ?err);
                     break;
                 }
             }

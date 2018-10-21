@@ -3,6 +3,8 @@ use crate::config::Config;
 use failure::{self, Error, ResultExt, SyncFailure};
 use serenity::model::prelude::*;
 use serenity::CACHE;
+use slog::{slog_error, slog_info};
+use slog_scope::{error, info};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
@@ -42,7 +44,7 @@ fn reap_channels(config: &Config) -> Result<(), Error> {
         if (now - created_at).to_std()? > Duration::from_secs(15 * 60)
             && voice_users.get(&channel.id).cloned().unwrap_or(0) == 0
         {
-            println!("Deleting {:?}", channel.name);
+            info!("Deleting a channel"; "channel.name" => ?channel.name);
             channel
                 .delete()
                 .map_err(SyncFailure::new)
@@ -57,7 +59,7 @@ pub fn channel_reaper(config: Arc<Config>) -> impl FnOnce() {
     move || loop {
         match reap_channels(&config) {
             Ok(()) => (),
-            Err(err) => println!("failed to reap channels: {:?}", err),
+            Err(err) => error!("Failed to reap channels"; "error" => ?err),
         }
         thread::sleep(Duration::from_secs(60));
     }
