@@ -13,7 +13,7 @@ script:
 before_deploy:
   - git config --local user.name "LRRbot"
   - git config --local user.email "lrrbot@qrpth.eu"
-  - git tag v$(cargo read-manifest | python3 -c "import json; print(json.loads(input())['version'])")-r$TRAVIS_BUILD_NUMBER
+  - git tag v$(cargo read-manifest | python3 -c "import json; print(json.loads(input())['version'])")-pre.$TRAVIS_BUILD_NUMBER
 deploy:
   provider: releases
   api_key:
