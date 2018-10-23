@@ -5,3 +5,21 @@ branches:
     - master
 language: rust
 cache: cargo
+script:
+  - cargo build --verbose --all
+  - cargo test --verbose --all
+  - cargo build --release --all
+before_deploy:
+  - git config --local user.name "LRRbot"
+  - git config --local user.email "lrrbot@qrpth.eu"
+  - git tag v$(cargo read-manifest | python3 -c "import json; print(json.loads(input())['version'])")-$(git rev-parse --short HEAD)
+deploy:
+  provider: releases
+  api_key:
+    secure: tkYn8uWW8p0yhXL7M7Fc30rTNF55h50ruMxlMU7Knu0lBfS58mU2w2fQsrE6Eb2U/tIy9MgAZhr4aW7bAhr4a1t6aRLSbZE71NWFooeSulNlJawkbNsdvvHa+H42L2qldkN6Hc34JO3ZGJzDrxTqgTiJ8v8qldv81utEcFbRBjwcFQMdRXjHfe59vQp7sb0pNkKq8aPdB553pQoTTqstCriPb9hYAlVILr+/uwDlW9oeAZFG2JRv7adcCpZLWgv4w6/QD4gz19CfYQiBOSALq/WjS129bvN3I+L8ETh6o3YVLpiuZLg9eOwxHn2N3eYmdCOZo1mHutQFHudQ/8ZZHT4MDftDXIFtCPHcJ8bfeTVm3zvP8DY5UT2BJefLQJEcvSOzj77mXIsPzPWw0rj/VmxgGAHFBVgtVlNDQNooVY4I7H9VNgSSgjoNV8DOTWHUrqZdH1wbVPz8HPZoAKh6rNJBTyraeuHUD4i05iN/YrfgeT3p65Fj5nD4DTCBhO2NrxgVhy73yuiA5P+pd/WWYib1XSImtzQerM3iJo5KTxuPjQYNxjsG0h22iBLyuuBe8fxsbonxg8tmX2RBf/XaNnpJ5pSbCo+yVfok3yRet03Sq4ry5Jr1v16k1MHUia0bn0R9N4MENSHsJeKL/H3vpVuOv34ha+oVlpxJP01U9dU=
+  file: target/release/eris
+  prerelease: true
+  on:
+    repo: andreasots/eris
+    branch: master
+  skip-cleanup: true
