@@ -4,3 +4,4 @@ branches:
     - trying
     - master
 language: rust
+cache: cargo
