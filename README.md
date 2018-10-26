@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/andreasots/eris.svg?branch=master)](https://travis-ci.com/andreasots/eris) [![Dependabot Status](https://api.dependabot.com/badges/status?host=github&repo=andreasots/eris)](https://dependabot.com)
+
 # eris
 LRRbot's Discord part but in Rust because discord.py sucks out loud.
 
