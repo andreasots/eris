@@ -18,7 +18,7 @@ egg-mode = "0.12.0"
 failure = "0.1.2"
 futures-preview = { version = "0.3.0-alpha.8", features = ["compat"] }
 log = { version = "0.4.4", features = ["max_level_trace", "release_max_level_info"] }
-reqwest = "0.9.2"
+reqwest = "0.9.4"
 rust-ini = "0.13.0"
 serde = "1.0.71"
 serde_derive = "1.0.71"
