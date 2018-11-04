@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
 use crate::config::Config;
+use crate::desertbus::DesertBus;
 use crate::google_calendar::{Calendar, Event, LRR};
 use crate::models::{Game, GameEntry, Show};
 use crate::rpc::LRRbot;
@@ -12,14 +13,13 @@ use diesel::OptionalExtension;
 use failure::{Error, ResultExt, SyncFailure};
 use futures::compat::Stream01CompatExt;
 use futures::prelude::*;
+use separator::FixedPlaceSeparatable;
 use slog::slog_error;
 use slog_scope::error;
 use std::fmt;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;
-use crate::desertbus::DesertBus;
-use separator::FixedPlaceSeparatable;
 
 struct ShortDisplay<'a> {
     event: &'a Event,
@@ -55,7 +55,13 @@ impl<'a> fmt::Display for ShortDisplay<'a> {
     }
 }
 
-pub async fn autotopic(config: Arc<Config>, helix: Helix, calendar: Calendar, desertbus: DesertBus, pg_pool: PgPool) {
+pub async fn autotopic(
+    config: Arc<Config>,
+    helix: Helix,
+    calendar: Calendar,
+    desertbus: DesertBus,
+    pg_pool: PgPool,
+) {
     let lrrbot = LRRbot::new(&config);
     let mut autotopic = Autotopic {
         config,
@@ -208,13 +214,20 @@ impl Autotopic {
                 Err(err) => {
                     messages.push(String::from("DESERT BUS!"));
                     return messages;
-                },
+                }
             };
             let total_hours = DesertBus::hours_raised(money_raised) as i64;
             if now <= start + chrono::Duration::hours(total_hours) {
                 messages.push(String::from("DESERT BUS!"));
-                messages.push(format!("${} raised.", money_raised.separated_string_with_fixed_place(2)));
-                messages.push(format!("{} of {} hours bussed.", (now - start).num_hours(), total_hours));
+                messages.push(format!(
+                    "${} raised.",
+                    money_raised.separated_string_with_fixed_place(2)
+                ));
+                messages.push(format!(
+                    "{} of {} hours bussed.",
+                    (now - start).num_hours(),
+                    total_hours
+                ));
             }
         }
 

@@ -68,27 +68,24 @@ impl Calendar {
         calendar: &'a str,
         after: DateTime<Tz>,
     ) -> Result<Vec<Event>, Error> {
-        Ok(await!(
-            await!(
-                self.client
-                    .get(&format!(
-                        "https://www.googleapis.com/calendar/v3/calendars/{}/events",
-                        calendar
-                    ))
-                    .query(&ListEventsRequest {
-                        maxResults: 10,
-                        orderBy: "startTime",
-                        singleEvents: true,
-                        timeMin: after,
-                        key: &self.config.google_key,
-                    })
-                    .send()
-                    .compat()
-            )
-            .context("failed to get calendar events")?
-            .json::<ListEventsResponse>()
-            .compat()
-        )
+        Ok(await!(await!(self
+            .client
+            .get(&format!(
+                "https://www.googleapis.com/calendar/v3/calendars/{}/events",
+                calendar
+            ))
+            .query(&ListEventsRequest {
+                maxResults: 10,
+                orderBy: "startTime",
+                singleEvents: true,
+                timeMin: after,
+                key: &self.config.google_key,
+            })
+            .send()
+            .compat())
+        .context("failed to get calendar events")?
+        .json::<ListEventsResponse>()
+        .compat())
         .context("failed to parse calendar events")?
         .items)
     }

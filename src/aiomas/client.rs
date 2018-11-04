@@ -36,9 +36,10 @@ impl NewClient {
     }
 
     pub async fn new_client(&self) -> Result<Client, Error> {
-        Ok(Client::from_stream(await!(
-            UnixStream::connect(&self.path).compat()
-        )?))
+        Ok(Client::from_stream(await!(UnixStream::connect(
+            &self.path
+        )
+        .compat())?))
     }
 }
 

@@ -66,16 +66,13 @@ impl Kraken {
             if let Some(ref token) = token {
                 req = req.header(AUTHORIZATION, token.clone());
             }
-            let value = await!(
-                await!(
-                    req.query(&[("offset", &format!("{}", data.len())[..]), ("limit", "25")])
-                        .send()
-                        .compat()
-                )
-                .context("failed to send the request")?
-                .json::<Value>()
-                .compat()
-            )
+            let value = await!(await!(req
+                .query(&[("offset", &format!("{}", data.len())[..]), ("limit", "25")])
+                .send()
+                .compat())
+            .context("failed to send the request")?
+            .json::<Value>()
+            .compat())
             .context("failed to parse the response")?;
             data.extend(
                 value
@@ -86,10 +83,11 @@ impl Kraken {
                     .context("failed to parse results")?,
             );
 
-            if data.len() as u64 >= value
-                .get("_total")
-                .and_then(Value::as_u64)
-                .ok_or_else(|| failure::err_msg("'_total' missing or not an integer"))?
+            if data.len() as u64
+                >= value
+                    .get("_total")
+                    .and_then(Value::as_u64)
+                    .ok_or_else(|| failure::err_msg("'_total' missing or not an integer"))?
             {
                 break;
             }

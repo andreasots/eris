@@ -71,10 +71,13 @@ fn main() -> Result<(), failure::Error> {
 
     let drain = slog::Duplicate::new(term_drain, file_drain).fuse();
     let drain = slog_async::Async::new(drain).build().fuse();
-    let logger = slog::Logger::root(drain, o!(
+    let logger = slog::Logger::root(
+        drain,
+        o!(
         "version" => env!("CARGO_PKG_VERSION"),
         "build" => option_env!("TRAVIS_BUILD_NUMBER").unwrap_or("local build")
-    ));
+    ),
+    );
     let _handle = slog_scope::set_global_logger(logger);
     log::set_logger(&stdlog::LOGGER)
         .context("failed to redirect logs from the standard log crate")?;

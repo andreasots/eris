@@ -95,23 +95,20 @@ impl Helix {
     }
 
     pub async fn get_stream<'a>(&'a self, user: User<'a>) -> Result<Option<Stream>, Error> {
-        Ok(await!(
-            await!(
-                self.client
-                    .get("https://api.twitch.tv/helix/streams")
-                    .header(
-                        "Client-ID",
-                        HeaderValue::from_str(&self.config.twitch_client_id)
-                            .context("failed to set the client ID")?
-                    )
-                    .query(&user.as_query()[..])
-                    .send()
-                    .compat()
+        Ok(await!(await!(self
+            .client
+            .get("https://api.twitch.tv/helix/streams")
+            .header(
+                "Client-ID",
+                HeaderValue::from_str(&self.config.twitch_client_id)
+                    .context("failed to set the client ID")?
             )
-            .context("failed to send the request")?
-            .json::<PaginatedResponse<Stream>>()
-            .compat()
-        )
+            .query(&user.as_query()[..])
+            .send()
+            .compat())
+        .context("failed to send the request")?
+        .json::<PaginatedResponse<Stream>>()
+        .compat())
         .context("failed to read the response")?
         .data
         .pop())

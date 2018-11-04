@@ -1,10 +1,10 @@
+use chrono::{DateTime, Duration, TimeZone};
 use chrono_tz::America::Vancouver as TIMEZONE;
 use chrono_tz::Tz;
-use chrono::{DateTime, Duration, TimeZone};
-use reqwest::r#async::Client;
 use failure::{Error, ResultExt};
-use serde_derive::Deserialize;
 use futures::compat::Future01CompatExt;
+use reqwest::r#async::Client;
+use serde_derive::Deserialize;
 
 #[derive(Deserialize)]
 struct Init {
@@ -20,9 +20,7 @@ impl DesertBus {
     pub const MULTIPLIER: f64 = 1.07;
 
     pub fn new(client: Client) -> DesertBus {
-        DesertBus {
-            client,
-        }
+        DesertBus { client }
     }
 
     pub fn start_time() -> DateTime<Tz> {
@@ -37,13 +35,21 @@ impl DesertBus {
         // MULTIPLIER.pow(hours) = money_raised / FIRST_HOUR * (MULTIPLIER - 1.0) + 1.0
         // hours = (money_raised / FIRST_HOUR * (MULTIPLIER - 1.0) + 1.0).log(MULTIPLIER)
 
-        (money_raised / DesertBus::FIRST_HOUR * (DesertBus::MULTIPLIER - 1.0) + 1.0).log(DesertBus::MULTIPLIER).floor()
+        (money_raised / DesertBus::FIRST_HOUR * (DesertBus::MULTIPLIER - 1.0) + 1.0)
+            .log(DesertBus::MULTIPLIER)
+            .floor()
     }
 
     pub async fn money_raised(&self) -> Result<f64, Error> {
-        let mut res = await!(self.client.get("https://desertbus.org/wapi/init").send().compat())
-            .context("failed to get the current Desert Bus total")?;
-        let total = await!(res.json::<Init>().compat()).context("failed to parse the current Desert Bus total")?.total;
+        let mut res = await!(self
+            .client
+            .get("https://desertbus.org/wapi/init")
+            .send()
+            .compat())
+        .context("failed to get the current Desert Bus total")?;
+        let total = await!(res.json::<Init>().compat())
+            .context("failed to parse the current Desert Bus total")?
+            .total;
         Ok(total)
     }
 }
