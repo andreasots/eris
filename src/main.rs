@@ -26,6 +26,7 @@ mod autotopic;
 mod channel_reaper;
 mod commands;
 mod config;
+mod desertbus;
 mod google_calendar;
 mod models;
 mod rpc;
@@ -116,6 +117,8 @@ fn main() -> Result<(), failure::Error> {
 
     let calendar = google_calendar::Calendar::new(http_client.clone(), config.clone());
 
+    let desertbus = desertbus::DesertBus::new(http_client.clone());
+
     let handler = voice_channel_tracker::VoiceChannelTracker::new(&config)
         .context("failed to create the voice channel tracker")?;
 
@@ -205,7 +208,7 @@ fn main() -> Result<(), failure::Error> {
     };
 
     runtime.spawn(
-        autotopic::autotopic(config, helix, calendar, pg_pool)
+        autotopic::autotopic(config, helix, calendar, desertbus, pg_pool)
             .unit_error()
             .boxed()
             .compat(),
