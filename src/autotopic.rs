@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, FixedOffset, Utc};
 use chrono_tz::Tz;
 use crate::config::Config;
 use crate::desertbus::DesertBus;
@@ -37,6 +37,10 @@ impl<'a> fmt::Display for ShortDisplay<'a> {
         }
 
         f.write_str(&self.event.summary)?;
+
+        if let Some(ref location) = self.event.location {
+            write!(f, " ({})", location);
+        }
 
         if let Some(ref desc) = self.event.description {
             // TODO: shorten to 200 characters.
@@ -160,21 +164,24 @@ impl Autotopic {
         } else {
             let now = Utc::now();
 
-            messages.extend(await!(self.desertbus(now)));
-
-            let events = await!(self.calendar.get_upcoming_events(LRR, now))
-                .context("failed to get the next scheduled stream")?;
-            let events = Calendar::get_next_event(&events, now, false);
-            messages.extend(events.iter().map(|event| {
-                format!(
-                    "{}",
-                    ShortDisplay {
-                        event,
-                        now,
-                        tz: self.config.timezone
-                    }
-                )
-            }));
+            let desertbus = await!(self.desertbus(now));
+            if !desertbus.is_empty() {
+                messages.extend(desertbus);
+            } else {
+                let events = await!(self.calendar.get_upcoming_events(LRR, now))
+                    .context("failed to get the next scheduled stream")?;
+                let events = Calendar::get_next_event(&events, now, false);
+                messages.extend(events.iter().map(|event| {
+                    format!(
+                        "{}",
+                        ShortDisplay {
+                            event,
+                            now,
+                            tz: self.config.timezone
+                        }
+                    )
+                }));
+            }
         }
 
         if let Some(advice) = header.advice {
@@ -212,12 +219,35 @@ impl Autotopic {
             let money_raised = match await!(self.desertbus.money_raised()) {
                 Ok(money_raised) => money_raised,
                 Err(err) => {
-                    messages.push(String::from("DESERT BUS!"));
+                    error!("Failed to fetch the current Desert Bus total"; "error" => ?err);
+                    messages.push(String::from("DESERT BUS?"));
                     return messages;
                 }
             };
             let total_hours = DesertBus::hours_raised(money_raised) as i64;
-            if now <= start + chrono::Duration::hours(total_hours) {
+            if now < start {
+                messages.push(format!(
+                    "{}",
+                    ShortDisplay {
+                        event: &Event {
+                            start: start.with_timezone(&FixedOffset::east(0)),
+                            summary: String::from("Desert Bus for Hope"),
+                            end: start.with_timezone(&FixedOffset::east(0))
+                                + chrono::Duration::hours(total_hours),
+                            location: Some(String::from(
+                                "https://desertbus.org/ or https://twitch.tv/desertbus"
+                            )),
+                            description: None,
+                        },
+                        now,
+                        tz: self.config.timezone,
+                    }
+                ));
+                messages.push(format!(
+                    "${} raised.",
+                    money_raised.separated_string_with_fixed_place(2)
+                ));
+            } else if now <= start + chrono::Duration::hours(total_hours) {
                 messages.push(String::from("DESERT BUS!"));
                 messages.push(format!(
                     "${} raised.",
