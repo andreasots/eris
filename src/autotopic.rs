@@ -210,7 +210,7 @@ impl Autotopic {
             .unwrap_or_else(|| String::from("The stream is not live.")))
     }
 
-    async fn desertbus(&mut self, now: DateTime<Utc>, events: &[Event]) -> Vec<String> {
+    async fn desertbus<'a>(&'a mut self, now: DateTime<Utc>, events: &'a [Event]) -> Vec<String> {
         let start = DesertBus::start_time().with_timezone(&Utc);
         let announce_start = start - chrono::Duration::days(2);
         let announce_end = start + chrono::Duration::days(7);
@@ -218,10 +218,11 @@ impl Autotopic {
 
         if announce_start <= now && now <= announce_end {
             if let Some(next_event_start) = events.get(0).map(|event| event.start) {
-                if next_event_start < start {
-                    return;
+                if next_event_start.with_timezone(&Utc) < start {
+                    return messages;
                 }
             }
+
             let money_raised = match await!(self.desertbus.money_raised()) {
                 Ok(money_raised) => money_raised,
                 Err(err) => {
