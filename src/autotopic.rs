@@ -261,7 +261,7 @@ impl Autotopic {
                     money_raised.separated_string_with_fixed_place(2)
                 ));
                 messages.push(format!(
-                    "{} of {} hours bussed.",
+                    "{} of {}+ hours bussed.",
                     (now - start).num_hours(),
                     total_hours
                 ));
