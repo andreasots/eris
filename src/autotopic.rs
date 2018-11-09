@@ -255,14 +255,16 @@ impl Autotopic {
                     money_raised.separated_string_with_fixed_place(2)
                 ));
             } else if now <= start + chrono::Duration::hours(total_hours) {
-                messages.push(String::from("DESERT BUS!"));
+                messages.push(String::from("DESERT BUS! (https://desertbus.org/ or https://twitch.tv/desertbus)"));
                 messages.push(format!(
                     "${} raised.",
                     money_raised.separated_string_with_fixed_place(2)
                 ));
+                let bussed = now - start;
                 messages.push(format!(
-                    "{} of {}+ hours bussed.",
-                    (now - start).num_hours(),
+                    "{}:{} hours of {} so far.",
+                    bussed.num_hours(),
+                    bussed.num_minutes() % 60,
                     total_hours
                 ));
             }
