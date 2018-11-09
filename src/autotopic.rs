@@ -262,7 +262,7 @@ impl Autotopic {
                 ));
                 let bussed = now - start;
                 messages.push(format!(
-                    "{}:{} hours of {} so far.",
+                    "{}:{:02} hours of {} so far.",
                     bussed.num_hours(),
                     bussed.num_minutes() % 60,
                     total_hours
