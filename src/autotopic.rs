@@ -39,7 +39,7 @@ impl<'a> fmt::Display for ShortDisplay<'a> {
         f.write_str(&self.event.summary)?;
 
         if let Some(ref location) = self.event.location {
-            write!(f, " ({})", location);
+            write!(f, " ({})", location)?;
         }
 
         if let Some(ref desc) = self.event.description {
