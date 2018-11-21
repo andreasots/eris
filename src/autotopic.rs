@@ -203,7 +203,7 @@ impl Autotopic {
             .context("failed to get the stream")?
             .map(|stream| {
                 format!(
-                    "The stream has been live for {}",
+                    "The stream has been live for {}.",
                     HumanReadable::new(Utc::now() - stream.started_at.with_timezone(&Utc))
                 )
             })
