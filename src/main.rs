@@ -6,7 +6,8 @@
     existential_type,
     async_await,
     never_type,
-    transpose_result
+    transpose_result,
+    const_slice_len
 )]
 // Remove when Diesel updates.
 #![allow(proc_macro_derive_resolution_fallback)]
