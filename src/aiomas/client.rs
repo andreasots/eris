@@ -59,6 +59,7 @@ impl NewClient {
     }
 }
 
+#[derive(Clone)]
 pub struct Client {
     channel: mpsc::Sender<(Request, oneshot::Sender<Result<Value, Exception>>)>,
 }
@@ -94,11 +95,8 @@ impl Client {
         let mut next_request_id = 0;
 
         loop {
-            let mut new_request = channel.next();
-            let mut new_response = stream.next();
-
             select! {
-                new_request => {
+                new_request = channel.next().fuse() => {
                     match new_request {
                         Some((request, channel)) => {
                             let request_id = next_request_id;
@@ -117,7 +115,7 @@ impl Client {
                         None => return,
                     }
                 },
-                new_response => {
+                new_response = stream.next().fuse() => {
                     match new_response {
                         Some(Ok((request_id, response))) => {
                             if let Some(channel) = pending.remove(&request_id) {
@@ -139,5 +137,56 @@ impl Client {
         let (tx, rx) = oneshot::channel();
         await!(self.channel.send((req, tx)))?;
         Ok(await!(rx)?)
+    }
+}
+
+// TODO: #[cfg(not(unix))]
+#[cfg(all(test, unix))]
+mod tests {
+    use tokio::runtime::Runtime;
+    use failure::{Error, ResultExt};
+    use super::Client;
+    use std::collections::HashMap;
+    use serde_json::Value;
+    use futures::prelude::*;
+    use futures::poll;
+    use pin_utils::pin_mut;
+    use tokio::net::UnixStream;
+    use tokio::io;
+    use futures::compat::Future01CompatExt;
+
+    #[test]
+    fn smoke_test() {
+        const REQUEST: &[u8] = b"\x00\x00\x00\x14[0,0,[\"test\",[],{}]]\x00\x00\x00\x14[0,1,[\"test\",[],{}]]";
+        const RESPONSE: &[u8] = b"\x00\x00\x00\x09[1, 1, 1]\x00\x00\x00\x09[1, 0, 0]";
+
+        let mut runtime = Runtime::new().unwrap();
+        runtime.block_on::<_, (), Error>(async move {
+            let (read, mut write) = UnixStream::pair().context("failed to create a socket pair")?;
+            
+            let mut client = Client::from_stream(read);
+            let mut client2 = client.clone();
+
+            let first = client2.call((String::from("test"), vec![], HashMap::new()));
+            let second = client.call((String::from("test"), vec![], HashMap::new()));
+
+            pin_mut!(first);
+            pin_mut!(second);
+
+            poll!(&mut first);
+            poll!(&mut second);
+
+            let mut buf = [0; REQUEST.len()];
+            await!(io::read_exact(&mut write, &mut buf[..]).compat())
+                .context("failed to read request")?;
+            assert_eq!(&buf[..], REQUEST);
+            await!(io::write_all(&mut write, RESPONSE).compat())
+                .context("failed to write response")?;
+
+            assert_eq!(await!(first).context("first")?, Ok(Value::Number(0.into())));
+            assert_eq!(await!(second).context("second")?, Ok(Value::Number(1.into())));
+
+            Ok(())
+        }.boxed().compat()).unwrap();
     }
 }

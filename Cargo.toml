@@ -34,3 +34,6 @@ tokio-core = "0.1.17"
 
 [patch.crates-io]
 serenity = { git = "https://github.com/andreasots/serenity", branch = "old-voice-state" }
+
+[dev-dependencies]
+pin-utils = "0.1.0-alpha.3"
