@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration, TimeZone};
+use chrono::{DateTime, TimeZone};
 use chrono_tz::America::Vancouver as TIMEZONE;
 use chrono_tz::Tz;
 use failure::{Error, ResultExt};

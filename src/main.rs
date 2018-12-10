@@ -18,8 +18,8 @@ extern crate diesel;
 use failure::ResultExt;
 
 use futures::future::{FutureExt, TryFutureExt};
-use slog::{o, slog_info, Drain};
-use slog_scope::info;
+use slog::{o, slog_error, slog_info, Drain};
+use slog_scope::{error, info};
 
 mod aiomas;
 mod announcements;
@@ -84,8 +84,6 @@ fn main() -> Result<(), failure::Error> {
         .context("failed to redirect logs from the standard log crate")?;
     log::set_max_level(log::LevelFilter::max());
 
-    info!("aaaa"; "max_log_level" => ?log::max_level());
-
     // TODO: determine if it should be something else. 10 ms is too short for some reason.
     serenity::CACHE.write().settings_mut().cache_lock_time = None;
 
@@ -141,11 +139,23 @@ fn main() -> Result<(), failure::Error> {
                 info!("Command received";
                     "command_name" => ?command_name,
                     "message" => ?&message.content,
+                    "message.id" => ?message.id.0,
                     "from.id" => ?message.author.id.0,
                     "from.name" => ?&message.author.name,
                     "from.discriminator" => ?message.author.discriminator,
                 );
                 true
+            })
+            .after(|_, message, command_name, result| {
+                if let Err(err) = result {
+                    error!("Command resulted in an unexpected error";
+                        "command_name" => ?command_name,
+                        "message.id" => ?message.id.0,
+                        "error" => ?err,
+                    );
+
+                    let _ = message.reply(&format!("Command resulted in an unexpected error: {}.", err.0));
+                }
             })
             .help(serenity::framework::standard::help_commands::with_embeds)
             .command("live", |c| {
