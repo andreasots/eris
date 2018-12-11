@@ -157,6 +157,7 @@ fn main() -> Result<(), failure::Error> {
                     let _ = message.reply(&format!("Command resulted in an unexpected error: {}.", err.0));
                 }
             })
+            .unrecognised_command(commands::static_response::static_response(config.clone()))
             .help(serenity::framework::standard::help_commands::with_embeds)
             .command("live", |c| {
                 c.desc("Post the currently live fanstreamers.")
