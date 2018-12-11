@@ -9,15 +9,17 @@ edition = "2018"
 [dependencies]
 byteorder = "1.2.7"
 bytes = "0.4.11"
-chrono = "0.4.5"
+chrono = "0.4.6"
 chrono-tz = "0.5.0"
 clap = "2.32.0"
 csv = "1.0.2"
-diesel = { version = "1.3.2", features = ["postgres", "r2d2", "serde_json"] }
+diesel = { version = "1.3.3", features = ["postgres", "r2d2", "serde_json"] }
 egg-mode = "0.12.0"
-failure = "0.1.2"
+failure = "0.1.3"
 futures-preview = { version = "0.3.0-alpha.10", features = ["compat"] }
 log = { version = "0.4.6", features = ["max_level_trace", "release_max_level_info"] }
+rand = "0.6.1"
+regex = "1.1.0"
 reqwest = "0.9.5"
 rust-ini = "0.13.0"
 separator = "0.4.0"
@@ -29,6 +31,7 @@ slog = { version = "2.4.1", features = ["max_level_trace", "release_max_level_de
 slog-async = "2.3.0"
 slog-scope = "4.0.1"
 slog-term = "2.4.0"
+strfmt = "0.1.6"
 tokio = "0.1.13"
 tokio-core = "0.1.17"
 
