@@ -130,7 +130,7 @@ fn main() -> Result<(), failure::Error> {
     client.with_framework(
         serenity::framework::StandardFramework::new()
             .configure(|c| {
-                c.prefix("!")
+                c.prefix(&config.command_prefix)
                     .allow_whitespace(true)
                     .on_mention(true)
                     .case_insensitivity(true)
@@ -158,7 +158,11 @@ fn main() -> Result<(), failure::Error> {
                 }
             })
             .unrecognised_command(commands::static_response::static_response(config.clone()))
-            .help(serenity::framework::standard::help_commands::with_embeds)
+            .customised_help(serenity::framework::standard::help_commands::with_embeds, |h| {
+                let help_url = config.site_url.join("help#help-section-text")
+                    .expect("failed to construct the simple text response command help URL");
+                h.individual_command_tip(&format!("To get help with an individual command, pass its name as an argument to this command. Simple text response commands (like `!advice`) are not listed here, for those see <{}>.", help_url))
+            })
             .command("live", |c| {
                 c.desc("Post the currently live fanstreamers.")
                     .help_available(true)

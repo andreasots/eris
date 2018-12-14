@@ -34,6 +34,7 @@ slog-term = "2.4.0"
 strfmt = "0.1.6"
 tokio = "0.1.13"
 tokio-core = "0.1.17"
+url = "1.7.2"
 
 [patch.crates-io]
 serenity = { git = "https://github.com/andreasots/serenity", branch = "old-voice-state" }

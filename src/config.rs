@@ -5,11 +5,16 @@ use ini::Ini;
 use serenity::model::prelude::*;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use url::Url;
 
 pub struct Config {
     pub username: String,
 
     pub database_url: String,
+
+    pub command_prefix: String,
+
+    pub site_url: Url,
 
     pub timezone: Tz,
 
@@ -56,6 +61,14 @@ impl Config {
                 .get_from(Some("lrrbot"), "postgres")
                 .unwrap_or("postgres:///lrrbot")
                 .into(),
+
+            command_prefix: ini
+                .get_from(Some("lrrbot"), "commandprefix")
+                .unwrap_or("!")
+                .trim()
+                .into(),
+
+            site_url: Url::parse(ini.get_from(Some("lrrbot"), "siteurl").unwrap_or("https://lrrbot.mrphlip.com/")).context("failed to parse `siteurl`")?,
 
             timezone: ini
                 .get_from(Some("lrrbot"), "timezone")
