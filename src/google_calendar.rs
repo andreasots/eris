@@ -1,6 +1,6 @@
+use crate::config::Config;
 use chrono::Duration;
 use chrono::{DateTime, FixedOffset, TimeZone};
-use crate::config::Config;
 use failure::{Error, ResultExt};
 use futures::compat::Future01CompatExt;
 use reqwest::r#async::Client;

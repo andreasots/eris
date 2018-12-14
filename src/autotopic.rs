@@ -1,5 +1,3 @@
-use chrono::{DateTime, FixedOffset, Utc};
-use chrono_tz::Tz;
 use crate::config::Config;
 use crate::desertbus::DesertBus;
 use crate::google_calendar::{Calendar, Event, LRR};
@@ -9,6 +7,8 @@ use crate::time::HumanReadable;
 use crate::twitch::helix::User;
 use crate::twitch::Helix;
 use crate::PgPool;
+use chrono::{DateTime, FixedOffset, Utc};
+use chrono_tz::Tz;
 use diesel::OptionalExtension;
 use failure::{Error, ResultExt, SyncFailure};
 use futures::compat::Stream01CompatExt;
@@ -255,7 +255,9 @@ impl Autotopic {
                     money_raised.separated_string_with_fixed_place(2)
                 ));
             } else if now <= start + chrono::Duration::hours(total_hours) {
-                messages.push(String::from("DESERT BUS! (https://desertbus.org/ or https://twitch.tv/desertbus)"));
+                messages.push(String::from(
+                    "DESERT BUS! (https://desertbus.org/ or https://twitch.tv/desertbus)",
+                ));
                 messages.push(format!(
                     "${} raised.",
                     money_raised.separated_string_with_fixed_place(2)

@@ -1,5 +1,5 @@
-use chrono::{DateTime, FixedOffset};
 use crate::config::Config;
+use chrono::{DateTime, FixedOffset};
 use failure::{Error, ResultExt};
 use futures::compat::Future01CompatExt;
 use reqwest::header::HeaderValue;

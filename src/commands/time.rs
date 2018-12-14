@@ -1,5 +1,5 @@
-use chrono::Utc;
 use crate::config::Config;
+use chrono::Utc;
 use serenity::framework::standard::{Args, Command, CommandError};
 use serenity::model::prelude::*;
 use serenity::prelude::*;

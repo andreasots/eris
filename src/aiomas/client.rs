@@ -143,50 +143,61 @@ impl Client {
 // TODO: #[cfg(not(unix))]
 #[cfg(all(test, unix))]
 mod tests {
-    use tokio::runtime::Runtime;
-    use failure::{Error, ResultExt};
     use super::Client;
-    use std::collections::HashMap;
-    use serde_json::Value;
-    use futures::prelude::*;
-    use futures::poll;
-    use pin_utils::pin_mut;
-    use tokio::net::UnixStream;
-    use tokio::io;
+    use failure::{Error, ResultExt};
     use futures::compat::Future01CompatExt;
+    use futures::poll;
+    use futures::prelude::*;
+    use pin_utils::pin_mut;
+    use serde_json::Value;
+    use std::collections::HashMap;
+    use tokio::io;
+    use tokio::net::UnixStream;
+    use tokio::runtime::Runtime;
 
     #[test]
     fn smoke_test() {
-        const REQUEST: &[u8] = b"\x00\x00\x00\x14[0,0,[\"test\",[],{}]]\x00\x00\x00\x14[0,1,[\"test\",[],{}]]";
+        const REQUEST: &[u8] =
+            b"\x00\x00\x00\x14[0,0,[\"test\",[],{}]]\x00\x00\x00\x14[0,1,[\"test\",[],{}]]";
         const RESPONSE: &[u8] = b"\x00\x00\x00\x09[1, 1, 1]\x00\x00\x00\x09[1, 0, 0]";
 
         let mut runtime = Runtime::new().unwrap();
-        runtime.block_on::<_, (), Error>(async move {
-            let (read, mut write) = UnixStream::pair().context("failed to create a socket pair")?;
-            
-            let mut client = Client::from_stream(read);
-            let mut client2 = client.clone();
+        runtime
+            .block_on::<_, (), Error>(
+                async move {
+                    let (read, mut write) =
+                        UnixStream::pair().context("failed to create a socket pair")?;
 
-            let first = client2.call((String::from("test"), vec![], HashMap::new()));
-            let second = client.call((String::from("test"), vec![], HashMap::new()));
+                    let mut client = Client::from_stream(read);
+                    let mut client2 = client.clone();
 
-            pin_mut!(first);
-            pin_mut!(second);
+                    let first = client2.call((String::from("test"), vec![], HashMap::new()));
+                    let second = client.call((String::from("test"), vec![], HashMap::new()));
 
-            poll!(&mut first);
-            poll!(&mut second);
+                    pin_mut!(first);
+                    pin_mut!(second);
 
-            let mut buf = [0; REQUEST.len()];
-            await!(io::read_exact(&mut write, &mut buf[..]).compat())
-                .context("failed to read request")?;
-            assert_eq!(&buf[..], REQUEST);
-            await!(io::write_all(&mut write, RESPONSE).compat())
-                .context("failed to write response")?;
+                    poll!(&mut first);
+                    poll!(&mut second);
 
-            assert_eq!(await!(first).context("first")?, Ok(Value::Number(0.into())));
-            assert_eq!(await!(second).context("second")?, Ok(Value::Number(1.into())));
+                    let mut buf = [0; REQUEST.len()];
+                    await!(io::read_exact(&mut write, &mut buf[..]).compat())
+                        .context("failed to read request")?;
+                    assert_eq!(&buf[..], REQUEST);
+                    await!(io::write_all(&mut write, RESPONSE).compat())
+                        .context("failed to write response")?;
 
-            Ok(())
-        }.boxed().compat()).unwrap();
+                    assert_eq!(await!(first).context("first")?, Ok(Value::Number(0.into())));
+                    assert_eq!(
+                        await!(second).context("second")?,
+                        Ok(Value::Number(1.into()))
+                    );
+
+                    Ok(())
+                }
+                    .boxed()
+                    .compat(),
+            )
+            .unwrap();
     }
 }

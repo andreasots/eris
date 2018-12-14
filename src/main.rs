@@ -75,9 +75,9 @@ fn main() -> Result<(), failure::Error> {
     let logger = slog::Logger::root(
         drain,
         o!(
-        "version" => env!("CARGO_PKG_VERSION"),
-        "build" => option_env!("TRAVIS_BUILD_NUMBER").unwrap_or("local build")
-    ),
+            "version" => env!("CARGO_PKG_VERSION"),
+            "build" => option_env!("TRAVIS_BUILD_NUMBER").unwrap_or("local build")
+        ),
     );
     let _handle = slog_scope::set_global_logger(logger);
     log::set_logger(&stdlog::LOGGER)

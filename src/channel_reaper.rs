@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use crate::config::Config;
+use chrono::{DateTime, Utc};
 use failure::{self, Error, ResultExt, SyncFailure};
 use serenity::model::prelude::*;
 use serenity::CACHE;

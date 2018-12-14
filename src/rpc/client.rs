@@ -2,8 +2,8 @@ use crate::aiomas::NewClient;
 use crate::config::Config;
 use crate::service::{Reconnect, Retry};
 use failure::{self, Error, ResultExt};
-use serde::{Deserialize, Deserializer};
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Deserializer};
 use serde_derive::Deserialize;
 use serde_json::{self, Value};
 use std::collections::HashMap;
@@ -82,7 +82,11 @@ impl LRRbot {
     }
 
     pub async fn get_data<T: DeserializeOwned>(&mut self, path: Vec<String>) -> Result<T, Error> {
-        let value = await!(self.call("get_data".into(), vec![Value::Array(path.into_iter().map(Value::String).collect())], HashMap::new()))?;
+        let value = await!(self.call(
+            "get_data".into(),
+            vec![Value::Array(path.into_iter().map(Value::String).collect())],
+            HashMap::new()
+        ))?;
         Ok(serde_json::from_value(value).context("failed to deserialize the response")?)
     }
 }

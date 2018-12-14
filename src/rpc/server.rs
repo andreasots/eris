@@ -1,8 +1,8 @@
-use chrono::{DateTime, FixedOffset};
 use crate::aiomas::Server as AiomasServer;
 use crate::announcements;
 use crate::config::Config;
 use crate::PgPool;
+use chrono::{DateTime, FixedOffset};
 use failure::{Error, ResultExt};
 use serde_derive::Deserialize;
 use serde_json::{self, Value};

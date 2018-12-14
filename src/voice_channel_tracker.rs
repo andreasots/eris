@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use crate::config::Config;
+use chrono::{DateTime, Utc};
 use csv::{Writer, WriterBuilder};
 use failure::{bail, format_err, Error, ResultExt};
 use serde_derive::Serialize;

@@ -68,7 +68,11 @@ impl Config {
                 .trim()
                 .into(),
 
-            site_url: Url::parse(ini.get_from(Some("lrrbot"), "siteurl").unwrap_or("https://lrrbot.mrphlip.com/")).context("failed to parse `siteurl`")?,
+            site_url: Url::parse(
+                ini.get_from(Some("lrrbot"), "siteurl")
+                    .unwrap_or("https://lrrbot.mrphlip.com/"),
+            )
+            .context("failed to parse `siteurl`")?,
 
             timezone: ini
                 .get_from(Some("lrrbot"), "timezone")

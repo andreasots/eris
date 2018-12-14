@@ -1,18 +1,18 @@
-use std::sync::Arc;
 use crate::config::Config;
-use serenity::prelude::*;
-use serenity::model::channel::Message;
 use crate::rpc::LRRbot;
+use failure::{Error, ResultExt, SyncFailure};
 use futures::prelude::*;
-use serde_derive::Deserialize;
-use serde::{Deserialize, Deserializer};
-use failure::{Error, SyncFailure, ResultExt};
 use rand::seq::SliceRandom;
-use std::collections::HashMap;
-use serenity::utils::Colour;
-use serenity::model::guild::Emoji;
 use regex::Regex;
+use serde::{Deserialize, Deserializer};
+use serde_derive::Deserialize;
+use serenity::model::channel::Message;
+use serenity::model::guild::Emoji;
+use serenity::prelude::*;
+use serenity::utils::Colour;
 use std::borrow::Cow;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use slog::{slog_error, slog_info};
 use slog_scope::{error, info};
@@ -34,19 +34,31 @@ impl Access {
                 msg.guild()
                     .and_then(|guild| {
                         let guild = guild.read();
-                        
-                        guild.members
-                            .get(&msg.author.id)
-                            .map(|member| member.roles.iter()
-                                .any(|role_id| guild.roles.get(role_id).map(|role| role.colour).unwrap_or_else(Colour::default) != Colour::default()))
+
+                        guild.members.get(&msg.author.id).map(|member| {
+                            member.roles.iter().any(|role_id| {
+                                guild
+                                    .roles
+                                    .get(role_id)
+                                    .map(|role| role.colour)
+                                    .unwrap_or_else(Colour::default)
+                                    != Colour::default()
+                            })
+                        })
                     })
                     .unwrap_or(false)
-            },
-            Access::Mod => {
-                msg.guild()
-                    .and_then(|guild| guild.read().members.get(&msg.author.id).map(|member| member.permissions().map(|p| p.administrator()).unwrap_or(false)))
-                    .unwrap_or(false)
-            },
+            }
+            Access::Mod => msg
+                .guild()
+                .and_then(|guild| {
+                    guild.read().members.get(&msg.author.id).map(|member| {
+                        member
+                            .permissions()
+                            .map(|p| p.administrator())
+                            .unwrap_or(false)
+                    })
+                })
+                .unwrap_or(false),
         }
     }
 }
@@ -59,12 +71,12 @@ enum Response {
         #[serde(deserialize_with = "string_or_seq_string")]
         response: Vec<String>,
     },
-    None {
-    },
+    None {},
 }
 
 fn string_or_seq_string<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
-    where D: Deserializer<'de>
+where
+    D: Deserializer<'de>,
 {
     struct StringOrVec;
 
@@ -76,13 +88,15 @@ fn string_or_seq_string<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error
         }
 
         fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-            where E: serde::de::Error
+        where
+            E: serde::de::Error,
         {
             Ok(vec![value.to_owned()])
         }
 
         fn visit_seq<S>(self, visitor: S) -> Result<Self::Value, S::Error>
-            where S: serde::de::SeqAccess<'de>
+        where
+            S: serde::de::SeqAccess<'de>,
         {
             Deserialize::deserialize(serde::de::value::SeqAccessDeserializer::new(visitor))
         }
@@ -91,7 +105,10 @@ fn string_or_seq_string<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error
     deserializer.deserialize_any(StringOrVec)
 }
 
-fn replace_emojis<'a, S: Into<String>, I: Iterator<Item=&'a Emoji>>(msg: S, emojis: I) -> Result<String, Error> {
+fn replace_emojis<'a, S: Into<String>, I: Iterator<Item = &'a Emoji>>(
+    msg: S,
+    emojis: I,
+) -> Result<String, Error> {
     let mut msg = msg.into();
 
     for emoji in emojis {
@@ -109,13 +126,21 @@ fn static_response_impl(config: Arc<Config>, msg: &Message, command: &str) -> Re
     let response = {
         let command = String::from(command);
 
-        let mut runtime = tokio::runtime::Runtime::new()
-            .context("failed to construct a new Tokio runtime")?;
-        runtime.block_on::<_, Response, Error>(async move {
-            let mut lrrbot = LRRbot::new(&config);
+        let mut runtime =
+            tokio::runtime::Runtime::new().context("failed to construct a new Tokio runtime")?;
+        runtime
+            .block_on::<_, Response, Error>(
+                async move {
+                    let mut lrrbot = LRRbot::new(&config);
 
-            Ok(await!(lrrbot.get_data::<Response>(vec![String::from("responses"), command]))?)
-        }.boxed().compat())
+                    Ok(await!(lrrbot.get_data::<Response>(vec![
+                        String::from("responses"),
+                        command
+                    ]))?)
+                }
+                    .boxed()
+                    .compat(),
+            )
             .context("failed to fetch the command")?
     };
 
@@ -133,9 +158,14 @@ fn static_response_impl(config: Arc<Config>, msg: &Message, command: &str) -> Re
             let response = response.choose(&mut rand::thread_rng());
             if let Some(response) = response {
                 let mut vars = HashMap::new();
-                vars.insert("user".into(), msg.guild_id.and_then(|guild| msg.author.nick_in(guild)).unwrap_or_else(|| msg.author.name.clone()));
-                let response = strfmt::strfmt(response, &vars)
-                    .context("failed to format the reply")?;
+                vars.insert(
+                    "user".into(),
+                    msg.guild_id
+                        .and_then(|guild| msg.author.nick_in(guild))
+                        .unwrap_or_else(|| msg.author.name.clone()),
+                );
+                let response =
+                    strfmt::strfmt(response, &vars).context("failed to format the reply")?;
                 let response = if let Some(guild) = msg.guild() {
                     replace_emojis(response, guild.read().emojis.values())
                         .context("failed to replace emojis")?
@@ -157,7 +187,9 @@ fn static_response_impl(config: Arc<Config>, msg: &Message, command: &str) -> Re
     Ok(())
 }
 
-pub fn static_response(config: Arc<Config>) -> impl Fn(&mut Context, &Message, &str) + Send + Sync + 'static {
+pub fn static_response(
+    config: Arc<Config>,
+) -> impl Fn(&mut Context, &Message, &str) + Send + Sync + 'static {
     move |_, msg, command| {
         let config = config.clone();
         match static_response_impl(config.clone(), msg, command) {
@@ -168,7 +200,10 @@ pub fn static_response(config: Arc<Config>) -> impl Fn(&mut Context, &Message, &
                     "error" => ?err,
                 );
 
-                let _ = msg.reply(&format!("Static command resulted in an unexpected error: {}.", err));
+                let _ = msg.reply(&format!(
+                    "Static command resulted in an unexpected error: {}.",
+                    err
+                ));
             }
         }
     }
@@ -176,20 +211,37 @@ pub fn static_response(config: Arc<Config>) -> impl Fn(&mut Context, &Message, &
 
 #[test]
 fn test_deserialize_single_response() {
-    let res = serde_json::from_str::<Response>(r#"{"access": "any", "response": "Help: https://lrrbot.mrphlip.com/help"}"#).unwrap();
-    assert_eq!(res, Response::Some { access: Access::Any, response: vec!["Help: https://lrrbot.mrphlip.com/help".into()] });
+    let res = serde_json::from_str::<Response>(
+        r#"{"access": "any", "response": "Help: https://lrrbot.mrphlip.com/help"}"#,
+    )
+    .unwrap();
+    assert_eq!(
+        res,
+        Response::Some {
+            access: Access::Any,
+            response: vec!["Help: https://lrrbot.mrphlip.com/help".into()]
+        }
+    );
 }
 
 #[test]
 fn test_deserialize_multi_response() {
-    let res = serde_json::from_str::<Response>(r#"{"access": "sub", "response": ["peach", "barf"]}"#).unwrap();
-    assert_eq!(res, Response::Some { access: Access::Sub, response: vec!["peach".into(), "barf".into()] });
+    let res =
+        serde_json::from_str::<Response>(r#"{"access": "sub", "response": ["peach", "barf"]}"#)
+            .unwrap();
+    assert_eq!(
+        res,
+        Response::Some {
+            access: Access::Sub,
+            response: vec!["peach".into(), "barf".into()]
+        }
+    );
 }
 
 #[test]
 fn test_deserialize_missing() {
     let res = serde_json::from_str::<Response>("{}").unwrap();
-    assert_eq!(res, Response::None { });
+    assert_eq!(res, Response::None {});
 }
 
 #[test]
@@ -204,14 +256,16 @@ fn test_replace_emojis() {
             managed: true,
             require_colons: true,
             roles: vec![],
-        }, Emoji {
+        },
+        Emoji {
             animated: false,
             id: EmojiId(2),
             name: String::from("lrrCIRCLE"),
             managed: true,
             require_colons: true,
             roles: vec![],
-        }, Emoji {
+        },
+        Emoji {
             animated: false,
             id: EmojiId(3),
             name: String::from("lrrARROW"),
