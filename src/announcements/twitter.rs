@@ -5,9 +5,10 @@ use egg_mode::{Response, Token};
 use failure::{Error, ResultExt, SyncFailure};
 use futures::compat::{Future01CompatExt, Stream01CompatExt};
 use futures::prelude::*;
+use serenity::model::id::ChannelId;
 use slog::slog_error;
 use slog_scope::error;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::timer::Delay;
@@ -47,35 +48,37 @@ async fn rate_limit<
     }
 }
 
-async fn init<'a>(config: &'a Config, handle: &'a Handle) -> Result<(Token, HashSet<u64>), Error> {
+async fn init<'a>(
+    config: &'a Config,
+    handle: &'a Handle,
+) -> Result<(Token, HashMap<u64, Vec<ChannelId>>), Error> {
     let token = await!(egg_mode::bearer_token(&config.twitter_api_keys, &handle).compat())
         .context("failed to get a bearer token")?;
 
-    let mut users = HashSet::new();
+    let mut users = HashMap::new();
 
-    for user in &config.twitter_users {
+    for (user, channels) in &config.twitter_users {
         let user = await!(rate_limit(
             || egg_mode::user::show(user, &token, handle).compat()
         ))
         .with_context(|err| format!("failed to get the Twitter ID of {:?}: {:?}", user, err))?;
-        users.insert(user.id);
+        users.insert(user.id, channels.clone());
     }
 
     Ok((token, users))
 }
 
 async fn inner<'a>(
-    config: &'a Config,
     pg_pool: &'a PgPool,
     handle: &'a Handle,
     token: &'a Token,
-    users: &'a HashSet<u64>,
+    users: &'a HashMap<u64, Vec<ChannelId>>,
 ) -> Result<(), Error> {
     let conn = pg_pool
         .get()
         .context("failed to get a DB connection from the connection pool")?;
 
-    for &user_id in users {
+    for (&user_id, channels) in users {
         let state_key = &format!("eris.announcements.twitter.{}.last_tweet_id", user_id);
         let last_tweet_id =
             State::get::<u64, _>(&state_key, &conn).context("failed to get the last tweet ID")?;
@@ -93,27 +96,29 @@ async fn inner<'a>(
                 // Non-reply tweet or a reply to an account we're watching.
                 if tweet
                     .in_reply_to_user_id
-                    .map(|user_id| users.contains(&user_id))
+                    .map(|user_id| users.contains_key(&user_id))
                     .unwrap_or(true)
                 {
-                    config
-                        .announcements
-                        .say(format_args!(
-                            "New tweet from {}: https://twitter.com/{}/status/{}",
-                            tweet
-                                .user
-                                .as_ref()
-                                .map(|user| &user.name[..])
-                                .unwrap_or("???"),
-                            tweet
-                                .user
-                                .as_ref()
-                                .map(|user| &user.screen_name[..])
-                                .unwrap_or("a"),
-                            tweet.id,
-                        ))
-                        .map_err(SyncFailure::new)
-                        .context("failed to send the annoucement message")?;
+                    let message = format!(
+                        "New tweet from {}: https://twitter.com/{}/status/{}",
+                        tweet
+                            .user
+                            .as_ref()
+                            .map(|user| &user.name[..])
+                            .unwrap_or("???"),
+                        tweet
+                            .user
+                            .as_ref()
+                            .map(|user| &user.screen_name[..])
+                            .unwrap_or("a"),
+                        tweet.id,
+                    );
+                    for channel in channels {
+                        channel
+                            .say(&message)
+                            .map_err(SyncFailure::new)
+                            .context("failed to send the annoucement message")?;
+                    }
                     State::set(&state_key, tweet.id, &conn)
                         .context("failed to set the new last tweet ID")?;
                 }
@@ -141,7 +146,7 @@ pub async fn post_tweets(config: Arc<Config>, pg_pool: PgPool, handle: Handle) {
 
     loop {
         match await!(timer.try_next()) {
-            Ok(Some(_)) => match await!(inner(&config, &pg_pool, &handle, &token, &users)) {
+            Ok(Some(_)) => match await!(inner(&pg_pool, &handle, &token, &users)) {
                 Ok(()) => (),
                 Err(err) => error!("Failed to announce new tweets"; "error" => ?err),
             },

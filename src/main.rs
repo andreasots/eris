@@ -71,7 +71,10 @@ fn main() -> Result<(), failure::Error> {
     let file_drain = slog::Duplicate::new(limited_drain, full_drain);
 
     let drain = slog::Duplicate::new(term_drain, file_drain).fuse();
-    let drain = slog_async::Async::new(drain).build().fuse();
+    let drain = slog_async::Async::new(drain)
+        .overflow_strategy(slog_async::OverflowStrategy::Block)
+        .build()
+        .fuse();
     let logger = slog::Logger::root(
         drain,
         o!(

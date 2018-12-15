@@ -113,7 +113,7 @@ fn replace_emojis<'a, S: Into<String>, I: Iterator<Item = &'a Emoji>>(
 
     for emoji in emojis {
         let regex = Regex::new(&format!(r"\b{}\b", regex::escape(&emoji.name)))
-            .with_context(|err| format!("invalid regex syntax with {:?}", emoji.name))?;
+            .with_context(|err| format!("invalid regex syntax with {:?}: {:?}", emoji.name, err))?;
         if let Cow::Owned(s) = regex.replace_all(&msg, &emoji.mention()[..]) {
             msg = s;
         }

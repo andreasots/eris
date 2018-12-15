@@ -3,6 +3,7 @@ use egg_mode::KeyPair;
 use failure::{self, Error, Fail, ResultExt};
 use ini::Ini;
 use serenity::model::prelude::*;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use url::Url;
@@ -43,7 +44,7 @@ pub struct Config {
     pub guild: GuildId,
 
     pub twitter_api_keys: KeyPair,
-    pub twitter_users: Vec<String>,
+    pub twitter_users: HashMap<String, Vec<ChannelId>>,
 
     pub voice_channel_data: PathBuf,
 }
@@ -131,12 +132,33 @@ impl Config {
                 Config::get_option_required(&ini, "twitter_api_secret")?,
             ),
             twitter_users: ini
-                .get_from(Some("lrrbot"), "twitter_users_to_monitor")
-                .unwrap_or("loadingreadyrun")
-                .trim()
-                .split(",")
-                .map(String::from)
-                .collect(),
+                .section(Some("eris.twitter"))
+                .map(|section| {
+                    section
+                        .iter()
+                        .map(|(twitter, channels)| {
+                            Ok((
+                                twitter.clone(),
+                                channels
+                                    .split(',')
+                                    .map(|id| Ok(ChannelId(str::parse(id)?)))
+                                    .collect::<Result<Vec<ChannelId>, Error>>()?,
+                            ))
+                        })
+                        .collect::<Result<HashMap<String, Vec<ChannelId>>, Error>>()
+                })
+                .unwrap_or_else(|| {
+                    let mut twitter = HashMap::new();
+                    twitter.insert(
+                        String::from("loadingreadyrun"),
+                        vec![ChannelId(322643668831961088)],
+                    );
+                    twitter.insert(
+                        String::from("desertbus"),
+                        vec![ChannelId(370211226564689921)],
+                    );
+                    Ok(twitter)
+                })?,
 
             voice_channel_data: ini
                 .get_from(Some("lrrbot"), "voice_channel_data")
