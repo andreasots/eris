@@ -203,7 +203,7 @@ fn main() -> Result<(), failure::Error> {
             })
             .group("Calendar", |g| {
                 g.command("next", |c| {
-                    c.desc("Gets the next scheduled stream from the LoadingReadyLive calendar. Can specify a timezone, to show stream in your local time. If no time zone is specified, times will be shown in Moonbase time. Unlike in Twitch the timezone is case-sensitive.")
+                    c.desc("Gets the next scheduled stream from the LoadingReadyLive calendar. Can specify a timezone, to show stream in your local time. If no time zone is specified, times will be shown in Moonbase time. Unlike on Twitch the timezone is case-sensitive.")
                         .usage("[TIMEZONE]")
                         .example("America/New_York")
                         .help_available(true)
@@ -212,7 +212,7 @@ fn main() -> Result<(), failure::Error> {
                         .cmd(commands::calendar::Calendar::lrr(config.clone(), calendar.clone(), runtime.executor()))
                 })
                     .command("nextfan", |c| {
-                        c.desc("Gets the next scheduled stream from the fan-streaming calendar. Can specify a timezone, to show stream in your local time. If no time zone is specified, times will be shown in Moonbase time. Unlike in Twitch the timezone is case-sensitive.")
+                        c.desc("Gets the next scheduled stream from the fan-streaming calendar. Can specify a timezone, to show stream in your local time. If no time zone is specified, times will be shown in Moonbase time. Unlike on Twitch the timezone is case-sensitive.")
                             .usage("[TIMEZONE]")
                             .example("America/New_York")
                             .help_available(true)
