@@ -10,10 +10,10 @@ use slog_scope::error;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
-use tokio;
 use tokio::codec::Framed;
 use tokio::prelude::Sink as Sink01;
 use tokio::prelude::Stream as Stream01;
+use tokio::runtime::TaskExecutor;
 
 #[cfg(unix)]
 use tokio::net::unix::UnixListener;
@@ -45,6 +45,7 @@ where
 
 pub struct Server {
     methods: HashMap<String, Box<Handler + Send + Sync>>,
+    executor: TaskExecutor,
 
     #[cfg(unix)]
     listener: UnixListener,
@@ -55,17 +56,18 @@ pub struct Server {
 
 impl Server {
     #[cfg(unix)]
-    pub fn new<P: AsRef<Path>>(path: P) -> Result<Server, Error> {
+    pub fn new<P: AsRef<Path>>(path: P, executor: TaskExecutor) -> Result<Server, Error> {
         let listener = UnixListener::bind(path).context("failed to create a listening socket")?;
 
         Ok(Server {
             listener,
             methods: HashMap::new(),
+            executor,
         })
     }
 
     #[cfg(not(unix))]
-    pub fn new(port: u16) -> Result<Server, Error> {
+    pub fn new(port: u16, executor: TaskExecutor) -> Result<Server, Error> {
         use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 
         let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port);
@@ -74,6 +76,7 @@ impl Server {
         Ok(Server {
             listener,
             methods: HashMap::new(),
+            executor,
         })
     }
 
@@ -86,7 +89,11 @@ impl Server {
     }
 
     pub async fn serve(self) {
-        let Server { methods, listener } = self;
+        let Server {
+            methods,
+            listener,
+            executor,
+        } = self;
 
         let mut listener = listener.incoming().compat().boxed();
         let methods = Arc::new(methods);
@@ -94,11 +101,15 @@ impl Server {
         loop {
             match await!(listener.try_next()) {
                 Ok(Some(socket)) => {
-                    tokio::spawn(
-                        Server::process(methods.clone(), Framed::new(socket, ServerCodec))
-                            .unit_error()
-                            .boxed()
-                            .compat(),
+                    executor.spawn(
+                        Server::process(
+                            methods.clone(),
+                            Framed::new(socket, ServerCodec),
+                            executor.clone(),
+                        )
+                        .unit_error()
+                        .boxed()
+                        .compat(),
                     );
                 }
                 Ok(None) => return,
@@ -110,6 +121,7 @@ impl Server {
     async fn process<T, E>(
         methods: Arc<HashMap<String, Box<Handler + Send + Sync + 'static>>>,
         transport: T,
+        executor: TaskExecutor,
     ) where
         T: Sink01<SinkItem = (u64, Result<Value, Exception>), SinkError = E>
             + Stream01<Item = (u64, Request), Error = E>
@@ -120,7 +132,7 @@ impl Server {
     {
         let (mut sink, stream) = transport.split();
         let (tx, mut rx) = mpsc::channel(16);
-        tokio::spawn(
+        executor.spawn(
             async move {
                 loop {
                     match await!(rx.next()) {
@@ -154,7 +166,7 @@ impl Server {
                         ),
                     };
 
-                    tokio::spawn(
+                    executor.spawn(
                         future
                             .then(move |res| {
                                 async move {

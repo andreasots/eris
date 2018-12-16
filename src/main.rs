@@ -28,6 +28,7 @@ mod channel_reaper;
 mod commands;
 mod config;
 mod desertbus;
+mod executor_ext;
 mod google_calendar;
 mod models;
 mod rpc;
@@ -127,6 +128,8 @@ fn main() -> Result<(), failure::Error> {
     let handler = voice_channel_tracker::VoiceChannelTracker::new(&config)
         .context("failed to create the voice channel tracker")?;
 
+    let mut runtime = tokio::runtime::Runtime::new().context("failed to create a Tokio runtime")?;
+
     let mut client = serenity::Client::new(&config.discord_botsecret, handler)
         .map_err(failure::SyncFailure::new)
         .context("failed to create the Discord client")?;
@@ -158,9 +161,14 @@ fn main() -> Result<(), failure::Error> {
                     );
 
                     let _ = message.reply(&format!("Command resulted in an unexpected error: {}.", err.0));
+                } else {
+                    info!("Command processed successfully";
+                        "command_name" => ?command_name,
+                        "message.id" => ?message.id.0,
+                    );
                 }
             })
-            .unrecognised_command(commands::static_response::static_response(config.clone()))
+            .unrecognised_command(commands::static_response::static_response(config.clone(), runtime.executor()))
             .customised_help(serenity::framework::standard::help_commands::with_embeds, |h| {
                 let help_url = config.site_url.join("help#help-section-text")
                     .expect("failed to construct the simple text response command help URL");
@@ -174,6 +182,7 @@ fn main() -> Result<(), failure::Error> {
                         config.clone(),
                         pg_pool.clone(),
                         kraken.clone(),
+                        runtime.executor(),
                     ))
             })
             .command("voice", |c| {
@@ -191,6 +200,26 @@ fn main() -> Result<(), failure::Error> {
                     .min_args(0)
                     .max_args(1)
                     .cmd(commands::time::Time::new(config.clone()))
+            })
+            .group("Calendar", |g| {
+                g.command("next", |c| {
+                    c.desc("Gets the next scheduled stream from the LoadingReadyLive calendar. Can specify a timezone, to show stream in your local time. If no time zone is specified, times will be shown in Moonbase time. Unlike in Twitch the timezone is case-sensitive.")
+                        .usage("[TIMEZONE]")
+                        .example("America/New_York")
+                        .help_available(true)
+                        .min_args(0)
+                        .max_args(1)
+                        .cmd(commands::calendar::Calendar::lrr(config.clone(), calendar.clone(), runtime.executor()))
+                })
+                    .command("nextfan", |c| {
+                        c.desc("Gets the next scheduled stream from the fan-streaming calendar. Can specify a timezone, to show stream in your local time. If no time zone is specified, times will be shown in Moonbase time. Unlike in Twitch the timezone is case-sensitive.")
+                            .usage("[TIMEZONE]")
+                            .example("America/New_York")
+                            .help_available(true)
+                            .min_args(0)
+                            .max_args(1)
+                            .cmd(commands::calendar::Calendar::fan(config.clone(), calendar.clone(), runtime.executor()))
+                    })
             }),
     );
 
@@ -205,9 +234,7 @@ fn main() -> Result<(), failure::Error> {
         })
         .context("failed to remove the socket file")?;
 
-    let mut runtime = tokio::runtime::Runtime::new().context("failed to create a Tokio runtime")?;
-
-    let rpc_server = rpc::Server::new(config.clone(), pg_pool.clone())
+    let rpc_server = rpc::Server::new(config.clone(), pg_pool.clone(), runtime.executor())
         .context("failed to create the RPC server")?;
     runtime.spawn(rpc_server.serve().unit_error().boxed().compat());
 
@@ -230,10 +257,17 @@ fn main() -> Result<(), failure::Error> {
     };
 
     runtime.spawn(
-        autotopic::autotopic(config, helix, calendar, desertbus, pg_pool)
-            .unit_error()
-            .boxed()
-            .compat(),
+        autotopic::autotopic(
+            config,
+            helix,
+            calendar,
+            desertbus,
+            pg_pool,
+            runtime.executor(),
+        )
+        .unit_error()
+        .boxed()
+        .compat(),
     );
 
     client

@@ -1,7 +1,7 @@
 use crate::config::Config;
+use crate::executor_ext::ExecutorExt;
 use crate::rpc::LRRbot;
 use failure::{Error, ResultExt, SyncFailure};
-use futures::prelude::*;
 use rand::seq::SliceRandom;
 use regex::Regex;
 use serde::{Deserialize, Deserializer};
@@ -13,6 +13,7 @@ use serenity::utils::Colour;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::runtime::TaskExecutor;
 
 use slog::{slog_error, slog_info};
 use slog_scope::{error, info};
@@ -122,24 +123,21 @@ fn replace_emojis<'a, S: Into<String>, I: Iterator<Item = &'a Emoji>>(
     Ok(msg)
 }
 
-fn static_response_impl(config: Arc<Config>, msg: &Message, command: &str) -> Result<(), Error> {
+fn static_response_impl(
+    config: Arc<Config>,
+    executor: TaskExecutor,
+    msg: &Message,
+    command: &str,
+) -> Result<(), Error> {
     let response = {
+        let mut lrrbot = LRRbot::new(&config, executor.clone());
         let command = String::from(command);
 
-        let mut runtime =
-            tokio::runtime::Runtime::new().context("failed to construct a new Tokio runtime")?;
-        runtime
-            .block_on::<_, Response, Error>(
+        executor
+            .block_on(
                 async move {
-                    let mut lrrbot = LRRbot::new(&config);
-
-                    Ok(await!(lrrbot.get_data::<Response>(vec![
-                        String::from("responses"),
-                        command
-                    ]))?)
-                }
-                    .boxed()
-                    .compat(),
+                    await!(lrrbot.get_data::<Response>(vec![String::from("responses"), command]))
+                },
             )
             .context("failed to fetch the command")?
     };
@@ -189,22 +187,25 @@ fn static_response_impl(config: Arc<Config>, msg: &Message, command: &str) -> Re
 
 pub fn static_response(
     config: Arc<Config>,
+    executor: TaskExecutor,
 ) -> impl Fn(&mut Context, &Message, &str) + Send + Sync + 'static {
-    move |_, msg, command| {
-        let config = config.clone();
-        match static_response_impl(config.clone(), msg, command) {
-            Ok(()) => (),
-            Err(err) => {
-                error!("Static command resulted in an unexpected error";
-                    "message.id" => ?msg.id.0,
-                    "error" => ?err,
-                );
+    move |_, msg, command| match static_response_impl(
+        config.clone(),
+        executor.clone(),
+        msg,
+        command,
+    ) {
+        Ok(()) => (),
+        Err(err) => {
+            error!("Static command resulted in an unexpected error";
+                "message.id" => ?msg.id.0,
+                "error" => ?err,
+            );
 
-                let _ = msg.reply(&format!(
-                    "Static command resulted in an unexpected error: {}.",
-                    err
-                ));
-            }
+            let _ = msg.reply(&format!(
+                "Simple text response command resulted in an unexpected error: {}.",
+                err
+            ));
         }
     }
 }

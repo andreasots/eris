@@ -8,6 +8,7 @@ use failure::{Error, ResultExt, SyncFailure};
 use slog::slog_error;
 use slog_scope::error;
 use std::fmt::{self, Display};
+use tokio::runtime::TaskExecutor;
 
 struct StreamUp {
     data: Channel,
@@ -79,8 +80,8 @@ async fn stream_up_inner<'a>(
     Ok(())
 }
 
-pub async fn stream_up(config: &Config, pg_pool: PgPool, data: Channel) {
-    let mut lrrbot = LRRbot::new(config);
+pub async fn stream_up(config: &Config, pg_pool: PgPool, data: Channel, executor: TaskExecutor) {
+    let mut lrrbot = LRRbot::new(config, executor);
 
     match await!(stream_up_inner(config, &mut lrrbot, pg_pool, data)) {
         Ok(()) => (),

@@ -19,15 +19,16 @@ use slog_scope::error;
 use std::fmt;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 
-struct ShortDisplay<'a> {
+struct EventDisplay<'a> {
     event: &'a Event,
     now: DateTime<Utc>,
     tz: Tz,
 }
 
-impl<'a> fmt::Display for ShortDisplay<'a> {
+impl<'a> fmt::Display for EventDisplay<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let start = self.event.start.with_timezone(&Utc);
         if start > self.now {
@@ -65,8 +66,9 @@ pub async fn autotopic(
     calendar: Calendar,
     desertbus: DesertBus,
     pg_pool: PgPool,
+    executor: TaskExecutor,
 ) {
-    let lrrbot = LRRbot::new(&config);
+    let lrrbot = LRRbot::new(&config, executor);
     let mut autotopic = Autotopic {
         config,
         lrrbot,
@@ -173,14 +175,12 @@ impl Autotopic {
                 messages.extend(desertbus);
             } else {
                 messages.extend(events.iter().map(|event| {
-                    format!(
-                        "{}",
-                        ShortDisplay {
-                            event,
-                            now,
-                            tz: self.config.timezone
-                        }
-                    )
+                    EventDisplay {
+                        event,
+                        now,
+                        tz: self.config.timezone,
+                    }
+                    .to_string()
                 }));
             }
         }
@@ -233,23 +233,23 @@ impl Autotopic {
             };
             let total_hours = DesertBus::hours_raised(money_raised) as i64;
             if now < start {
-                messages.push(format!(
-                    "{}",
-                    ShortDisplay {
+                messages.push(
+                    EventDisplay {
                         event: &Event {
                             start: start.with_timezone(&FixedOffset::east(0)),
                             summary: String::from("Desert Bus for Hope"),
                             end: start.with_timezone(&FixedOffset::east(0))
                                 + chrono::Duration::hours(total_hours),
                             location: Some(String::from(
-                                "https://desertbus.org/ or https://twitch.tv/desertbus"
+                                "https://desertbus.org/ or https://twitch.tv/desertbus",
                             )),
                             description: None,
                         },
                         now,
                         tz: self.config.timezone,
                     }
-                ));
+                    .to_string(),
+                );
                 messages.push(format!(
                     "${} raised.",
                     money_raised.separated_string_with_fixed_place(2)

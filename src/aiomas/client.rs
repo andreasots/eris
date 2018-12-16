@@ -9,8 +9,8 @@ use slog::slog_error;
 use slog_scope::error;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use tokio;
 use tokio::codec::Framed;
+use tokio::runtime::TaskExecutor;
 
 use tokio::prelude::Sink as Sink01;
 use tokio::prelude::Stream as Stream01;
@@ -27,35 +27,41 @@ pub struct NewClient {
 
     #[cfg(not(unix))]
     port: u16,
+
+    executor: TaskExecutor,
 }
 
 #[cfg(unix)]
 impl NewClient {
-    pub fn new<P: Into<PathBuf>>(path: P) -> NewClient {
-        NewClient { path: path.into() }
+    pub fn new<P: Into<PathBuf>>(path: P, executor: TaskExecutor) -> NewClient {
+        NewClient {
+            path: path.into(),
+            executor,
+        }
     }
 
     pub async fn new_client(&self) -> Result<Client, Error> {
-        Ok(Client::from_stream(await!(UnixStream::connect(
-            &self.path
-        )
-        .compat())?))
+        Ok(Client::from_stream(
+            await!(UnixStream::connect(&self.path).compat())?,
+            self.executor.clone(),
+        ))
     }
 }
 
 #[cfg(not(unix))]
 impl NewClient {
-    pub fn new(port: u16) -> NewClient {
-        NewClient { port }
+    pub fn new(port: u16, executor: TaskExecutor) -> NewClient {
+        NewClient { port, executor }
     }
 
     pub async fn new_service(&self) -> Result<Client, Error> {
         use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 
         let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), self.port);
-        Ok(Client::from_stream(await!(
-            TcpStream::connect(&addr).compat()
-        )?))
+        Ok(Client::from_stream(
+            await!(TcpStream::connect(&addr).compat())?,
+            self.executor.clone(),
+        ))
     }
 }
 
@@ -67,10 +73,11 @@ pub struct Client {
 impl Client {
     fn from_stream<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + 'static>(
         stream: S,
+        executor: TaskExecutor,
     ) -> Client {
         let (tx, rx) = mpsc::channel(16);
 
-        tokio::spawn(
+        executor.spawn(
             Client::dispatch(rx, Framed::new(stream, ClientCodec))
                 .unit_error()
                 .boxed()
@@ -162,13 +169,14 @@ mod tests {
         const RESPONSE: &[u8] = b"\x00\x00\x00\x09[1, 1, 1]\x00\x00\x00\x09[1, 0, 0]";
 
         let mut runtime = Runtime::new().unwrap();
+        let executor = runtime.executor();
         runtime
             .block_on::<_, (), Error>(
                 async move {
                     let (read, mut write) =
                         UnixStream::pair().context("failed to create a socket pair")?;
 
-                    let mut client = Client::from_stream(read);
+                    let mut client = Client::from_stream(read, executor);
                     let mut client2 = client.clone();
 
                     let first = client2.call((String::from("test"), vec![], HashMap::new()));

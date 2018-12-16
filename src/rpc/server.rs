@@ -8,6 +8,7 @@ use serde_derive::Deserialize;
 use serde_json::{self, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::runtime::TaskExecutor;
 
 #[derive(Deserialize)]
 pub struct Channel {
@@ -25,21 +26,27 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(config: Arc<Config>, pg_pool: PgPool) -> Result<Server, Error> {
+    pub fn new(
+        config: Arc<Config>,
+        pg_pool: PgPool,
+        executor: TaskExecutor,
+    ) -> Result<Server, Error> {
         #[cfg(unix)]
-        let mut server = AiomasServer::new(&config.eris_socket)?;
+        let mut server = AiomasServer::new(&config.eris_socket, executor.clone())?;
 
         #[cfg(not(unix))]
-        let mut server = AiomasServer::new(config.eris_port)?;
+        let mut server = AiomasServer::new(config.eris_port, executor.clone())?;
 
         {
             let config = config.clone();
             let pg_pool = pg_pool.clone();
+            let executor = executor.clone();
             server.register(
                 "announcements/stream_up",
                 move |mut args: Vec<Value>, kwargs: HashMap<String, Value>| {
                     let config = config.clone();
                     let pg_pool = pg_pool.clone();
+                    let executor = executor.clone();
 
                     async move {
                         if args.len() != 1 || kwargs.len() != 0 {
@@ -50,7 +57,12 @@ impl Server {
                             .context("failed to deserialize arguments")
                             .map_err(|e| format!("{:?}", e))?;
 
-                        await!(announcements::stream_up(&config, pg_pool, data));
+                        await!(announcements::stream_up(
+                            &config,
+                            pg_pool,
+                            data,
+                            executor.clone()
+                        ));
 
                         Ok(serde_json::Value::Null)
                     }

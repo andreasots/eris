@@ -7,6 +7,7 @@ use serde::{Deserialize, Deserializer};
 use serde_derive::Deserialize;
 use serde_json::{self, Value};
 use std::collections::HashMap;
+use tokio::runtime::TaskExecutor;
 
 #[derive(Copy, Clone, Debug, Deserialize)]
 pub struct GameId {
@@ -42,12 +43,12 @@ pub struct LRRbot {
 }
 
 impl LRRbot {
-    pub fn new(config: &Config) -> LRRbot {
+    pub fn new(config: &Config, executor: TaskExecutor) -> LRRbot {
         #[cfg(unix)]
-        let client = NewClient::new(&config.lrrbot_socket);
+        let client = NewClient::new(&config.lrrbot_socket, executor);
 
         #[cfg(not(unix))]
-        let client = NewClient::new(&config.lrrbot_port);
+        let client = NewClient::new(&config.lrrbot_port, executor);
 
         LRRbot {
             service: Retry::new(Reconnect::new(client), 3),
