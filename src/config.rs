@@ -71,7 +71,7 @@ impl Config {
 
             site_url: Url::parse(
                 ini.get_from(Some("lrrbot"), "siteurl")
-                    .unwrap_or("https://lrrbot.mrphlip.com/"),
+                    .unwrap_or("https://lrrbot.com/"),
             )
             .context("failed to parse `siteurl`")?,
 
