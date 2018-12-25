@@ -213,14 +213,14 @@ pub fn static_response(
 #[test]
 fn test_deserialize_single_response() {
     let res = serde_json::from_str::<Response>(
-        r#"{"access": "any", "response": "Help: https://lrrbot.mrphlip.com/help"}"#,
+        r#"{"access": "any", "response": "Help: https://lrrbot.com/help"}"#,
     )
     .unwrap();
     assert_eq!(
         res,
         Response::Some {
             access: Access::Any,
-            response: vec!["Help: https://lrrbot.mrphlip.com/help".into()]
+            response: vec!["Help: https://lrrbot.com/help".into()]
         }
     );
 }
