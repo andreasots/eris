@@ -41,4 +41,4 @@ url = "1.7.2"
 serenity = { git = "https://github.com/andreasots/serenity", branch = "old-voice-state" }
 
 [dev-dependencies]
-pin-utils = "0.1.0-alpha.3"
+pin-utils = "0.1.0-alpha.4"
