@@ -1,2 +1,7 @@
 /target
 **/*.rs.bk
+eris.log
+eris.debug.log
+eris.sock
+lrrbot.conf
+voice_channels.csv

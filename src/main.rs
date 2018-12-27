@@ -19,6 +19,7 @@ use slog_scope::{error, info};
 
 mod aiomas;
 mod announcements;
+mod apng;
 mod autotopic;
 mod channel_reaper;
 mod commands;
@@ -156,7 +157,10 @@ fn main() -> Result<(), failure::Error> {
                         "error" => ?err,
                     );
 
-                    let _ = message.reply(&format!("Command resulted in an unexpected error: {}.", err.0));
+                    let _ = message.reply(&format!(
+                        "Command resulted in an unexpected error: {}.",
+                        err.0
+                    ));
                 } else {
                     info!("Command processed successfully";
                         "command_name" => ?command_name,
@@ -164,12 +168,27 @@ fn main() -> Result<(), failure::Error> {
                     );
                 }
             })
-            .unrecognised_command(commands::static_response::static_response(config.clone(), runtime.executor()))
-            .customised_help(serenity::framework::standard::help_commands::with_embeds, |h| {
-                let help_url = config.site_url.join("help#help-section-text")
-                    .expect("failed to construct the simple text response command help URL");
-                h.individual_command_tip(&format!("To get help with an individual command, pass its name as an argument to this command. Simple text response commands (like `!advice`) are not listed here, for those see <{}>.", help_url))
-            })
+            .unrecognised_command(commands::static_response::static_response(
+                config.clone(),
+                runtime.executor(),
+            ))
+            .customised_help(
+                serenity::framework::standard::help_commands::with_embeds,
+                |h| {
+                    let help_url = config
+                        .site_url
+                        .join("help#help-section-text")
+                        .expect("failed to construct the simple text response command help URL");
+                    h.individual_command_tip(&format!(
+                        concat!(
+                            "To get help with an individual command, pass its name as an argument ",
+                            "to this command. Simple text response commands (like `!advice`) are ",
+                            "not listed here, for those see <{}>."
+                        ),
+                        help_url
+                    ))
+                },
+            )
             .command("live", |c| {
                 c.desc("Post the currently live fanstreamers.")
                     .help_available(true)
@@ -197,25 +216,56 @@ fn main() -> Result<(), failure::Error> {
                     .max_args(1)
                     .cmd(commands::time::Time::new(config.clone()))
             })
+            .command("spoiler", |c| {
+                c.desc(concat!(
+                    "Conceal a spoiler. If you are running Discord in a browser that's not ",
+                    "Internet Explorer or Microsoft Edge you only need to click on the thumbnail ",
+                    "for the message to be revealed. Otherwise you also need to click the 'Open ",
+                    "original' link on desktop or the 'Open in browser' button on mobile.",
+                ))
+                .usage("<TOPIC> <MESSAGE>")
+                .example("\"the password\" dickbutt")
+                .help_available(true)
+                .min_args(2)
+                .cmd(commands::spoiler::Spoiler::new(config.clone()))
+            })
             .group("Calendar", |g| {
                 g.command("next", |c| {
-                    c.desc("Gets the next scheduled stream from the LoadingReadyLive calendar. Can specify a timezone, to show stream in your local time. If no time zone is specified, times will be shown in Moonbase time. Unlike on Twitch the timezone is case-sensitive.")
-                        .usage("[TIMEZONE]")
-                        .example("America/New_York")
-                        .help_available(true)
-                        .min_args(0)
-                        .max_args(1)
-                        .cmd(commands::calendar::Calendar::lrr(config.clone(), calendar.clone(), runtime.executor()))
+                    c.desc(concat!(
+                        "Gets the next scheduled stream from the LoadingReadyLive calendar. Can ",
+                        "specify a timezone, to show stream in your local time. If no time zone ",
+                        "is specified, times will be shown in Moonbase time. Unlike on Twitch the ",
+                        "timezone is case-sensitive."
+                    ))
+                    .usage("[TIMEZONE]")
+                    .example("America/New_York")
+                    .help_available(true)
+                    .min_args(0)
+                    .max_args(1)
+                    .cmd(commands::calendar::Calendar::lrr(
+                        config.clone(),
+                        calendar.clone(),
+                        runtime.executor(),
+                    ))
                 })
-                    .command("nextfan", |c| {
-                        c.desc("Gets the next scheduled stream from the fan-streaming calendar. Can specify a timezone, to show stream in your local time. If no time zone is specified, times will be shown in Moonbase time. Unlike on Twitch the timezone is case-sensitive.")
-                            .usage("[TIMEZONE]")
-                            .example("America/New_York")
-                            .help_available(true)
-                            .min_args(0)
-                            .max_args(1)
-                            .cmd(commands::calendar::Calendar::fan(config.clone(), calendar.clone(), runtime.executor()))
-                    })
+                .command("nextfan", |c| {
+                    c.desc(concat!(
+                        "Gets the next scheduled stream from the fan-streaming calendar. Can ",
+                        "specify a timezone, to show stream in your local time. If no time zone ",
+                        "is specified, times will be shown in Moonbase time. Unlike on Twitch the ",
+                        "timezone is case-sensitive."
+                    ))
+                    .usage("[TIMEZONE]")
+                    .example("America/New_York")
+                    .help_available(true)
+                    .min_args(0)
+                    .max_args(1)
+                    .cmd(commands::calendar::Calendar::fan(
+                        config.clone(),
+                        calendar.clone(),
+                        runtime.executor(),
+                    ))
+                })
             }),
     );
 
