@@ -17,7 +17,7 @@ diesel = { version = "1.3.3", features = ["postgres", "r2d2", "serde_json"] }
 egg-mode = "0.12.0"
 egg-mode-text = "1.14.7"
 failure = "0.1.3"
-futures-preview = { version = "0.3.0-alpha.10", features = ["compat"] }
+futures-preview = { version = "0.3.0-alpha.11", features = ["compat"] }
 log = { version = "0.4.6", features = ["max_level_trace", "release_max_level_info"] }
 rand = "0.6.1"
 regex = "1.1.0"
