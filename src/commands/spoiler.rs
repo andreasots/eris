@@ -13,7 +13,7 @@ use pango::{FontDescription, Layout};
 use pangocairo::FontMap;
 
 // This needs to be larger than the Discord's thumbnailer threshold which is currently 400x300 px.
-const WIDTH: i32 = 1200;
+const WIDTH: i32 = 800;
 const MARGIN: i32 = 20;
 
 pub struct Spoiler {
@@ -98,7 +98,7 @@ impl Spoiler {
 
         let mut font = FontDescription::new();
         font.set_family("sans");
-        font.set_size((2.25 * 11.25 * pango::SCALE as f64) as i32);
+        font.set_size((1.5 * 11.25 * pango::SCALE as f64) as i32);
 
         let usage_layout = Self::layout(
             &pango_ctx,
