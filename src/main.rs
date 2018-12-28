@@ -1,11 +1,7 @@
 #![feature(
-    arbitrary_self_types,
     futures_api,
-    pin,
     await_macro,
-    existential_type,
     async_await,
-    never_type,
     transpose_result,
     const_slice_len
 )]
