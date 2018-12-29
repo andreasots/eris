@@ -17,6 +17,11 @@ use pangocairo::FontMap;
 const WIDTH: i32 = 3200;
 const MARGIN: i32 = 80;
 
+enum Input<'a> {
+    Markup(&'a str),
+    Text(&'a str),
+}
+
 pub struct Spoiler {
     config: Arc<Config>,
 }
@@ -26,13 +31,17 @@ impl Spoiler {
         Spoiler { config }
     }
 
-    fn layout(ctx: &pango::Context, text: &str, font: &FontDescription) -> Layout {
+    fn layout(ctx: &pango::Context, text: Input, font: &FontDescription) -> Layout {
         let layout = Layout::new(ctx);
 
         layout.set_font_description(font);
         layout.set_width((WIDTH - 2 * MARGIN) * pango::SCALE);
         layout.set_justify(true);
-        layout.set_text(text);
+
+        match text {
+            Input::Markup(text) => layout.set_markup(text),
+            Input::Text(text) => layout.set_text(text),
+        }
 
         layout
     }
@@ -103,16 +112,18 @@ impl Spoiler {
 
         let usage_layout = Self::layout(
             &pango_ctx,
-            &format!(
+            Input::Markup(&format!(
                 concat!(
-                    "Click and/or open in a browser to reveal the spoiler.\n",
-                    "See {}help spoiler for more.",
+                    "Click and then open in a browser to reveal the spoiler.\n",
+                    "See ",
+                    "<span font_family=\"monospace\" background=\"#292b30\">{}help spoiler</span> ",
+                    "for more.",
                 ),
                 self.config.command_prefix
-            ),
+            )),
             &font,
         );
-        let spoiler_layout = Self::layout(&pango_ctx, &spoiler, &font);
+        let spoiler_layout = Self::layout(&pango_ctx, Input::Text(&spoiler), &font);
 
         let height = std::cmp::max(
             usage_layout.get_pixel_extents().1.height,

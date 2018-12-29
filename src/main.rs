@@ -218,10 +218,9 @@ fn main() -> Result<(), failure::Error> {
             })
             .command("spoiler", |c| {
                 c.desc(concat!(
-                    "Conceal a spoiler. If you are running Discord in a browser that's not ",
-                    "Internet Explorer or Microsoft Edge you only need to click on the thumbnail ",
-                    "for the message to be revealed. Otherwise you also need to click the 'Open ",
-                    "original' link on desktop or the 'Open in browser' button on mobile.",
+                    "Conceal a spoiler. To reveal the message click on the thumbnail and then ",
+                    "click the 'Open original' link on desktop or the 'Open in browser' button on ",
+                    "mobile. The revealing doesn't work on Internet Explorer and Microsoft Edge."
                 ))
                 .usage("<TOPIC> <MESSAGE>")
                 .example("\"the password\" dickbutt")
