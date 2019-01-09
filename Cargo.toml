@@ -24,7 +24,7 @@ futures-preview = { version = "0.3.0-alpha.11", features = ["compat"] }
 log = { version = "0.4.6", features = ["max_level_trace", "release_max_level_info"] }
 pango = "0.5.0"
 pangocairo = "0.6.0"
-rand = "0.6.1"
+rand = "0.6.3"
 regex = "1.1.0"
 reqwest = "0.9.6"
 rust-ini = "0.13.0"
