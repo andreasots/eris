@@ -664,7 +664,7 @@ dependencies = [
 
 [[package]]
 name = "futures-select-macro-preview"
-version = "0.3.0-alpha.11"
+version = "0.3.0-alpha.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "proc-macro-hack 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -693,7 +693,7 @@ dependencies = [
  "futures-channel-preview 0.3.0-alpha.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-core-preview 0.3.0-alpha.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-io-preview 0.3.0-alpha.11 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-select-macro-preview 0.3.0-alpha.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures-select-macro-preview 0.3.0-alpha.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-sink-preview 0.3.0-alpha.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "pin-utils 0.1.0-alpha.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "proc-macro-hack 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2736,7 +2736,7 @@ dependencies = [
 "checksum futures-executor-preview 0.3.0-alpha.11 (registry+https://github.com/rust-lang/crates.io-index)" = "b267447ec2b8a84cbe6ae250603268bf86b3c30315c6506b23a939af950b9e6c"
 "checksum futures-io-preview 0.3.0-alpha.11 (registry+https://github.com/rust-lang/crates.io-index)" = "2ad71c7781169013ee56b94316f281c3fa690244c7bd17ebc546167c6ea558bb"
 "checksum futures-preview 0.3.0-alpha.11 (registry+https://github.com/rust-lang/crates.io-index)" = "7e3846197ff6a2f25e306fea0f98b22b03c0c2d0121ff48c10dbb9a923833d64"
-"checksum futures-select-macro-preview 0.3.0-alpha.11 (registry+https://github.com/rust-lang/crates.io-index)" = "d9ef6081511aaf8f16804046829d0d3126bae9ba51c4837eea1c53f432dbfa25"
+"checksum futures-select-macro-preview 0.3.0-alpha.12 (registry+https://github.com/rust-lang/crates.io-index)" = "b5e90a1190c77bd279401cd247f1849ce9f4c74b37998088c11b1b038c5e4e3f"
 "checksum futures-sink-preview 0.3.0-alpha.11 (registry+https://github.com/rust-lang/crates.io-index)" = "113c745dcea4f505a8b137160eb6777c785bc979e32cb6971443af356c09b373"
 "checksum futures-util-preview 0.3.0-alpha.11 (registry+https://github.com/rust-lang/crates.io-index)" = "2aabd61c42118a455d62d13fb82c98b7e936f8fdc3810104ca8d9b11c5c2f0d6"
 "checksum generic-array 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)" = "fceb69994e330afed50c93524be68c42fa898c2d9fd4ee8da03bd7363acd26f2"
