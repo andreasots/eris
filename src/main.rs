@@ -2,11 +2,11 @@
     futures_api,
     await_macro,
     async_await,
-    transpose_result,
     const_slice_len
 )]
 // Remove when Diesel updates.
 #![allow(proc_macro_derive_resolution_fallback)]
+#![recursion_limit="256"]
 
 #[macro_use]
 extern crate diesel;
