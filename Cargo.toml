@@ -20,7 +20,7 @@ failure = "0.1.5"
 futures-preview = { version = "0.3.0-alpha.13", features = ["compat"] }
 log = { version = "0.4.6", features = ["max_level_trace", "release_max_level_info"] }
 rand = "0.6.5"
-regex = "1.1.0"
+regex = "1.1.2"
 reqwest = "0.9.10"
 rust-ini = "0.13.0"
 separator = "0.4.0"
