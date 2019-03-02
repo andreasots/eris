@@ -4,7 +4,6 @@ use futures::compat::Future01CompatExt;
 use reqwest::header::{HeaderValue, ACCEPT, AUTHORIZATION};
 use reqwest::r#async::Client;
 use serde::Deserialize;
-use serde_derive::Deserialize;
 use serde_json::{self, Value};
 use std::sync::Arc;
 

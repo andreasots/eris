@@ -4,7 +4,6 @@ use crate::service::{Reconnect, Retry};
 use failure::{self, Error, ResultExt};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer};
-use serde_derive::Deserialize;
 use serde_json::{self, Value};
 use std::collections::HashMap;
 use tokio::runtime::TaskExecutor;

@@ -6,7 +6,6 @@ use reqwest::header::HeaderValue;
 use reqwest::r#async::Client;
 use serde::de::{Error as SerdeError, Visitor};
 use serde::{Deserialize, Deserializer};
-use serde_derive::Deserialize;
 use std::fmt;
 use std::sync::Arc;
 

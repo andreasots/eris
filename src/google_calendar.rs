@@ -4,8 +4,7 @@ use chrono::{DateTime, FixedOffset, TimeZone};
 use failure::{Error, ResultExt};
 use futures::compat::Future01CompatExt;
 use reqwest::r#async::Client;
-use serde::{Deserialize, Deserializer};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::cmp;
 use std::sync::Arc;
 

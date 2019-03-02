@@ -185,8 +185,8 @@ mod tests {
                     pin_mut!(first);
                     pin_mut!(second);
 
-                    poll!(&mut first);
-                    poll!(&mut second);
+                    assert!(poll!(&mut first).is_pending());
+                    assert!(poll!(&mut second).is_pending());
 
                     let mut buf = [0; REQUEST.len()];
                     await!(io::read_exact(&mut write, &mut buf[..]).compat())
