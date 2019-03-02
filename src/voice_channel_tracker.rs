@@ -2,7 +2,7 @@ use crate::config::Config;
 use chrono::{DateTime, Utc};
 use csv::{Writer, WriterBuilder};
 use failure::{bail, format_err, Error, ResultExt};
-use serde_derive::Serialize;
+use serde::Serialize;
 use serenity::model::prelude::*;
 use serenity::prelude::*;
 use serenity::CACHE;

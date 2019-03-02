@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::PgPool;
 use chrono::{DateTime, FixedOffset};
 use failure::{Error, ResultExt};
-use serde_derive::Deserialize;
+use serde::Deserialize;
 use serde_json::{self, Value};
 use std::collections::HashMap;
 use std::sync::Arc;

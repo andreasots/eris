@@ -4,7 +4,7 @@ use chrono_tz::Tz;
 use failure::{Error, ResultExt};
 use futures::compat::Future01CompatExt;
 use reqwest::r#async::Client;
-use serde_derive::Deserialize;
+use serde::Deserialize;
 
 #[derive(Deserialize)]
 struct Init {

@@ -19,7 +19,6 @@ use slog_scope::{error, info};
 
 mod aiomas;
 mod announcements;
-mod apng;
 mod autotopic;
 mod channel_reaper;
 mod commands;
@@ -215,18 +214,6 @@ fn main() -> Result<(), failure::Error> {
                     .min_args(0)
                     .max_args(1)
                     .cmd(commands::time::Time::new(config.clone()))
-            })
-            .command("spoiler", |c| {
-                c.desc(concat!(
-                    "Conceal a spoiler. To reveal the message click on the thumbnail and then ",
-                    "click the 'Open original' link on desktop or the 'Open in browser' button on ",
-                    "mobile. The revealing doesn't work on Internet Explorer and Microsoft Edge."
-                ))
-                .usage("<TOPIC> <MESSAGE>")
-                .example("\"the password\" dickbutt")
-                .help_available(true)
-                .min_args(2)
-                .cmd(commands::spoiler::Spoiler::new(config.clone()))
             })
             .group("Calendar", |g| {
                 g.command("next", |c| {

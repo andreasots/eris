@@ -5,7 +5,6 @@ use failure::{Error, ResultExt, SyncFailure};
 use rand::seq::SliceRandom;
 use regex::Regex;
 use serde::{Deserialize, Deserializer};
-use serde_derive::Deserialize;
 use serenity::model::channel::Message;
 use serenity::model::guild::Emoji;
 use serenity::prelude::*;
