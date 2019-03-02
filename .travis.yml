@@ -5,8 +5,7 @@ branches:
     - master
 language: rust
 script:
-  - cargo build --verbose --all
-  - cargo test --verbose --all
+  - cargo test --verbose --release --all --target x86_64-unknown-linux-gnu
   - cargo build --verbose --release --all --target x86_64-unknown-linux-gnu
   - cp target/x86_64-unknown-linux-gnu/release/eris eris-x86_64-unknown-linux-gnu
 before_deploy:
