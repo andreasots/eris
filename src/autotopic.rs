@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::desertbus::DesertBus;
-use crate::google_calendar::{Calendar, Event, LRR};
+use crate::google::calendar::{Calendar, Event, LRR};
 use crate::models::{Game, GameEntry, Show};
 use crate::rpc::LRRbot;
 use crate::time::HumanReadable;

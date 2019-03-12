@@ -106,6 +106,8 @@ impl Helix {
             .send()
             .compat())
         .context("failed to send the request")?
+        .error_for_status()
+        .context("request failed")?
         .json::<PaginatedResponse<Stream>>()
         .compat())
         .context("failed to read the response")?

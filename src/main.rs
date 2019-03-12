@@ -23,9 +23,10 @@ mod autotopic;
 mod channel_reaper;
 mod commands;
 mod config;
+mod contact;
 mod desertbus;
 mod executor_ext;
-mod google_calendar;
+mod google;
 mod models;
 mod rpc;
 mod schema;
@@ -98,6 +99,13 @@ fn main() -> Result<(), failure::Error> {
                 .help("Config file")
                 .default_value("lrrbot.conf"),
         )
+        .arg(
+            clap::Arg::with_name("google-service-account")
+                .short("k")
+                .value_name("FILE")
+                .help("JSON file containing the Google service account key")
+                .default_value("keys.json")
+        )
         .get_matches();
 
     let config = std::sync::Arc::new(
@@ -117,7 +125,8 @@ fn main() -> Result<(), failure::Error> {
     let kraken = twitch::Kraken::new(http_client.clone(), config.clone());
     let helix = twitch::Helix::new(http_client.clone(), config.clone());
 
-    let calendar = google_calendar::Calendar::new(http_client.clone(), config.clone());
+    let calendar = google::Calendar::new(http_client.clone(), config.clone());
+    let spreadsheets = google::Sheets::new(http_client.clone(), config.clone(), matches.value_of_os("google-service-account").unwrap());
 
     let desertbus = desertbus::DesertBus::new(http_client.clone());
 
@@ -290,17 +299,19 @@ fn main() -> Result<(), failure::Error> {
 
     runtime.spawn(
         autotopic::autotopic(
-            config,
-            helix,
-            calendar,
-            desertbus,
-            pg_pool,
+            config.clone(),
+            helix.clone(),
+            calendar.clone(),
+            desertbus.clone(),
+            pg_pool.clone(),
             runtime.executor(),
         )
         .unit_error()
         .boxed()
         .compat(),
     );
+
+    runtime.spawn(contact::post_messages(config.clone(), spreadsheets.clone()).unit_error().boxed().compat());
 
     client
         .start()

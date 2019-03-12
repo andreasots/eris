@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::executor_ext::ExecutorExt;
-use crate::google_calendar::{Calendar as GoogleCalendar, Event, FANSTREAMS, LRR};
+use crate::google::calendar::{Calendar as GoogleCalendar, Event, FANSTREAMS, LRR};
 use crate::time::HumanReadable;
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;

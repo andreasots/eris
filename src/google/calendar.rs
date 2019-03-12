@@ -83,6 +83,8 @@ impl Calendar {
             .send()
             .compat())
         .context("failed to get calendar events")?
+        .error_for_status()
+        .context("request failed")?
         .json::<ListEventsResponse>()
         .compat())
         .context("failed to parse calendar events")?

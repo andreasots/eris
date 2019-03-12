@@ -11,6 +11,7 @@ struct Init {
     total: f64,
 }
 
+#[derive(Clone)]
 pub struct DesertBus {
     client: Client,
 }

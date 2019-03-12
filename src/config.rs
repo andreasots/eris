@@ -41,12 +41,15 @@ pub struct Config {
     pub temp_channel_prefix: String,
     pub announcements: ChannelId,
     pub voice_category: ChannelId,
+    pub mods_channel: ChannelId,
     pub guild: GuildId,
 
     pub twitter_api_keys: KeyPair,
     pub twitter_users: HashMap<String, Vec<ChannelId>>,
 
     pub voice_channel_data: PathBuf,
+
+    pub contact_spreadsheet: Option<String>,
 }
 
 impl Config {
@@ -124,6 +127,10 @@ impl Config {
                 Config::get_option_parsed(&ini, "discord_category_voice")?
                     .unwrap_or(360796352357072896),
             ),
+            mods_channel: ChannelId(
+                Config::get_option_parsed(&ini, "discord_channel_mods")?
+                    .unwrap_or(289166968307712000),
+            ),
             guild: GuildId(
                 Config::get_option_parsed(&ini, "discord_serverid")?.unwrap_or(288920509272555520),
             ),
@@ -164,6 +171,9 @@ impl Config {
                 .get_from(Some("lrrbot"), "voice_channel_data")
                 .unwrap_or("voice_channels.csv")
                 .into(),
+            contact_spreadsheet: ini
+                .get_from(Some("lrrbot"), "discord_contact_spreadsheet")
+                .map(String::from),
         })
     }
 

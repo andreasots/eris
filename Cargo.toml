@@ -18,7 +18,9 @@ egg-mode = "0.12.0"
 egg-mode-text = "1.14.7"
 failure = "0.1.5"
 futures-preview = { version = "0.3.0-alpha.13", features = ["compat"] }
+jsonwebtoken = "5.0.1"
 log = { version = "0.4.6", features = ["max_level_trace", "release_max_level_info"] }
+openssl = "0.10.19"
 rand = "0.6.5"
 regex = "1.1.2"
 reqwest = "0.9.11"
@@ -39,7 +41,6 @@ url = "1.7.2"
 [patch.crates-io]
 serenity = { git = "https://github.com/andreasots/serenity", branch = "old-voice-state" }
 openssl = { git = "https://github.com/ishitatsuyuki/rust-openssl", branch = "0.9.x" }
-
 
 [dev-dependencies]
 pin-utils = "0.1.0-alpha.4"

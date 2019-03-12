@@ -70,6 +70,8 @@ impl Kraken {
                 .send()
                 .compat())
             .context("failed to send the request")?
+            .error_for_status()
+            .context("request failed")?
             .json::<Value>()
             .compat())
             .context("failed to parse the response")?;
