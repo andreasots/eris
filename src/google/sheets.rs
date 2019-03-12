@@ -1,17 +1,15 @@
-use reqwest::r#async::Client;
 use crate::config::Config;
-use failure::{Error, ResultExt};
-use serde::Deserialize;
-use futures::compat::Future01CompatExt;
-use std::path::PathBuf;
 use crate::google::ServiceAccount;
+use failure::{Error, ResultExt};
+use futures::compat::Future01CompatExt;
 use reqwest::header::AUTHORIZATION;
+use reqwest::r#async::Client;
+use serde::Deserialize;
 use serde_json::json;
+use std::path::PathBuf;
 use std::sync::Arc;
 
-const SCOPES: &[&str] = &[
-    "https://www.googleapis.com/auth/spreadsheets",
-];
+const SCOPES: &[&str] = &["https://www.googleapis.com/auth/spreadsheets"];
 
 /// https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets#Spreadsheet
 #[derive(Deserialize, Debug)]
@@ -51,7 +49,7 @@ pub struct GridData {
     #[serde(rename = "rowData")]
     pub row_data: Option<Vec<RowData>>,
     #[serde(rename = "rowMetadata")]
-    pub row_metadata: Option<Vec<DimensionProperties>>
+    pub row_metadata: Option<Vec<DimensionProperties>>,
 }
 
 /// https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets#DimensionProperties
@@ -154,29 +152,57 @@ pub struct Sheets {
 impl Sheets {
     pub fn new<P: Into<PathBuf>>(client: Client, config: Arc<Config>, key_file_path: P) -> Sheets {
         Sheets {
-            oauth2: Arc::new(ServiceAccount::new(key_file_path.into(), client.clone(), SCOPES)),
+            oauth2: Arc::new(ServiceAccount::new(
+                key_file_path.into(),
+                client.clone(),
+                SCOPES,
+            )),
             client,
             config,
         }
     }
 
-    pub async fn get_spreadsheet<'a>(&'a self, spreadsheet: &'a str, fields: &'a str) -> Result<Spreadsheet, Error> {
-        let token = await!(self.oauth2.get_token()).context("failed to get a service account OAuth2 token")?;
-        Ok(await!(await!(self.client.get(&format!("https://sheets.googleapis.com/v4/spreadsheets/{}", spreadsheet))
+    pub async fn get_spreadsheet<'a>(
+        &'a self,
+        spreadsheet: &'a str,
+        fields: &'a str,
+    ) -> Result<Spreadsheet, Error> {
+        let token = await!(self.oauth2.get_token())
+            .context("failed to get a service account OAuth2 token")?;
+        Ok(await!(await!(self
+            .client
+            .get(&format!(
+                "https://sheets.googleapis.com/v4/spreadsheets/{}",
+                spreadsheet
+            ))
             .header(AUTHORIZATION, format!("Bearer {}", token))
             .query(&[("fields", fields)])
             .send()
             .compat())
-            .context("failed to send the request")?
-           .error_for_status()
-           .context("request failed")?
-           .json::<Spreadsheet>().compat())
-           .context("failed to read the response")?)
+        .context("failed to send the request")?
+        .error_for_status()
+        .context("request failed")?
+        .json::<Spreadsheet>()
+        .compat())
+        .context("failed to read the response")?)
     }
 
-    pub async fn create_developer_metadata_for_row<'a>(&'a self, spreadsheet: &'a str, sheet_id: u64, row: u64, key: &'a str, value: &'a str) -> Result<(), Error> {
-        let token = await!(self.oauth2.get_token()).context("failed to get a service account OAuth2 token")?;
-        let req = self.client.post(&format!("https://sheets.googleapis.com/v4/spreadsheets/{}:batchUpdate", spreadsheet))
+    pub async fn create_developer_metadata_for_row<'a>(
+        &'a self,
+        spreadsheet: &'a str,
+        sheet_id: u64,
+        row: u64,
+        key: &'a str,
+        value: &'a str,
+    ) -> Result<(), Error> {
+        let token = await!(self.oauth2.get_token())
+            .context("failed to get a service account OAuth2 token")?;
+        let req = self
+            .client
+            .post(&format!(
+                "https://sheets.googleapis.com/v4/spreadsheets/{}:batchUpdate",
+                spreadsheet
+            ))
             .header(AUTHORIZATION, format!("Bearer {}", token))
             .json(&json!({
                 "requests": [

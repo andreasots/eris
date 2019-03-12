@@ -1,24 +1,31 @@
 //! Creating OAuth2 bearer tokens for Google service accounts
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use futures::lock::Mutex;
-use std::path::PathBuf;
 use failure::{Error, ResultExt};
-use serde::{Deserialize, Deserializer, Serialize};
+use futures::compat::Future01CompatExt;
+use futures::lock::Mutex;
 use jsonwebtoken::{Algorithm, Header};
 use reqwest::r#async::Client;
-use futures::compat::Future01CompatExt;
+use serde::{Deserialize, Deserializer, Serialize};
+use std::path::PathBuf;
 use tokio::fs::File;
 
-fn pem_to_der<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error> where D: Deserializer<'de> {
+fn pem_to_der<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+where
+    D: Deserializer<'de>,
+{
     use serde::de::Error;
 
     let pem = String::deserialize(deserializer)?;
     let private_key = openssl::rsa::Rsa::private_key_from_pem(pem.as_bytes())
         .map_err(|err| Error::custom(format!("failed to parse the private key: {}", err)))?;
 
-    private_key.private_key_to_der()
-        .map_err(|err| Error::custom(format!("failed to serialize the private key to DER: {}", err)))
+    private_key.private_key_to_der().map_err(|err| {
+        Error::custom(format!(
+            "failed to serialize the private key to DER: {}",
+            err
+        ))
+    })
 }
 
 /// Type of a service account key JSON. There are more fields but we're only interested in these.
@@ -93,21 +100,24 @@ impl ServiceAccount {
                     exp: (now + Duration::seconds(3600)).timestamp(),
                 },
                 &key.private_key,
-            ).context("failed to create a JWT token")?;
+            )
+            .context("failed to create a JWT token")?;
 
-            let req = self.client.post(&key.token_uri)
-                .form(&[
-                    ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
-                    ("assertion", &jwt),
-                ]);
+            let req = self.client.post(&key.token_uri).form(&[
+                ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
+                ("assertion", &jwt),
+            ]);
             let mut res = await!(req.send().compat())
                 .context("failed to request a OAuth2 token")?
                 .error_for_status()
                 .context("request failed")?;
-            let new_token = await!(res.json::<NewToken>().compat())
-                .context("failed to read the response")?;
+            let new_token =
+                await!(res.json::<NewToken>().compat()).context("failed to read the response")?;
             if new_token.token_type != "Bearer" {
-                return Err(failure::err_msg(format!("{:?} token returned, expected Bearer", new_token.token_type)));
+                return Err(failure::err_msg(format!(
+                    "{:?} token returned, expected Bearer",
+                    new_token.token_type
+                )));
             }
             *token = Token {
                 token: new_token.access_token,

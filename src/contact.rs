@@ -1,16 +1,16 @@
-use std::sync::Arc;
 use crate::config::Config;
-use crate::google::sheets::{Sheets, Spreadsheet, CellData, ExtendedValue};
-use tokio::timer::Interval;
-use std::time::{Instant, Duration};
-use futures::TryStreamExt;
-use failure::{Error, ResultExt, SyncFailure};
+use crate::google::sheets::{CellData, ExtendedValue, Sheets, Spreadsheet};
+use chrono::TimeZone;
 use chrono::{DateTime, Utc};
+use chrono_tz::Tz;
+use failure::{Error, ResultExt, SyncFailure};
 use futures::compat::Stream01CompatExt;
+use futures::TryStreamExt;
 use slog::{slog_error, slog_info};
 use slog_scope::{error, info};
-use chrono_tz::Tz;
-use chrono::TimeZone;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::timer::Interval;
 
 const SENT_KEY: &str = "lrrbot.sent";
 
@@ -60,7 +60,9 @@ fn extract_string(cell: &CellData) -> Option<&str> {
 }
 
 fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(u64, Vec<Entry>)> {
-    let timezone = spreadsheet.properties.as_ref()
+    let timezone = spreadsheet
+        .properties
+        .as_ref()
         .and_then(|p| p.timezone.as_ref())
         .and_then(|tz| tz.parse::<Tz>().ok())
         .expect("timezone missing or invalid timezone");
@@ -73,7 +75,10 @@ fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(u64, Vec<Entry>)> {
 
     for grid in sheet.data.as_ref()? {
         let start_row = grid.start_row.unwrap_or(0);
-        'row: for (i, (row, meta)) in grid.row_data.as_ref()?.iter().zip(grid.row_metadata.as_ref()?.iter()).enumerate() {
+
+        let row_data = grid.row_data.as_ref()?.iter();
+        let metadata = grid.row_metadata.as_ref()?.iter();
+        'row: for (i, (row, meta)) in row_data.zip(metadata).enumerate() {
             let row_idx = start_row + i as u64;
             if row_idx == 0 {
                 continue;
@@ -87,14 +92,19 @@ fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(u64, Vec<Entry>)> {
                 }
             }
 
+            let values = row.values.as_ref();
 
-            let timestamp = row.values.as_ref().and_then(|row| row.get(0)).and_then(extract_timestamp);
-            let message = row.values.as_ref().and_then(|row| row.get(1)).and_then(extract_string);
-            let username = row.values.as_ref().and_then(|row| row.get(2)).and_then(extract_string);
+            let timestamp = values
+                .and_then(|row| row.get(0))
+                .and_then(extract_timestamp);
+            let message = values.and_then(|row| row.get(1)).and_then(extract_string);
+            let username = values.and_then(|row| row.get(2)).and_then(extract_string);
 
             if let (Some(timestamp), Some(message)) = (timestamp, message) {
                 rows.push(Entry {
-                    timestamp: timezone.timestamp(timestamp as i64, (timestamp.fract() * 1e9) as u32).with_timezone(&Utc),
+                    timestamp: timezone
+                        .timestamp(timestamp as i64, (timestamp.fract() * 1e9) as u32)
+                        .with_timezone(&Utc),
                     message,
                     username,
                     row: row_idx,
@@ -107,7 +117,9 @@ fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(u64, Vec<Entry>)> {
 }
 
 async fn inner<'a>(config: &'a Config, sheets: &'a Sheets) -> Result<(), Error> {
-    let spreadsheet_key: &str = config.contact_spreadsheet.as_ref()
+    let spreadsheet_key: &str = config
+        .contact_spreadsheet
+        .as_ref()
         .ok_or(failure::err_msg("Contact spreadsheet is not set."))?;
 
     let spreadsheet = await!(sheets.get_spreadsheet(spreadsheet_key, "properties.timeZone,sheets(properties.sheetId,data(startRow,startColumn,rowData.values.effectiveValue,rowMetadata.developerMetadata))"))
@@ -118,22 +130,31 @@ async fn inner<'a>(config: &'a Config, sheets: &'a Sheets) -> Result<(), Error> 
 
     for message in unsent {
         info!("forwarding message"; "message" => ?message);
-        config.mods_channel.send_message(|m| {
-            m.content(format!("New message from the contact form:"))
-                .embed(|mut embed| {
-                    embed = embed.description(message.message)
-                        .timestamp(message.timestamp.to_rfc3339());
-                    if let Some(user) = message.username {
-                        embed = embed.author(|e| e.name(user))
-                    }
-                    embed
-                })
-        })
+        config
+            .mods_channel
+            .send_message(|m| {
+                m.content(format!("New message from the contact form:"))
+                    .embed(|mut embed| {
+                        embed = embed
+                            .description(message.message)
+                            .timestamp(message.timestamp.to_rfc3339());
+                        if let Some(user) = message.username {
+                            embed = embed.author(|e| e.name(user))
+                        }
+                        embed
+                    })
+            })
             .map_err(SyncFailure::new)
             .context("failed to forward the message")?;
 
-        await!(sheets.create_developer_metadata_for_row(spreadsheet_key, sheet_id, message.row, SENT_KEY, "1"))
-            .context("failed to set the message as sent")?;
+        await!(sheets.create_developer_metadata_for_row(
+            spreadsheet_key,
+            sheet_id,
+            message.row,
+            SENT_KEY,
+            "1"
+        ))
+        .context("failed to set the message as sent")?;
     }
 
     Ok(())

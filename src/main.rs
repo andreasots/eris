@@ -1,12 +1,7 @@
-#![feature(
-    futures_api,
-    await_macro,
-    async_await,
-    const_slice_len
-)]
+#![feature(futures_api, await_macro, async_await, const_slice_len)]
 // Remove when Diesel updates.
 #![allow(proc_macro_derive_resolution_fallback)]
-#![recursion_limit="256"]
+#![recursion_limit = "256"]
 
 #[macro_use]
 extern crate diesel;
@@ -104,7 +99,7 @@ fn main() -> Result<(), failure::Error> {
                 .short("k")
                 .value_name("FILE")
                 .help("JSON file containing the Google service account key")
-                .default_value("keys.json")
+                .default_value("keys.json"),
         )
         .get_matches();
 
@@ -126,7 +121,11 @@ fn main() -> Result<(), failure::Error> {
     let helix = twitch::Helix::new(http_client.clone(), config.clone());
 
     let calendar = google::Calendar::new(http_client.clone(), config.clone());
-    let spreadsheets = google::Sheets::new(http_client.clone(), config.clone(), matches.value_of_os("google-service-account").unwrap());
+    let spreadsheets = google::Sheets::new(
+        http_client.clone(),
+        config.clone(),
+        matches.value_of_os("google-service-account").unwrap(),
+    );
 
     let desertbus = desertbus::DesertBus::new(http_client.clone());
 
@@ -311,7 +310,12 @@ fn main() -> Result<(), failure::Error> {
         .compat(),
     );
 
-    runtime.spawn(contact::post_messages(config.clone(), spreadsheets.clone()).unit_error().boxed().compat());
+    runtime.spawn(
+        contact::post_messages(config.clone(), spreadsheets.clone())
+            .unit_error()
+            .boxed()
+            .compat(),
+    );
 
     client
         .start()
