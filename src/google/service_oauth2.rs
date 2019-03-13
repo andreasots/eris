@@ -10,6 +10,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::path::PathBuf;
 use tokio::fs::File;
 
+const TOKEN_URI: &str = "https://www.googleapis.com/oauth2/v4/token";
+
 fn pem_to_der<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
 where
     D: Deserializer<'de>,
@@ -34,7 +36,6 @@ struct Key {
     #[serde(deserialize_with = "pem_to_der")]
     private_key: Vec<u8>,
     client_email: String,
-    token_uri: String,
 }
 
 #[derive(Serialize)]
@@ -95,7 +96,7 @@ impl ServiceAccount {
                 &Claims {
                     iss: &key.client_email,
                     scope: &self.scopes,
-                    aud: &key.token_uri,
+                    aud: TOKEN_URI,
                     iat: now.timestamp(),
                     exp: (now + Duration::seconds(3600)).timestamp(),
                 },
@@ -103,7 +104,7 @@ impl ServiceAccount {
             )
             .context("failed to create a JWT token")?;
 
-            let req = self.client.post(&key.token_uri).form(&[
+            let req = self.client.post(TOKEN_URI).form(&[
                 ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
                 ("assertion", &jwt),
             ]);

@@ -129,7 +129,6 @@ async fn inner<'a>(config: &'a Config, sheets: &'a Sheets) -> Result<(), Error> 
         .ok_or_else(|| failure::err_msg("no sheets or required information missing"))?;
 
     for message in unsent {
-        info!("forwarding message"; "message" => ?message);
         config
             .mods_channel
             .send_message(|m| {
