@@ -23,7 +23,7 @@ log = { version = "0.4.6", features = ["max_level_trace", "release_max_level_inf
 openssl = "0.10.19"
 rand = "0.6.5"
 regex = "1.1.5"
-reqwest = "0.9.12"
+reqwest = "0.9.13"
 rust-ini = "0.13.0"
 separator = "0.4.0"
 serde = { version = "1.0.89", features = ["derive"] }
