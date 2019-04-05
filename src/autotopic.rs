@@ -104,7 +104,7 @@ struct Autotopic {
 }
 
 impl Autotopic {
-    async fn update_topic<'a>(&mut self) -> Result<(), Error> {
+    async fn update_topic(&mut self) -> Result<(), Error> {
         let header =
             await!(self.lrrbot.get_header_info()).context("failed to fetch header info")?;
         // FIXME: This is what discord.py was doing. This should probably be a config option instead.
