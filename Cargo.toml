@@ -17,7 +17,7 @@ diesel = { version = "1.4.2", features = ["postgres", "r2d2", "serde_json"] }
 egg-mode = "0.12.0"
 egg-mode-text = "1.14.7"
 failure = "0.1.5"
-futures-preview = { version = "0.3.0-alpha.13", features = ["compat"] }
+futures-preview = { version = "0.3.0-alpha.14", features = ["compat"] }
 jsonwebtoken = "5.0.1"
 log = { version = "0.4.6", features = ["max_level_trace", "release_max_level_info"] }
 openssl = "0.10.19"
