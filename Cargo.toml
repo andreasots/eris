@@ -22,7 +22,7 @@ jsonwebtoken = "5.0.1"
 log = { version = "0.4.6", features = ["max_level_trace", "release_max_level_info"] }
 openssl = "0.10.19"
 rand = "0.6.5"
-regex = "1.1.5"
+regex = "1.1.6"
 reqwest = "0.9.15"
 rust-ini = "0.13.0"
 separator = "0.4.1"
