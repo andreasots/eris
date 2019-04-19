@@ -2,31 +2,34 @@ use crate::config::Config;
 use crate::google::sheets::{CellData, ExtendedValue, Sheets, Spreadsheet};
 use chrono::TimeZone;
 use chrono::{DateTime, Utc};
-use chrono_tz::Tz;
 use failure::{Error, ResultExt, SyncFailure};
 use futures::compat::Stream01CompatExt;
 use futures::TryStreamExt;
 use slog::{slog_error, slog_info};
 use slog_scope::{error, info};
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;
+use crate::context::ErisContext;
+use crate::extract::Extract;
 
 const SENT_KEY: &str = "lrrbot.sent";
 
-pub async fn post_messages(config: Arc<Config>, sheets: Sheets) {
-    if config.contact_spreadsheet.is_none() {
-        info!("Contact spreadsheet not set.");
+pub async fn post_messages(ctx: ErisContext) {
+    let spreadsheet_set = ctx.data.read()
+        .extract::<Config>()
+        .map(|config| config.contact_spreadsheet.is_some())
+        .unwrap_or(false);
+    if !spreadsheet_set {
+        info!("Contact spreadsheet not set");
         return;
     };
 
     let mut timer = Interval::new(Instant::now(), Duration::from_secs(60)).compat();
 
     loop {
-        match await!(timer.try_next()) {
-            Ok(Some(_)) => match await!(inner(&config, &sheets)) {
-                Ok(()) => (),
-                Err(err) => error!("Failed to post new messages"; "error" => ?err),
+        match timer.try_next().await {
+            Ok(Some(_)) => if let Err(err) = inner(&ctx).await {
+                error!("Failed to post new messages"; "error" => ?err);
             },
             Ok(None) => break,
             Err(err) => error!("Timer error"; "error" => ?err),
@@ -60,13 +63,6 @@ fn extract_string(cell: &CellData) -> Option<&str> {
 }
 
 fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(u64, Vec<Entry>)> {
-    let timezone = spreadsheet
-        .properties
-        .as_ref()
-        .and_then(|p| p.timezone.as_ref())
-        .and_then(|tz| tz.parse::<Tz>().ok())
-        .expect("timezone missing or invalid timezone");
-
     let sheets = spreadsheet.sheets.as_ref()?;
     let sheet = sheets.get(0)?;
     let sheet_id = sheet.properties.as_ref()?.sheet_id?;
@@ -102,9 +98,7 @@ fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(u64, Vec<Entry>)> {
 
             if let (Some(timestamp), Some(message)) = (timestamp, message) {
                 rows.push(Entry {
-                    timestamp: timezone
-                        .timestamp(timestamp as i64, (timestamp.fract() * 1e9) as u32)
-                        .with_timezone(&Utc),
+                    timestamp: Utc.timestamp(timestamp as i64, (timestamp.fract() * 1e9) as u32),
                     message,
                     username,
                     row: row_idx,
@@ -116,22 +110,29 @@ fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(u64, Vec<Entry>)> {
     Some((sheet_id, rows))
 }
 
-async fn inner<'a>(config: &'a Config, sheets: &'a Sheets) -> Result<(), Error> {
-    let spreadsheet_key: &str = config
-        .contact_spreadsheet
-        .as_ref()
-        .ok_or(failure::err_msg("Contact spreadsheet is not set."))?;
+async fn inner(ctx: &ErisContext) -> Result<(), Error> {
+    let (spreadsheet_key, sheets, mods_channel) = {
+        let data = ctx.data.read();
 
-    let spreadsheet = await!(sheets.get_spreadsheet(spreadsheet_key, "properties.timeZone,sheets(properties.sheetId,data(startRow,startColumn,rowData.values.effectiveValue,rowMetadata.developerMetadata))"))
+        let config = data.extract::<Config>()?;
+
+        let spreadsheet_key = config.contact_spreadsheet.clone().ok_or(failure::err_msg("Contact spreadsheet is not set"))?;
+
+        let sheets = data.extract::<Sheets>()?.clone();
+
+        (spreadsheet_key, sheets, config.mods_channel)
+    };
+
+    let spreadsheet = sheets.get_spreadsheet(&spreadsheet_key, "properties.timeZone,sheets(properties.sheetId,data(startRow,startColumn,rowData.values.effectiveValue,rowMetadata.developerMetadata))")
+        .await
         .context("failed to fetch the spreadsheet")?;
 
     let (sheet_id, unsent) = find_unsent_rows(&spreadsheet)
         .ok_or_else(|| failure::err_msg("no sheets or required information missing"))?;
 
     for message in unsent {
-        config
-            .mods_channel
-            .send_message(|m| {
+        mods_channel
+            .send_message(ctx, |m| {
                 m.content(format!("New message from the contact form:"))
                     .embed(|mut embed| {
                         embed = embed
@@ -146,14 +147,15 @@ async fn inner<'a>(config: &'a Config, sheets: &'a Sheets) -> Result<(), Error> 
             .map_err(SyncFailure::new)
             .context("failed to forward the message")?;
 
-        await!(sheets.create_developer_metadata_for_row(
-            spreadsheet_key,
+        sheets.create_developer_metadata_for_row(
+            &spreadsheet_key,
             sheet_id,
             message.row,
             SENT_KEY,
             "1"
-        ))
-        .context("failed to set the message as sent")?;
+        )
+            .await
+            .context("failed to set the message as sent")?;
     }
 
     Ok(())

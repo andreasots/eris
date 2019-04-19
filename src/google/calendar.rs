@@ -6,7 +6,6 @@ use futures::compat::Future01CompatExt;
 use reqwest::r#async::Client;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::cmp;
-use std::sync::Arc;
 
 pub const LRR: &str = "loadingreadyrun.com_72jmf1fn564cbbr84l048pv1go@group.calendar.google.com";
 pub const FANSTREAMS: &str = "caffeinatedlemur@gmail.com";
@@ -54,12 +53,12 @@ where
 #[derive(Clone)]
 pub struct Calendar {
     client: Client,
-    config: Arc<Config>,
+    key: String,
 }
 
 impl Calendar {
-    pub fn new(client: Client, config: Arc<Config>) -> Calendar {
-        Calendar { client, config }
+    pub fn new(client: Client, config: &Config) -> Calendar {
+        Calendar { client, key: config.google_key.clone() }
     }
 
     pub async fn get_upcoming_events<'a, Tz: TimeZone + 'a>(
@@ -67,28 +66,32 @@ impl Calendar {
         calendar: &'a str,
         after: DateTime<Tz>,
     ) -> Result<Vec<Event>, Error> {
-        Ok(await!(await!(self
-            .client
-            .get(&format!(
-                "https://www.googleapis.com/calendar/v3/calendars/{}/events",
-                calendar
-            ))
-            .query(&ListEventsRequest {
-                maxResults: 10,
-                orderBy: "startTime",
-                singleEvents: true,
-                timeMin: after,
-                key: &self.config.google_key,
-            })
-            .send()
-            .compat())
-        .context("failed to get calendar events")?
-        .error_for_status()
-        .context("request failed")?
-        .json::<ListEventsResponse>()
-        .compat())
-        .context("failed to parse calendar events")?
-        .items)
+        Ok(
+            self
+                .client
+                .get(&format!(
+                    "https://www.googleapis.com/calendar/v3/calendars/{}/events",
+                    calendar
+                ))
+                .query(&ListEventsRequest {
+                    maxResults: 10,
+                    orderBy: "startTime",
+                    singleEvents: true,
+                    timeMin: after,
+                    key: &self.key,
+                })
+                .send()
+                .compat()
+                .await
+                .context("failed to get calendar events")?
+                .error_for_status()
+                .context("request failed")?
+                .json::<ListEventsResponse>()
+                .compat()
+                .await
+                .context("failed to parse calendar events")?
+                .items
+        )
     }
 
     pub fn get_next_event<Tz: TimeZone>(

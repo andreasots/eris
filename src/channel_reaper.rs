@@ -1,27 +1,24 @@
 use crate::config::Config;
 use chrono::{DateTime, Utc};
-use failure::{self, Error, ResultExt, SyncFailure};
+use failure::{self, Error};
 use serenity::model::prelude::*;
-use serenity::CACHE;
 use slog::{slog_error, slog_info};
 use slog_scope::{error, info};
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
+use crate::context::ErisContext;
+use crate::extract::Extract;
 
-fn reap_channels(config: &Config) -> Result<(), Error> {
-    let guild = CACHE
-        .read()
-        .guilds
-        .get(&config.guild)
-        .cloned()
+const STARTUP_DELAY: Duration = Duration::from_secs(5);
+const REAP_INTERVAL: Duration = Duration::from_secs(60);
+const MIN_CHANNEL_AGE: Duration = Duration::from_secs(15 * 60);
+
+fn reap_channels(ctx: &ErisContext) -> Result<(), Error> {
+    let data = ctx.data.read();
+    let config = data.extract::<Config>()?;
+    let guild = ctx.cache_and_http.cache.read().guild(config.guild)
         .ok_or_else(|| failure::err_msg("failed to get the guild"))?;
-    let channels = config
-        .guild
-        .channels()
-        .map_err(SyncFailure::new)
-        .context("failed to fetch channels")?;
 
     let mut voice_users = HashMap::new();
     for voice_state in guild.read().voice_states.values() {
@@ -32,7 +29,10 @@ fn reap_channels(config: &Config) -> Result<(), Error> {
 
     let now = Utc::now();
 
-    for channel in channels.values() {
+    let mut unused_channels = vec![];
+
+    for channel in guild.read().channels.values() {
+        let channel = channel.read();
         if channel.kind != ChannelType::Voice
             || !channel.name.starts_with(&config.temp_channel_prefix)
         {
@@ -41,26 +41,34 @@ fn reap_channels(config: &Config) -> Result<(), Error> {
 
         let created_at = DateTime::from_utc(channel.id.created_at(), Utc);
 
-        if (now - created_at).to_std()? > Duration::from_secs(15 * 60)
+        if (now - created_at).to_std()? > MIN_CHANNEL_AGE
             && voice_users.get(&channel.id).cloned().unwrap_or(0) == 0
         {
-            info!("Deleting a channel"; "channel.name" => ?channel.name);
-            channel
-                .delete()
-                .map_err(SyncFailure::new)
-                .with_context(|_| format!("failed to delete {:?}", channel.name))?;
+            info!("Scheduling a temporary channel for deletion"; "channel.id" => ?channel.id, "channel.name" => ?channel.name);
+            unused_channels.push(channel.id);
+        }
+    }
+
+    for channel_id in unused_channels {
+        if let Err(err) = channel_id.delete(&ctx) {
+            error!("Failed to delete a temporary channel"; "error" => ?err, "channel.id" => ?channel_id);
         }
     }
 
     Ok(())
 }
 
-pub fn channel_reaper(config: Arc<Config>) -> impl FnOnce() {
-    move || loop {
-        match reap_channels(&config) {
-            Ok(()) => (),
-            Err(err) => error!("Failed to reap channels"; "error" => ?err),
+pub fn channel_reaper(ctx: ErisContext) -> impl FnOnce() {
+    move || {
+        // Delay the first reap so that it doesn't happen before the Discord connection is ready.
+        thread::sleep(STARTUP_DELAY);
+
+        loop {
+            match reap_channels(&ctx) {
+                Ok(()) => (),
+                Err(err) => error!("Failed to reap channels"; "error" => ?err),
+            }
+            thread::sleep(REAP_INTERVAL);
         }
-        thread::sleep(Duration::from_secs(60));
     }
 }

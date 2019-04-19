@@ -42,15 +42,18 @@ impl DesertBus {
     }
 
     pub async fn money_raised(&self) -> Result<f64, Error> {
-        let mut res = await!(self
-            .client
-            .get("https://desertbus.org/wapi/init")
-            .send()
-            .compat())
-        .context("failed to get the current Desert Bus total")?;
-        let total = await!(res.json::<Init>().compat())
-            .context("failed to parse the current Desert Bus total")?
-            .total;
-        Ok(total)
+        Ok(
+            self
+                .client
+                .get("https://desertbus.org/wapi/init")
+                .send()
+                .compat()
+                .await
+                .context("failed to get the current Desert Bus total")?
+                .json::<Init>().compat()
+                .await
+                .context("failed to parse the current Desert Bus total")?
+                .total
+        )
     }
 }

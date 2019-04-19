@@ -7,7 +7,6 @@ use reqwest::r#async::Client;
 use serde::de::{Error as SerdeError, Visitor};
 use serde::{Deserialize, Deserializer};
 use std::fmt;
-use std::sync::Arc;
 
 #[derive(Copy, Clone, Debug)]
 pub enum User<'a> {
@@ -85,33 +84,37 @@ struct PaginatedResponse<T> {
 #[derive(Clone)]
 pub struct Helix {
     client: Client,
-    config: Arc<Config>,
+    client_id: HeaderValue,
 }
 
 impl Helix {
-    pub fn new(client: Client, config: Arc<Config>) -> Helix {
-        Helix { client, config }
+    pub fn new(client: Client, config: &Config) -> Result<Helix, Error> {
+        Ok(Helix {
+            client,
+            client_id: HeaderValue::from_str(&config.twitch_client_id)
+                .context("Client-ID is not valid as a header value")?,
+        })
     }
 
     pub async fn get_stream<'a>(&'a self, user: User<'a>) -> Result<Option<Stream>, Error> {
-        Ok(await!(await!(self
-            .client
-            .get("https://api.twitch.tv/helix/streams")
-            .header(
-                "Client-ID",
-                HeaderValue::from_str(&self.config.twitch_client_id)
-                    .context("failed to set the client ID")?
-            )
-            .query(&user.as_query()[..])
-            .send()
-            .compat())
-        .context("failed to send the request")?
-        .error_for_status()
-        .context("request failed")?
-        .json::<PaginatedResponse<Stream>>()
-        .compat())
-        .context("failed to read the response")?
-        .data
-        .pop())
+        Ok(
+            self
+                .client
+                .get("https://api.twitch.tv/helix/streams")
+                .header("Client-ID", self.client_id.clone())
+                .query(&user.as_query()[..])
+                .send()
+                .compat()
+                .await
+                .context("failed to send the request")?
+                .error_for_status()
+                .context("request failed")?
+                .json::<PaginatedResponse<Stream>>()
+                .compat()
+                .await
+                .context("failed to read the response")?
+                .data
+                .pop()
+        )
     }
 }

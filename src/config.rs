@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use url::Url;
 
+#[derive(Debug)]
 pub struct Config {
     pub username: String,
 
@@ -42,6 +43,7 @@ pub struct Config {
     pub announcements: ChannelId,
     pub voice_category: ChannelId,
     pub mods_channel: ChannelId,
+    pub general_channel: ChannelId,
     pub guild: GuildId,
 
     pub twitter_api_keys: KeyPair,
@@ -130,6 +132,13 @@ impl Config {
             mods_channel: ChannelId(
                 Config::get_option_parsed(&ini, "discord_channel_mods")?
                     .unwrap_or(289166968307712000),
+            ),
+            general_channel: ChannelId(
+                if let Some(channel_id) = Config::get_option_parsed(&ini, "discord_channel_general")? {
+                    channel_id
+                } else {
+                    Config::get_option_parsed(&ini, "discord_serverid")?.unwrap_or(288920509272555520)
+                }
             ),
             guild: GuildId(
                 Config::get_option_parsed(&ini, "discord_serverid")?.unwrap_or(288920509272555520),

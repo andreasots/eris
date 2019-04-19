@@ -99,7 +99,7 @@ impl Server {
         let methods = Arc::new(methods);
 
         loop {
-            match await!(listener.try_next()) {
+            match listener.try_next().await {
                 Ok(Some(socket)) => {
                     executor.spawn(
                         Server::process(
@@ -135,9 +135,9 @@ impl Server {
         executor.spawn(
             async move {
                 loop {
-                    match await!(rx.next()) {
+                    match rx.next().await {
                         Some(response) => {
-                            sink = match await!(sink.send(response).compat()) {
+                            sink = match sink.send(response).compat().await {
                                 Ok(sink) => sink,
                                 Err(err) => {
                                     error!("Failed to send a response"; "error" => ?err);
@@ -156,7 +156,7 @@ impl Server {
         let mut stream = stream.compat();
 
         loop {
-            match await!(stream.try_next()) {
+            match stream.try_next().await {
                 Ok(Some((id, (method, args, kwargs)))) => {
                     let mut tx = tx.clone();
                     let future = match methods.get(&method) {
@@ -170,7 +170,7 @@ impl Server {
                         future
                             .then(move |res| {
                                 async move {
-                                    let _ = await!(tx.send((id, res)));
+                                    let _ = tx.send((id, res)).await;
                                 }
                             })
                             .unit_error()

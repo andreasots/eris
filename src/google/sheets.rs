@@ -1,4 +1,3 @@
-use crate::config::Config;
 use crate::google::ServiceAccount;
 use failure::{Error, ResultExt};
 use futures::compat::Future01CompatExt;
@@ -145,12 +144,11 @@ pub enum ErrorType {
 #[derive(Clone)]
 pub struct Sheets {
     client: Client,
-    config: Arc<Config>,
     oauth2: Arc<ServiceAccount>,
 }
 
 impl Sheets {
-    pub fn new<P: Into<PathBuf>>(client: Client, config: Arc<Config>, key_file_path: P) -> Sheets {
+    pub fn new<P: Into<PathBuf>>(client: Client, key_file_path: P) -> Sheets {
         Sheets {
             oauth2: Arc::new(ServiceAccount::new(
                 key_file_path.into(),
@@ -158,7 +156,6 @@ impl Sheets {
                 SCOPES,
             )),
             client,
-            config,
         }
     }
 
@@ -167,24 +164,29 @@ impl Sheets {
         spreadsheet: &'a str,
         fields: &'a str,
     ) -> Result<Spreadsheet, Error> {
-        let token = await!(self.oauth2.get_token())
+        let token = self.oauth2.get_token()
+            .await
             .context("failed to get a service account OAuth2 token")?;
-        Ok(await!(await!(self
-            .client
-            .get(&format!(
-                "https://sheets.googleapis.com/v4/spreadsheets/{}",
-                spreadsheet
-            ))
-            .header(AUTHORIZATION, format!("Bearer {}", token))
-            .query(&[("fields", fields)])
-            .send()
-            .compat())
-        .context("failed to send the request")?
-        .error_for_status()
-        .context("request failed")?
-        .json::<Spreadsheet>()
-        .compat())
-        .context("failed to read the response")?)
+        Ok(
+            self
+                .client
+                .get(&format!(
+                    "https://sheets.googleapis.com/v4/spreadsheets/{}",
+                    spreadsheet
+                ))
+                .header(AUTHORIZATION, format!("Bearer {}", token))
+                .query(&[("fields", fields)])
+                .send()
+                .compat()
+                .await
+                .context("failed to send the request")?
+                .error_for_status()
+                .context("request failed")?
+                .json::<Spreadsheet>()
+                .compat()
+                .await
+                .context("failed to read the response")?
+        )
     }
 
     pub async fn create_developer_metadata_for_row<'a>(
@@ -195,9 +197,10 @@ impl Sheets {
         key: &'a str,
         value: &'a str,
     ) -> Result<(), Error> {
-        let token = await!(self.oauth2.get_token())
+        let token = self.oauth2.get_token()
+            .await
             .context("failed to get a service account OAuth2 token")?;
-        let req = self
+        self
             .client
             .post(&format!(
                 "https://sheets.googleapis.com/v4/spreadsheets/{}:batchUpdate",
@@ -225,8 +228,10 @@ impl Sheets {
                     }
                 ],
                 "includeSpreadsheetInResponse": false,
-            }));
-        await!(req.send().compat())
+            }))
+            .send()
+            .compat()
+            .await
             .context("failed to send the request")?
             .error_for_status()
             .context("request failed")?;

@@ -14,12 +14,13 @@ chrono-tz = "0.5.1"
 clap = "2.33.0"
 csv = "1.0.7"
 diesel = { version = "1.4.2", features = ["postgres", "r2d2", "serde_json"] }
-egg-mode = "0.12.0"
+# 0.12.0 depends on an old OpenSSL version and uses old Tokio
+egg-mode = { git = "https://github.com/QuietMisdreavus/twitter-rs" }
 egg-mode-text = "1.14.7"
 failure = "0.1.5"
-futures-preview = { version = "0.3.0-alpha.15", features = ["compat"] }
+futures-preview = { version = "0.3.0-alpha.15", features = ["async-await", "compat", "nightly"] }
 jsonwebtoken = "6.0.0"
-log = { version = "0.4.6", features = ["max_level_trace", "release_max_level_info"] }
+log = { version = "0.4.6", features = ["max_level_trace", "release_max_level_info", "std"] }
 openssl = "0.10.19"
 rand = "0.6.5"
 regex = "1.1.6"
@@ -28,19 +29,14 @@ rust-ini = "0.13.0"
 separator = "0.4.1"
 serde = { version = "1.0.91", features = ["derive"] }
 serde_json = "1.0.39"
-serenity = "0.5.13"
+serenity = "0.6.0-rc.1"
 slog = { version = "2.4.1", features = ["max_level_trace", "release_max_level_debug"] }
 slog-async = "2.3.0"
 slog-scope = "4.1.1"
 slog-term = "2.4.0"
 strfmt = "0.1.6"
 tokio = "0.1.19"
-tokio-core = "0.1.17"
 url = "1.7.2"
-
-[patch.crates-io]
-serenity = { git = "https://github.com/andreasots/serenity", branch = "old-voice-state" }
-openssl = { git = "https://github.com/ishitatsuyuki/rust-openssl", branch = "0.9.x" }
 
 [dev-dependencies]
 pin-utils = "0.1.0-alpha.4"

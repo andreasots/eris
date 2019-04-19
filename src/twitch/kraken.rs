@@ -5,7 +5,6 @@ use reqwest::header::{HeaderValue, ACCEPT, AUTHORIZATION};
 use reqwest::r#async::Client;
 use serde::Deserialize;
 use serde_json::{self, Value};
-use std::sync::Arc;
 
 #[derive(Debug, Deserialize)]
 pub struct Channel {
@@ -25,12 +24,16 @@ pub struct Stream {
 #[derive(Clone)]
 pub struct Kraken {
     client: Client,
-    config: Arc<Config>,
+    client_id: HeaderValue,
 }
 
 impl Kraken {
-    pub fn new(client: Client, config: Arc<Config>) -> Kraken {
-        Kraken { client, config }
+    pub fn new(client: Client, config: &Config) -> Result<Kraken, Error> {
+        Ok(Kraken {
+            client,
+            client_id: HeaderValue::from_str(&config.twitch_client_id)
+                .context("Client-ID is not valid as a header value")?,
+        })
     }
 
     async fn paginated_by_offset<'a, T: for<'de> Deserialize<'de>>(
@@ -53,11 +56,7 @@ impl Kraken {
             let mut req = self
                 .client
                 .get(url)
-                .header(
-                    "Client-ID",
-                    HeaderValue::from_str(&self.config.twitch_client_id[..])
-                        .context("failed to set the Client-ID")?,
-                )
+                .header("Client-ID", self.client_id.clone())
                 .header(
                     ACCEPT,
                     HeaderValue::from_static("application/vnd.twitchtv.v5+json"),
@@ -65,16 +64,18 @@ impl Kraken {
             if let Some(ref token) = token {
                 req = req.header(AUTHORIZATION, token.clone());
             }
-            let value = await!(await!(req
+            let value = req
                 .query(&[("offset", &format!("{}", data.len())[..]), ("limit", "25")])
                 .send()
-                .compat())
-            .context("failed to send the request")?
-            .error_for_status()
-            .context("request failed")?
-            .json::<Value>()
-            .compat())
-            .context("failed to parse the response")?;
+                .compat()
+                .await
+                .context("failed to send the request")?
+                .error_for_status()
+                .context("request failed")?
+                .json::<Value>()
+                .compat()
+                .await
+                .context("failed to parse the response")?;
             data.extend(
                 value
                     .get(key)
@@ -99,10 +100,11 @@ impl Kraken {
 
     /// https://dev.twitch.tv/docs/v5/reference/streams/#get-followed-streams
     pub async fn get_streams_followed(&self, token: String) -> Result<Vec<Stream>, Error> {
-        await!(self.paginated_by_offset(
+        self.paginated_by_offset(
             "https://api.twitch.tv/kraken/streams/followed",
             Some(token),
             "streams",
-        ))
+        )
+            .await
     }
 }

@@ -1,6 +1,5 @@
 use crate::config::Config;
 use crate::models::State;
-use crate::PgPool;
 use egg_mode::{Response, Token};
 use failure::{Error, ResultExt, SyncFailure};
 use futures::compat::{Future01CompatExt, Stream01CompatExt};
@@ -9,17 +8,19 @@ use serenity::model::id::ChannelId;
 use slog::slog_error;
 use slog_scope::error;
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::timer::Delay;
 use tokio::timer::Interval;
-use tokio_core::reactor::Handle;
+use crate::context::ErisContext;
+use crate::typemap_keys::PgPool;
+use crate::extract::Extract;
 
 async fn wait_until(rate_limit_reset: u64) -> Result<(), Error> {
     let rate_limit_reset = SystemTime::UNIX_EPOCH + Duration::from_secs(rate_limit_reset);
     let rate_limit_reset_instant =
         Instant::now() + SystemTime::now().duration_since(rate_limit_reset)?;
-    await!(Delay::new(rate_limit_reset_instant).compat())
+    Delay::new(rate_limit_reset_instant).compat()
+        .await
         .context("failed to wait until the rate-limit is reset")?;
     Ok(())
 }
@@ -32,61 +33,67 @@ async fn rate_limit<
     mut f: Fn,
 ) -> Result<Response<T>, Error> {
     loop {
-        match await!(f()) {
+        match f().await {
             Ok(res) => {
                 if res.rate_limit_remaining == 0 {
-                    await!(wait_until(res.rate_limit_reset as u64))?;
+                    wait_until(res.rate_limit_reset as u64).await?;
                 }
 
                 return Ok(res);
             }
             Err(egg_mode::error::Error::RateLimit(rate_limit_reset)) => {
-                await!(wait_until(rate_limit_reset as u64))?;
+                wait_until(rate_limit_reset as u64).await?;
             }
             Err(err) => return Err(err)?,
         }
     }
 }
 
-async fn init<'a>(
-    config: &'a Config,
-    handle: &'a Handle,
-) -> Result<(Token, HashMap<u64, Vec<ChannelId>>), Error> {
-    let token = await!(egg_mode::bearer_token(&config.twitter_api_keys, &handle).compat())
+async fn init(ctx: &ErisContext) -> Result<(Token, HashMap<u64, Vec<ChannelId>>), Error> {
+    let (token_future, twitter_users) = {
+        let data = ctx.data.read();
+        let config = data.extract::<Config>()?;
+        let token_future = egg_mode::bearer_token(&config.twitter_api_keys);
+
+        (token_future, config.twitter_users.clone())
+    };
+    let token = token_future.compat()
+        .await
         .context("failed to get a bearer token")?;
 
     let mut users = HashMap::new();
 
-    for (user, channels) in &config.twitter_users {
-        let user = await!(rate_limit(
-            || egg_mode::user::show(user, &token, handle).compat()
-        ))
-        .with_context(|err| format!("failed to get the Twitter ID of {:?}: {:?}", user, err))?;
-        users.insert(user.id, channels.clone());
+    for (user, channels) in twitter_users {
+        let user = rate_limit(|| egg_mode::user::show(&user, &token).compat())
+            .await
+            .with_context(|err| format!("failed to get the Twitter ID of {:?}: {:?}", user, err))?;
+        users.insert(user.id, channels);
     }
 
     Ok((token, users))
 }
 
 async fn inner<'a>(
-    pg_pool: &'a PgPool,
-    handle: &'a Handle,
+    ctx: &'a ErisContext,
     token: &'a Token,
     users: &'a HashMap<u64, Vec<ChannelId>>,
 ) -> Result<(), Error> {
-    let conn = pg_pool
-        .get()
-        .context("failed to get a DB connection from the connection pool")?;
-
     for (&user_id, channels) in users {
         let state_key = &format!("eris.announcements.twitter.{}.last_tweet_id", user_id);
-        let last_tweet_id =
-            State::get::<u64, _>(&state_key, &conn).context("failed to get the last tweet ID")?;
+        let last_tweet_id = {
+            let data = ctx.data.read();
+            let conn = data.extract::<PgPool>()?
+                .get()
+                .context("failed to get a DB connection from the connection pool")?;
+
+            State::get::<u64, _>(&state_key, &conn).context("failed to get the last tweet ID")?
+        };
 
         let timeline =
-            egg_mode::tweet::user_timeline(user_id, true, true, token, handle).with_page_size(200);
+            egg_mode::tweet::user_timeline(user_id, true, true, token).with_page_size(200);
 
-        let mut tweets = await!(rate_limit(|| timeline.call(last_tweet_id, None).compat()))
+        let mut tweets = rate_limit(|| timeline.call(last_tweet_id, None).compat())
+            .await
             .context("failed to fetch new tweets")?
             .response;
         // Don't send an avalanche of tweets when first activated.
@@ -115,15 +122,27 @@ async fn inner<'a>(
                     );
                     for channel in channels {
                         channel
-                            .say(&message)
+                            .say(ctx, &message)
                             .map_err(SyncFailure::new)
                             .context("failed to send the annoucement message")?;
                     }
-                    State::set(&state_key, tweet.id, &conn)
-                        .context("failed to set the new last tweet ID")?;
+
+                    {
+                        let data = ctx.data.read();
+                        let conn = data.extract::<PgPool>()?
+                            .get()
+                            .context("failed to get a DB connection from the connection pool")?;
+                        State::set(&state_key, tweet.id, &conn)
+                            .context("failed to set the new last tweet ID")?;
+                    }
                 }
             }
         } else {
+            let data = ctx.data.read();
+            let conn = data.extract::<PgPool>()?
+                .get()
+                .context("failed to get a DB connection from the connection pool")?;
+
             let last_tweet_id = tweets.iter().map(|tweet| tweet.id).max().unwrap_or(1);
             State::set(&state_key, last_tweet_id, &conn)
                 .context("failed to set the new last tweet ID")?;
@@ -133,8 +152,8 @@ async fn inner<'a>(
     Ok(())
 }
 
-pub async fn post_tweets(config: Arc<Config>, pg_pool: PgPool, handle: Handle) {
-    let (token, users) = match await!(init(&config, &handle)) {
+pub async fn post_tweets(ctx: ErisContext) {
+    let (token, users) = match init(&ctx).await {
         Ok((token, users)) => (token, users),
         Err(err) => {
             error!("failed to initialize the tweet announcer"; "error" => ?err);
@@ -145,10 +164,9 @@ pub async fn post_tweets(config: Arc<Config>, pg_pool: PgPool, handle: Handle) {
     let mut timer = Interval::new(Instant::now(), Duration::from_secs(10)).compat();
 
     loop {
-        match await!(timer.try_next()) {
-            Ok(Some(_)) => match await!(inner(&pg_pool, &handle, &token, &users)) {
-                Ok(()) => (),
-                Err(err) => error!("Failed to announce new tweets"; "error" => ?err),
+        match timer.try_next().await {
+            Ok(Some(_)) => if let Err(err) = inner(&ctx, &token, &users).await {
+                error!("Failed to announce new tweets"; "error" => ?err);
             },
             Ok(None) => break,
             Err(err) => error!("Timer error"; "error" => ?err),

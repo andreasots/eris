@@ -1,6 +1,4 @@
-#![feature(futures_api, await_macro, async_await, const_slice_len)]
-// Remove when Diesel updates.
-#![allow(proc_macro_derive_resolution_fallback)]
+#![feature(await_macro, async_await, const_slice_len, core_intrinsics)]
 #![recursion_limit = "256"]
 
 #[macro_use]
@@ -11,6 +9,7 @@ use failure::ResultExt;
 use futures::future::{FutureExt, TryFutureExt};
 use slog::{o, slog_error, slog_info, Drain};
 use slog_scope::{error, info};
+use crate::context::ErisContext;
 
 mod aiomas;
 mod announcements;
@@ -19,19 +18,21 @@ mod channel_reaper;
 mod commands;
 mod config;
 mod contact;
+mod context;
 mod desertbus;
 mod executor_ext;
+mod extract;
 mod google;
 mod models;
+mod rwlock;
 mod rpc;
 mod schema;
 mod service;
 mod stdlog;
 mod time;
 mod twitch;
+mod typemap_keys;
 mod voice_channel_tracker;
-
-type PgPool = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<diesel::pg::PgConnection>>;
 
 fn main() -> Result<(), failure::Error> {
     let decorator = slog_term::TermDecorator::new().build();
@@ -80,9 +81,6 @@ fn main() -> Result<(), failure::Error> {
         .context("failed to redirect logs from the standard log crate")?;
     log::set_max_level(log::LevelFilter::max());
 
-    // TODO: determine if it should be something else. 10 ms is too short for some reason.
-    serenity::CACHE.write().settings_mut().cache_lock_time = None;
-
     let matches = clap::App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
@@ -103,12 +101,10 @@ fn main() -> Result<(), failure::Error> {
         )
         .get_matches();
 
-    let config = std::sync::Arc::new(
-        config::Config::load_from_file(matches.value_of_os("conf").unwrap())
-            .context("failed to load the config file")?,
-    );
+    let config = config::Config::load_from_file(matches.value_of_os("conf").unwrap())
+            .context("failed to load the config file")?;
 
-    let pg_pool: PgPool = diesel::r2d2::Pool::new(diesel::r2d2::ConnectionManager::<
+    let pg_pool = diesel::r2d2::Pool::new(diesel::r2d2::ConnectionManager::<
         diesel::pg::PgConnection,
     >::new(&config.database_url[..]))
     .context("failed to create the database pool")?;
@@ -117,13 +113,14 @@ fn main() -> Result<(), failure::Error> {
         .build()
         .context("failed to create the HTTP client")?;
 
-    let kraken = twitch::Kraken::new(http_client.clone(), config.clone());
-    let helix = twitch::Helix::new(http_client.clone(), config.clone());
+    let kraken = twitch::Kraken::new(http_client.clone(), &config)
+        .context("failed to create the Twitch API v5 client")?;
+    let helix = twitch::Helix::new(http_client.clone(), &config)
+        .context("failed to create the New Twitch API client")?;
 
-    let calendar = google::Calendar::new(http_client.clone(), config.clone());
+    let calendar = google::Calendar::new(http_client.clone(), &config);
     let spreadsheets = google::Sheets::new(
         http_client.clone(),
-        config.clone(),
         matches.value_of_os("google-service-account").unwrap(),
     );
 
@@ -137,12 +134,14 @@ fn main() -> Result<(), failure::Error> {
     let mut client = serenity::Client::new(&config.discord_botsecret, handler)
         .map_err(failure::SyncFailure::new)
         .context("failed to create the Discord client")?;
+    let current_application_info = client.cache_and_http.http.get_current_application_info()
+        .context("failed to fetch the current application information")?;
     client.with_framework(
         serenity::framework::StandardFramework::new()
             .configure(|c| {
                 c.prefix(&config.command_prefix)
-                    .allow_whitespace(true)
-                    .on_mention(true)
+                    .with_whitespace((true, true, true))
+                    .on_mention(Some(current_application_info.id))
                     .case_insensitivity(true)
             })
             .before(|_, message, command_name| {
@@ -156,111 +155,29 @@ fn main() -> Result<(), failure::Error> {
                 );
                 true
             })
-            .after(|_, message, command_name, result| {
+            .after(|ctx, message, _command_name, result| {
                 if let Err(err) = result {
                     error!("Command resulted in an unexpected error";
-                        "command_name" => ?command_name,
                         "message.id" => ?message.id.0,
                         "error" => ?err,
                     );
 
-                    let _ = message.reply(&format!(
+                    let _ = message.reply(ctx, &format!(
                         "Command resulted in an unexpected error: {}.",
                         err.0
                     ));
                 } else {
                     info!("Command processed successfully";
-                        "command_name" => ?command_name,
                         "message.id" => ?message.id.0,
                     );
                 }
             })
-            .unrecognised_command(commands::static_response::static_response(
-                config.clone(),
-                runtime.executor(),
-            ))
-            .customised_help(
-                serenity::framework::standard::help_commands::with_embeds,
-                |h| {
-                    let help_url = config
-                        .site_url
-                        .join("help#help-section-text")
-                        .expect("failed to construct the simple text response command help URL");
-                    h.individual_command_tip(&format!(
-                        concat!(
-                            "To get help with an individual command, pass its name as an argument ",
-                            "to this command. Simple text response commands (like `!advice`) are ",
-                            "not listed here, for those see <{}>."
-                        ),
-                        help_url
-                    ))
-                },
-            )
-            .command("live", |c| {
-                c.desc("Post the currently live fanstreamers.")
-                    .help_available(true)
-                    .num_args(0)
-                    .cmd(commands::live::Live::new(
-                        config.clone(),
-                        pg_pool.clone(),
-                        kraken.clone(),
-                        runtime.executor(),
-                    ))
-            })
-            .command("voice", |c| {
-                c.desc("Create a temporary voice channel.")
-                    .usage("CHANNEL NAME")
-                    .example("PUBG #15")
-                    .help_available(true)
-                    .cmd(commands::voice::Voice::new(config.clone()))
-            })
-            .command("time", |c| {
-                c.desc("Post the current moonbase time, optionally in the 24-hour format.")
-                    .usage("[24]")
-                    .example("24")
-                    .help_available(true)
-                    .min_args(0)
-                    .max_args(1)
-                    .cmd(commands::time::Time::new(config.clone()))
-            })
-            .group("Calendar", |g| {
-                g.command("next", |c| {
-                    c.desc(concat!(
-                        "Gets the next scheduled stream from the LoadingReadyLive calendar. Can ",
-                        "specify a timezone, to show stream in your local time. If no time zone ",
-                        "is specified, times will be shown in Moonbase time. Unlike on Twitch the ",
-                        "timezone is case-sensitive."
-                    ))
-                    .usage("[TIMEZONE]")
-                    .example("America/New_York")
-                    .help_available(true)
-                    .min_args(0)
-                    .max_args(1)
-                    .cmd(commands::calendar::Calendar::lrr(
-                        config.clone(),
-                        calendar.clone(),
-                        runtime.executor(),
-                    ))
-                })
-                .command("nextfan", |c| {
-                    c.desc(concat!(
-                        "Gets the next scheduled stream from the fan-streaming calendar. Can ",
-                        "specify a timezone, to show stream in your local time. If no time zone ",
-                        "is specified, times will be shown in Moonbase time. Unlike on Twitch the ",
-                        "timezone is case-sensitive."
-                    ))
-                    .usage("[TIMEZONE]")
-                    .example("America/New_York")
-                    .help_available(true)
-                    .min_args(0)
-                    .max_args(1)
-                    .cmd(commands::calendar::Calendar::fan(
-                        config.clone(),
-                        calendar.clone(),
-                        runtime.executor(),
-                    ))
-                })
-            }),
+            .unrecognised_command(commands::static_response::static_response)
+            .help(&crate::commands::help::HELP_HELP_COMMAND)
+            .group(&crate::commands::calendar::CALENDAR_GROUP)
+            .group(&crate::commands::voice::VOICE_GROUP)
+            .group(&crate::commands::time::TIME_GROUP)
+            .group(&crate::commands::live::FANSTREAMS_GROUP),
     );
 
     #[cfg(unix)]
@@ -274,44 +191,45 @@ fn main() -> Result<(), failure::Error> {
         })
         .context("failed to remove the socket file")?;
 
-    let rpc_server = rpc::Server::new(config.clone(), pg_pool.clone(), runtime.executor())
+    {
+        let mut data = client.data.write();
+
+        data.insert::<crate::rpc::LRRbot>(std::sync::Arc::new(crate::rpc::LRRbot::new(&config, runtime.executor())));
+
+        data.insert::<crate::config::Config>(config);
+        data.insert::<crate::typemap_keys::Executor>(runtime.executor());
+        data.insert::<crate::typemap_keys::PgPool>(pg_pool);
+        data.insert::<crate::twitch::Kraken>(kraken);
+        data.insert::<crate::twitch::Helix>(helix);
+        data.insert::<crate::google::Calendar>(calendar);
+        data.insert::<crate::google::Sheets>(spreadsheets);
+        data.insert::<crate::desertbus::DesertBus>(desertbus);
+    }
+
+    let ctx = ErisContext::from_client(&client);
+
+    let rpc_server = rpc::Server::new(&ctx)
         .context("failed to create the RPC server")?;
     runtime.spawn(rpc_server.serve().unit_error().boxed().compat());
 
-    let _handle = std::thread::spawn(channel_reaper::channel_reaper(config.clone()));
-
-    let _handle = {
-        let config = config.clone();
-        let pg_pool = pg_pool.clone();
-        std::thread::spawn(move || {
-            let mut core =
-                tokio_core::reactor::Core::new().expect("failed to create a tokio-core reactor");
-            core.run(
-                announcements::post_tweets(config, pg_pool, core.handle())
-                    .unit_error()
-                    .boxed()
-                    .compat(),
-            )
-            .expect("failed to announce tweets");
-        })
-    };
+    let _handle = std::thread::spawn(channel_reaper::channel_reaper(ctx.clone()));
 
     runtime.spawn(
-        autotopic::autotopic(
-            config.clone(),
-            helix.clone(),
-            calendar.clone(),
-            desertbus.clone(),
-            pg_pool.clone(),
-            runtime.executor(),
-        )
+        announcements::post_tweets(ctx.clone())
+            .unit_error()
+            .boxed()
+            .compat(),
+    );
+
+    runtime.spawn(
+        autotopic::autotopic(ctx.clone())
         .unit_error()
         .boxed()
         .compat(),
     );
 
     runtime.spawn(
-        contact::post_messages(config.clone(), spreadsheets.clone())
+        contact::post_messages(ctx.clone())
             .unit_error()
             .boxed()
             .compat(),
