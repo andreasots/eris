@@ -15,11 +15,11 @@ impl Retry {
         Retry { service, max_count }
     }
 
-    pub async fn call(&mut self, req: Request) -> Result<Result<Value, Exception>, Error> {
+    pub async fn call(&self, req: Request) -> Result<Result<Value, Exception>, Error> {
         let mut error = None;
 
         for _ in 0..self.max_count {
-            match await!(self.service.call(req.clone())) {
+            match self.service.call(req.clone()).await {
                 Ok(res) => return Ok(res),
                 Err(err) => error = Some(err),
             }

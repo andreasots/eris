@@ -5,7 +5,6 @@ use failure::{bail, format_err, Error, ResultExt};
 use serde::Serialize;
 use serenity::model::prelude::*;
 use serenity::prelude::*;
-use serenity::CACHE;
 use slog::slog_error;
 use slog_scope::error;
 use std::collections::HashSet;
@@ -76,6 +75,115 @@ fn log_error<F: FnOnce() -> Result<(), Error>>(f: F) {
 }
 
 impl EventHandler for VoiceChannelTracker {
+    fn channel_create(&self, ctx: Context, channel: Arc<RwLock<GuildChannel>>) {
+        log_error(|| {
+            let channel = channel.read();
+            if channel.kind != ChannelType::Voice {
+                return Ok(());
+            }
+
+            let guild = match channel.guild(&ctx) {
+                Some(guild) => guild,
+                None => bail!("failed to get the guild for the channel {:?}", channel.name),
+            };
+
+            let mut writer = self
+                .writer
+                .lock()
+                .map_err(|err| format_err!("{}", err))
+                .context("writer is poisoned")?;
+            writer
+                .serialize(Row {
+                    timestamp: Utc::now(),
+                    channel_id: channel.id,
+                    channel_name: &channel.name,
+                    user_count: user_count_for(&guild.read(), channel.id),
+                    event: Event::Create,
+                })
+                .context("failed to append to the voice channel log")?;
+            writer
+                .flush()
+                .context("failed to flush the voice channel log")?;
+
+            Ok(())
+        });
+    }
+
+    fn channel_delete(&self, ctx: Context, channel: Arc<RwLock<GuildChannel>>) {
+        log_error(|| {
+            let channel = channel.read();
+            if channel.kind != ChannelType::Voice {
+                return Ok(());
+            }
+
+            let guild = match channel.guild(&ctx) {
+                Some(guild) => guild,
+                None => bail!("failed to get the guild for the channel {:?}", channel.name),
+            };
+
+            let mut writer = self
+                .writer
+                .lock()
+                .map_err(|err| format_err!("{}", err))
+                .context("writer is poisoned")?;
+            writer
+                .serialize(Row {
+                    timestamp: Utc::now(),
+                    channel_id: channel.id,
+                    channel_name: &channel.name,
+                    user_count: user_count_for(&guild.read(), channel.id),
+                    event: Event::Delete,
+                })
+                .context("failed to append to the voice channel log")?;
+            writer
+                .flush()
+                .context("failed to flush the voice channel log")?;
+
+            Ok(())
+        });
+    }
+
+    fn channel_update(&self, ctx: Context, _old: Option<Channel>, new: Channel) {
+        log_error(|| {
+            let channel = if let Some(channel) = new.guild() {
+                channel
+            } else {
+                return Ok(());
+            };
+
+            let channel = channel.read();
+            if channel.kind != ChannelType::Voice {
+                return Ok(());
+            }
+
+            let guild = match channel.guild(&ctx) {
+                Some(guild) => guild,
+                None => bail!("failed to get the guild for the channel {:?}", channel.name),
+            };
+
+            let mut writer = self
+                .writer
+                .lock()
+                .map_err(|err| format_err!("{}", err))
+                .context("writer is poisoned")?;
+
+            writer
+                .serialize(Row {
+                    timestamp: Utc::now(),
+                    channel_id: channel.id,
+                    channel_name: &channel.name,
+                    user_count: user_count_for(&guild.read(), channel.id),
+                    event: Event::Update,
+                })
+                .context("failed to append to the voice channel log")?;
+            writer
+                .flush()
+                .context("failed to flush the voice channel log")?;
+
+            Ok(())
+        });
+    }
+
     fn guild_create(&self, _ctx: Context, guild: Guild, _is_new: bool) {
         log_error(|| {
             let mut writer = self
@@ -111,118 +219,9 @@ impl EventHandler for VoiceChannelTracker {
         });
     }
 
-    fn channel_create(&self, _ctx: Context, channel: Arc<RwLock<GuildChannel>>) {
-        log_error(|| {
-            let channel = channel.read();
-            if channel.kind != ChannelType::Voice {
-                return Ok(());
-            }
-
-            let guild = match channel.guild() {
-                Some(guild) => guild,
-                None => bail!("failed to get the guild for the channel {:?}", channel.name),
-            };
-
-            let mut writer = self
-                .writer
-                .lock()
-                .map_err(|err| format_err!("{}", err))
-                .context("writer is poisoned")?;
-            writer
-                .serialize(Row {
-                    timestamp: Utc::now(),
-                    channel_id: channel.id,
-                    channel_name: &channel.name,
-                    user_count: user_count_for(&guild.read(), channel.id),
-                    event: Event::Create,
-                })
-                .context("failed to append to the voice channel log")?;
-            writer
-                .flush()
-                .context("failed to flush the voice channel log")?;
-
-            Ok(())
-        });
-    }
-
-    fn channel_update(&self, _ctx: Context, _old: Option<Channel>, new: Channel) {
-        log_error(|| {
-            let channel = if let Some(channel) = new.guild() {
-                channel
-            } else {
-                return Ok(());
-            };
-
-            let channel = channel.read();
-            if channel.kind != ChannelType::Voice {
-                return Ok(());
-            }
-
-            let guild = match channel.guild() {
-                Some(guild) => guild,
-                None => bail!("failed to get the guild for the channel {:?}", channel.name),
-            };
-
-            let mut writer = self
-                .writer
-                .lock()
-                .map_err(|err| format_err!("{}", err))
-                .context("writer is poisoned")?;
-
-            writer
-                .serialize(Row {
-                    timestamp: Utc::now(),
-                    channel_id: channel.id,
-                    channel_name: &channel.name,
-                    user_count: user_count_for(&guild.read(), channel.id),
-                    event: Event::Update,
-                })
-                .context("failed to append to the voice channel log")?;
-            writer
-                .flush()
-                .context("failed to flush the voice channel log")?;
-
-            Ok(())
-        });
-    }
-
-    fn channel_delete(&self, _ctx: Context, channel: Arc<RwLock<GuildChannel>>) {
-        log_error(|| {
-            let channel = channel.read();
-            if channel.kind != ChannelType::Voice {
-                return Ok(());
-            }
-
-            let guild = match channel.guild() {
-                Some(guild) => guild,
-                None => bail!("failed to get the guild for the channel {:?}", channel.name),
-            };
-
-            let mut writer = self
-                .writer
-                .lock()
-                .map_err(|err| format_err!("{}", err))
-                .context("writer is poisoned")?;
-            writer
-                .serialize(Row {
-                    timestamp: Utc::now(),
-                    channel_id: channel.id,
-                    channel_name: &channel.name,
-                    user_count: user_count_for(&guild.read(), channel.id),
-                    event: Event::Delete,
-                })
-                .context("failed to append to the voice channel log")?;
-            writer
-                .flush()
-                .context("failed to flush the voice channel log")?;
-
-            Ok(())
-        });
-    }
-
     fn voice_state_update(
         &self,
-        _ctx: Context,
+        ctx: Context,
         guild: Option<GuildId>,
         old: Option<VoiceState>,
         new: VoiceState,
@@ -246,7 +245,7 @@ impl EventHandler for VoiceChannelTracker {
                 .flat_map(Clone::clone)
                 .collect::<HashSet<ChannelId>>();
 
-            let cache = CACHE.read();
+            let cache = ctx.cache.read();
 
             for channel_id in channels {
                 let guild = match cache.guilds.get(&guild) {

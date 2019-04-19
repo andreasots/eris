@@ -1,31 +1,38 @@
 use crate::config::Config;
-use serenity::framework::standard::{Args, Command, CommandError};
+use serenity::framework::standard::{Args, CommandResult};
+use serenity::framework::standard::macros::{command, group};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
-use std::sync::Arc;
+use crate::extract::Extract;
 
-pub struct Voice {
-    config: Arc<Config>,
-}
+group!({
+    name: "Voice",
+    options: {
+        description: "Voice channel commands",
+    },
+    commands: [
+        voice,
+    ],
+});
 
-impl Voice {
-    pub fn new(config: Arc<Config>) -> Voice {
-        Voice { config }
-    }
-}
+#[command]
+#[description = "Create a temporary voice channel. Unused temporary voice channels will be automatically deleted if they're older than 15 minutes."]
+#[usage = "CHANNEL NAME"]
+#[example = "PUBG #15"]
+pub fn voice(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
+    let data = ctx.data.read();
+    let config = data.extract::<Config>()?;
 
-impl Command for Voice {
-    fn execute(&self, _: &mut Context, msg: &Message, args: Args) -> Result<(), CommandError> {
-        let name = format!("{} {}", self.config.temp_channel_prefix, args.full());
-        let reply = match self.config.guild.create_channel(
-            &name,
-            ChannelType::Voice,
-            self.config.voice_category,
-        ) {
-            Ok(channel) => format!("Created a temporary voice channel {:?}", channel.name),
-            Err(err) => format!("Failed to create a temporary voice channel: {}", err),
-        };
-        msg.reply(&reply)?;
-        Ok(())
-    }
+    let name = format!("{} {}", config.temp_channel_prefix, args.rest().trim());
+    let reply = match config.guild.create_channel(
+        &ctx,
+        &name,
+        ChannelType::Voice,
+        config.voice_category,
+    ) {
+        Ok(channel) => format!("Created a temporary voice channel {:?}", channel.name),
+        Err(err) => format!("Failed to create a temporary voice channel: {}", err),
+    };
+    msg.reply(ctx, &reply)?;
+    Ok(())
 }

@@ -45,7 +45,6 @@ impl LRRbot {
     pub fn new(config: &Config, executor: TaskExecutor) -> LRRbot {
         #[cfg(unix)]
         let client = NewClient::new(&config.lrrbot_socket, executor);
-
         #[cfg(not(unix))]
         let client = NewClient::new(&config.lrrbot_port, executor);
 
@@ -54,39 +53,37 @@ impl LRRbot {
         }
     }
 
-    // FIXME: `&mut self` prevents sending multiple requests at once. Maybe return the channel from
-    // `aiomas::Client::call` so that even though sending still requires a `&mut self` receiving
-    // doesn't and so multiple requests can be in flight at once.
     async fn call(
-        &mut self,
+        &self,
         name: String,
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
     ) -> Result<Value, Error> {
-        await!(self.service.call((name, args, kwargs)))?.map_err(failure::err_msg)
+        self.service.call((name, args, kwargs)).await?.map_err(failure::err_msg)
     }
 
-    pub async fn get_header_info(&mut self) -> Result<HeaderInfo, Error> {
-        let value = await!(self.call("get_header_info".into(), vec![], HashMap::new()))?;
+    pub async fn get_header_info(&self) -> Result<HeaderInfo, Error> {
+        let value = self.call("get_header_info".into(), vec![], HashMap::new()).await?;
         Ok(serde_json::from_value(value).context("failed to deserialize the response")?)
     }
 
-    pub async fn get_game_id(&mut self) -> Result<Option<i32>, Error> {
-        let value = await!(self.call("get_game_id".into(), vec![], HashMap::new()))?;
+    pub async fn get_game_id(&self) -> Result<Option<i32>, Error> {
+        let value = self.call("get_game_id".into(), vec![], HashMap::new()).await?;
         Ok(serde_json::from_value(value).context("failed to deserialize the response")?)
     }
 
-    pub async fn get_show_id(&mut self) -> Result<i32, Error> {
-        let value = await!(self.call("get_show_id".into(), vec![], HashMap::new()))?;
+    pub async fn get_show_id(&self) -> Result<i32, Error> {
+        let value = self.call("get_show_id".into(), vec![], HashMap::new()).await?;
         Ok(serde_json::from_value(value).context("failed to deserialize the response")?)
     }
 
-    pub async fn get_data<T: DeserializeOwned>(&mut self, path: Vec<String>) -> Result<T, Error> {
-        let value = await!(self.call(
+    pub async fn get_data<T: DeserializeOwned>(&self, path: Vec<String>) -> Result<T, Error> {
+        let value = self.call(
             "get_data".into(),
             vec![Value::Array(path.into_iter().map(Value::String).collect())],
             HashMap::new()
-        ))?;
+        )
+            .await?;
         Ok(serde_json::from_value(value).context("failed to deserialize the response")?)
     }
 }

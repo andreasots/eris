@@ -10,7 +10,7 @@ impl ExecutorExt for TaskExecutor {
         let (tx, rx) = std::sync::mpsc::channel();
         self.spawn(
             async move {
-                let res = await!(future);
+                let res = future.await;
                 tx.send(res).unwrap();
             }
                 .unit_error()

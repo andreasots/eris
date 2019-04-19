@@ -1,4 +1,3 @@
-use crate::config::Config;
 use crate::executor_ext::ExecutorExt;
 use crate::rpc::LRRbot;
 use failure::{Error, ResultExt, SyncFailure};
@@ -11,11 +10,11 @@ use serenity::prelude::*;
 use serenity::utils::Colour;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::runtime::TaskExecutor;
-
 use slog::{slog_error, slog_info};
 use slog_scope::{error, info};
+use crate::typemap_keys::Executor;
+use crate::extract::Extract;
+use serenity::framework::standard::{Args, Delimiter};
 
 #[derive(Deserialize, Debug, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "lowercase")]
@@ -26,12 +25,12 @@ enum Access {
 }
 
 impl Access {
-    fn user_has_access(self, msg: &Message) -> bool {
+    fn user_has_access(self, ctx: &Context, msg: &Message) -> bool {
         match self {
             Access::Any => true,
             Access::Sub => {
                 // A user is a "subscriber" if they have a coloured role
-                msg.guild()
+                msg.guild(ctx)
                     .and_then(|guild| {
                         let guild = guild.read();
 
@@ -49,11 +48,11 @@ impl Access {
                     .unwrap_or(false)
             }
             Access::Mod => msg
-                .guild()
+                .guild(ctx)
                 .and_then(|guild| {
                     guild.read().members.get(&msg.author.id).map(|member| {
                         member
-                            .permissions()
+                            .permissions(ctx)
                             .map(|p| p.administrator())
                             .unwrap_or(false)
                     })
@@ -122,20 +121,16 @@ fn replace_emojis<'a, S: Into<String>, I: Iterator<Item = &'a Emoji>>(
     Ok(msg)
 }
 
-fn static_response_impl(
-    config: Arc<Config>,
-    executor: TaskExecutor,
-    msg: &Message,
-    command: &str,
-) -> Result<(), Error> {
+fn static_response_impl(ctx: &mut Context, msg: &Message, command: &str) -> Result<(), Error> {
     let response = {
-        let mut lrrbot = LRRbot::new(&config, executor.clone());
+        let data = ctx.data.read();
+        let lrrbot = data.extract::<LRRbot>()?.clone();
         let command = String::from(command);
 
-        executor
+        data.extract::<Executor>()?
             .block_on(
                 async move {
-                    await!(lrrbot.get_data::<Response>(vec![String::from("responses"), command]))
+                    lrrbot.get_data::<Response>(vec![String::from("responses"), command]).await
                 },
             )
             .context("failed to fetch the command")?
@@ -151,25 +146,25 @@ fn static_response_impl(
             "from.discriminator" => ?msg.author.discriminator,
         );
 
-        if access.user_has_access(msg) {
+        if access.user_has_access(ctx, msg) {
             let response = response.choose(&mut rand::thread_rng());
             if let Some(response) = response {
                 let mut vars = HashMap::new();
                 vars.insert(
                     "user".into(),
                     msg.guild_id
-                        .and_then(|guild| msg.author.nick_in(guild))
+                        .and_then(|guild| msg.author.nick_in(ctx, guild))
                         .unwrap_or_else(|| msg.author.name.clone()),
                 );
                 let response =
                     strfmt::strfmt(response, &vars).context("failed to format the reply")?;
-                let response = if let Some(guild) = msg.guild() {
+                let response = if let Some(guild) = msg.guild(&ctx) {
                     replace_emojis(response, guild.read().emojis.values())
                         .context("failed to replace emojis")?
                 } else {
                     response
                 };
-                msg.reply(&response)
+                msg.reply(ctx, &response)
                     .map_err(SyncFailure::new)
                     .context("failed to send a reply")?;
             }
@@ -184,16 +179,8 @@ fn static_response_impl(
     Ok(())
 }
 
-pub fn static_response(
-    config: Arc<Config>,
-    executor: TaskExecutor,
-) -> impl Fn(&mut Context, &Message, &str) + Send + Sync + 'static {
-    move |_, msg, command| match static_response_impl(
-        config.clone(),
-        executor.clone(),
-        msg,
-        command,
-    ) {
+pub fn static_response(ctx: &mut Context, msg: &Message, command: &str) {
+    match static_response_impl(ctx, msg, &extract_command(&msg.content, command)) {
         Ok(()) => (),
         Err(err) => {
             error!("Static command resulted in an unexpected error";
@@ -201,12 +188,29 @@ pub fn static_response(
                 "error" => ?err,
             );
 
-            let _ = msg.reply(&format!(
+            let _ = msg.reply(ctx, &format!(
                 "Simple text response command resulted in an unexpected error: {}.",
                 err
             ));
         }
     }
+}
+
+fn extract_command(msg: &str, command: &str) -> String {
+    let index = msg.find(command).unwrap();
+    // FIXME: extract the delimiter from the framework configuration
+    let mut args = Args::new(&msg[index + command.len()..], &[Delimiter::Single(' ')]);
+
+    let mut command = String::from(command);
+    while let Some(arg) = args.trimmed().current() {
+        if arg.len() > 0 {
+            command.push(' ');
+            command.push_str(arg);
+        }
+        args.advance();
+    }
+
+    command
 }
 
 #[test]
@@ -238,45 +242,58 @@ fn test_deserialize_multi_response() {
     );
 }
 
-#[test]
-fn test_deserialize_missing() {
-    let res = serde_json::from_str::<Response>("{}").unwrap();
-    assert_eq!(res, Response::None {});
-}
+#[cfg(test)]
+mod tests {
+    use super::Response;
+    use serenity::model::guild::Emoji;
 
-#[test]
-fn test_replace_emojis() {
-    use serenity::model::id::EmojiId;
+    #[test]
+    fn deserialize_missing() {
+        let res = serde_json::from_str::<Response>("{}").unwrap();
+        assert_eq!(res, Response::None {});
+    }
 
-    let emoji = [
-        Emoji {
-            animated: false,
-            id: EmojiId(1),
-            name: String::from("lrrDOTS"),
-            managed: true,
-            require_colons: true,
-            roles: vec![],
-        },
-        Emoji {
-            animated: false,
-            id: EmojiId(2),
-            name: String::from("lrrCIRCLE"),
-            managed: true,
-            require_colons: true,
-            roles: vec![],
-        },
-        Emoji {
-            animated: false,
-            id: EmojiId(3),
-            name: String::from("lrrARROW"),
-            managed: true,
-            require_colons: true,
-            roles: vec![],
-        },
-    ];
+    #[test]
+    fn replace_emojis() {
+        use serenity::model::id::EmojiId;
 
-    assert_eq!(
-        replace_emojis("lrrDOTS lrrCIRCLE lrrARROW Visit LoadingReadyRun: http://loadingreadyrun.com/", emoji.iter()).unwrap(),
-        "<:lrrDOTS:1> <:lrrCIRCLE:2> <:lrrARROW:3> Visit LoadingReadyRun: http://loadingreadyrun.com/"
-    );
+        let emoji = [
+            Emoji {
+                animated: false,
+                id: EmojiId(1),
+                name: String::from("lrrDOTS"),
+                managed: true,
+                require_colons: true,
+                roles: vec![],
+            },
+            Emoji {
+                animated: false,
+                id: EmojiId(2),
+                name: String::from("lrrCIRCLE"),
+                managed: true,
+                require_colons: true,
+                roles: vec![],
+            },
+            Emoji {
+                animated: false,
+                id: EmojiId(3),
+                name: String::from("lrrARROW"),
+                managed: true,
+                require_colons: true,
+                roles: vec![],
+            },
+        ];
+
+        assert_eq!(
+            super::replace_emojis("lrrDOTS lrrCIRCLE lrrARROW Visit LoadingReadyRun: http://loadingreadyrun.com/", emoji.iter()).unwrap(),
+            "<:lrrDOTS:1> <:lrrCIRCLE:2> <:lrrARROW:3> Visit LoadingReadyRun: http://loadingreadyrun.com/"
+        );
+    }
+
+    #[test]
+    fn extract_command() {
+        assert_eq!(super::extract_command(" \t ! \t some \t command \t ", "some"), "some command");
+        assert_eq!(super::extract_command("!command", "command"), "command");
+        assert_eq!(super::extract_command("<@!1234> some command", "some"), "some command");
+    }
 }

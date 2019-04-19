@@ -80,13 +80,17 @@ impl ServiceAccount {
     }
 
     pub async fn get_token(&self) -> Result<String, Error> {
-        let mut token = await!(self.token.lock());
+        let mut token = self.token.lock().await;
         let now = Utc::now();
 
         if token.expires <= now {
-            let file = await!(File::open(self.key_path.clone()).compat())
+            let file = File::open(self.key_path.clone())
+                .compat()
+                .await
                 .context("failed to open the service account key JSON file")?;
-            let (_, content) = await!(tokio::io::read_to_end(file, vec![]).compat())
+            let (_, content) = tokio::io::read_to_end(file, vec![])
+                .compat()
+                .await
                 .context("failed to read the service account key JSON file")?;
             let key = serde_json::from_slice::<'_, Key>(&content)
                 .context("failed to parse the service account key JSON")?;
@@ -104,16 +108,21 @@ impl ServiceAccount {
             )
             .context("failed to create a JWT token")?;
 
-            let req = self.client.post(TOKEN_URI).form(&[
-                ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
-                ("assertion", &jwt),
-            ]);
-            let mut res = await!(req.send().compat())
+            let new_token = self.client.post(TOKEN_URI)
+                .form(&[
+                    ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
+                    ("assertion", &jwt),
+                ])
+                .send()
+                .compat()
+                .await
                 .context("failed to request a OAuth2 token")?
                 .error_for_status()
-                .context("request failed")?;
-            let new_token =
-                await!(res.json::<NewToken>().compat()).context("failed to read the response")?;
+                .context("request failed")?
+                .json::<NewToken>()
+                .compat()
+                .await
+                .context("failed to read the response")?;
             if new_token.token_type != "Bearer" {
                 return Err(failure::err_msg(format!(
                     "{:?} token returned, expected Bearer",

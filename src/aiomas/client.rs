@@ -4,6 +4,7 @@ use futures::channel::{mpsc, oneshot};
 use futures::compat::{Future01CompatExt, Stream01CompatExt};
 use futures::prelude::*;
 use futures::select;
+use futures::lock::Mutex;
 use serde_json::Value;
 use slog::slog_error;
 use slog_scope::error;
@@ -42,7 +43,7 @@ impl NewClient {
 
     pub async fn new_client(&self) -> Result<Client, Error> {
         Ok(Client::from_stream(
-            await!(UnixStream::connect(&self.path).compat())?,
+            UnixStream::connect(&self.path).compat().await?,
             self.executor.clone(),
         ))
     }
@@ -59,15 +60,14 @@ impl NewClient {
 
         let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), self.port);
         Ok(Client::from_stream(
-            await!(TcpStream::connect(&addr).compat())?,
+            TcpStream::connect(&addr).compat().await?,
             self.executor.clone(),
         ))
     }
 }
 
-#[derive(Clone)]
 pub struct Client {
-    channel: mpsc::Sender<(Request, oneshot::Sender<Result<Value, Exception>>)>,
+    channel: Mutex<mpsc::Sender<(Request, oneshot::Sender<Result<Value, Exception>>)>>,
 }
 
 impl Client {
@@ -84,7 +84,7 @@ impl Client {
                 .compat(),
         );
 
-        Client { channel: tx }
+        Client { channel: Mutex::new(tx) }
     }
 
     async fn dispatch<T, E>(
@@ -111,7 +111,7 @@ impl Client {
 
                             pending.insert(request_id, channel);
 
-                            sink = match await!(sink.send((request_id, request)).compat()) {
+                            sink = match sink.send((request_id, request)).compat().await {
                                 Ok(sink) => sink,
                                 Err(err) => {
                                     error!("Failed to send the request"; "error" => ?err);
@@ -140,10 +140,13 @@ impl Client {
         }
     }
 
-    pub async fn call(&mut self, req: Request) -> Result<Result<Value, Exception>, Error> {
+    pub async fn call(&self, req: Request) -> Result<Result<Value, Exception>, Error> {
         let (tx, rx) = oneshot::channel();
-        await!(self.channel.send((req, tx)))?;
-        Ok(await!(rx)?)
+        {
+            let mut channel = self.channel.lock().await;
+            channel.send((req, tx)).await?;
+        }
+        Ok(rx.await?)
     }
 }
 
@@ -176,10 +179,9 @@ mod tests {
                     let (read, mut write) =
                         UnixStream::pair().context("failed to create a socket pair")?;
 
-                    let mut client = Client::from_stream(read, executor);
-                    let mut client2 = client.clone();
+                    let client = Client::from_stream(read, executor);
 
-                    let first = client2.call((String::from("test"), vec![], HashMap::new()));
+                    let first = client.call((String::from("test"), vec![], HashMap::new()));
                     let second = client.call((String::from("test"), vec![], HashMap::new()));
 
                     pin_mut!(first);
@@ -189,15 +191,17 @@ mod tests {
                     assert!(poll!(&mut second).is_pending());
 
                     let mut buf = [0; REQUEST.len()];
-                    await!(io::read_exact(&mut write, &mut buf[..]).compat())
+                    io::read_exact(&mut write, &mut buf[..]).compat()
+                        .await
                         .context("failed to read request")?;
                     assert_eq!(&buf[..], REQUEST);
-                    await!(io::write_all(&mut write, RESPONSE).compat())
+                    io::write_all(&mut write, RESPONSE).compat()
+                        .await
                         .context("failed to write response")?;
 
-                    assert_eq!(await!(first).context("first")?, Ok(Value::Number(0.into())));
+                    assert_eq!(first.await.context("first")?, Ok(Value::Number(0.into())));
                     assert_eq!(
-                        await!(second).context("second")?,
+                        second.await.context("second")?,
                         Ok(Value::Number(1.into()))
                     );
 

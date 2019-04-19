@@ -1,14 +1,14 @@
 use crate::aiomas::Server as AiomasServer;
 use crate::announcements;
 use crate::config::Config;
-use crate::PgPool;
 use chrono::{DateTime, FixedOffset};
 use failure::{Error, ResultExt};
 use serde::Deserialize;
 use serde_json::{self, Value};
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::runtime::TaskExecutor;
+use crate::typemap_keys::Executor;
+use crate::extract::Extract;
+use crate::context::ErisContext;
 
 #[derive(Deserialize)]
 pub struct Channel {
@@ -26,28 +26,26 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(
-        config: Arc<Config>,
-        pg_pool: PgPool,
-        executor: TaskExecutor,
-    ) -> Result<Server, Error> {
-        #[cfg(unix)]
-        let mut server = AiomasServer::new(&config.eris_socket, executor.clone())?;
+    pub fn new(ctx: &ErisContext) -> Result<Server, Error> {
+        let mut server = {
+            let data = ctx.data.read();
+            let config = data.extract::<Config>()?;
+            let executor = data.extract::<Executor>()?.clone();
 
-        #[cfg(not(unix))]
-        let mut server = AiomasServer::new(config.eris_port, executor.clone())?;
+            #[cfg(unix)]
+            let server = AiomasServer::new(&config.eris_socket, executor)?;
+            #[cfg(not(unix))]
+            let server = AiomasServer::new(config.eris_port, executor)?;
+
+            server
+        };
 
         {
-            let config = config.clone();
-            let pg_pool = pg_pool.clone();
-            let executor = executor.clone();
+            let ctx = ctx.clone();
             server.register(
                 "announcements/stream_up",
                 move |mut args: Vec<Value>, kwargs: HashMap<String, Value>| {
-                    let config = config.clone();
-                    let pg_pool = pg_pool.clone();
-                    let executor = executor.clone();
-
+                    let ctx = ctx.clone();
                     async move {
                         if args.len() != 1 || kwargs.len() != 0 {
                             return Err(String::from("invalid number of arguments"));
@@ -57,12 +55,7 @@ impl Server {
                             .context("failed to deserialize arguments")
                             .map_err(|e| format!("{:?}", e))?;
 
-                        await!(announcements::stream_up(
-                            &config,
-                            pg_pool,
-                            data,
-                            executor.clone()
-                        ));
+                        announcements::stream_up(&ctx, data).await;
 
                         Ok(serde_json::Value::Null)
                     }
@@ -74,6 +67,6 @@ impl Server {
     }
 
     pub async fn serve(self) {
-        await!(self.server.serve())
+        self.server.serve().await
     }
 }
