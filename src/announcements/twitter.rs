@@ -1,81 +1,45 @@
 use crate::config::Config;
 use crate::models::State;
-use egg_mode::{Response, Token};
 use failure::{Error, ResultExt, SyncFailure};
-use futures::compat::{Future01CompatExt, Stream01CompatExt};
+use futures::compat::Stream01CompatExt;
 use futures::prelude::*;
 use serenity::model::id::ChannelId;
 use slog::slog_error;
 use slog_scope::error;
 use std::collections::HashMap;
-use std::time::{Duration, Instant, SystemTime};
-use tokio::timer::Delay;
+use std::time::{Duration, Instant};
 use tokio::timer::Interval;
 use crate::context::ErisContext;
 use crate::typemap_keys::PgPool;
 use crate::extract::Extract;
+use crate::twitter::Twitter;
 
-async fn wait_until(rate_limit_reset: u64) -> Result<(), Error> {
-    let rate_limit_reset = SystemTime::UNIX_EPOCH + Duration::from_secs(rate_limit_reset);
-    let rate_limit_reset_instant =
-        Instant::now() + SystemTime::now().duration_since(rate_limit_reset)?;
-    Delay::new(rate_limit_reset_instant).compat()
-        .await
-        .context("failed to wait until the rate-limit is reset")?;
-    Ok(())
-}
-
-async fn rate_limit<
-    T,
-    Fn: FnMut() -> Fut,
-    Fut: Future<Output = Result<Response<T>, egg_mode::error::Error>>,
->(
-    mut f: Fn,
-) -> Result<Response<T>, Error> {
-    loop {
-        match f().await {
-            Ok(res) => {
-                if res.rate_limit_remaining == 0 {
-                    wait_until(res.rate_limit_reset as u64).await?;
-                }
-
-                return Ok(res);
-            }
-            Err(egg_mode::error::Error::RateLimit(rate_limit_reset)) => {
-                wait_until(rate_limit_reset as u64).await?;
-            }
-            Err(err) => return Err(err)?,
-        }
-    }
-}
-
-async fn init(ctx: &ErisContext) -> Result<(Token, HashMap<u64, Vec<ChannelId>>), Error> {
-    let (token_future, twitter_users) = {
+async fn init(ctx: &ErisContext) -> Result<HashMap<u64, Vec<ChannelId>>, Error> {
+    let (twitter, twitter_users) = {
         let data = ctx.data.read();
-        let config = data.extract::<Config>()?;
-        let token_future = egg_mode::bearer_token(&config.twitter_api_keys);
 
-        (token_future, config.twitter_users.clone())
+        (data.extract::<Twitter>()?.clone(), data.extract::<Config>()?.twitter_users.clone())
     };
-    let token = token_future.compat()
+
+    let usernames = twitter_users.keys().map(|s| &s[..]).collect::<Vec<&str>>();
+    let user_ids = twitter.users_lookup(&usernames)
         .await
-        .context("failed to get a bearer token")?;
+        .context("failed to fetch the Twitter IDs for watched users")?
+        .into_iter()
+        .map(|user| (user.screen_name.to_lowercase(), user.id))
+        .collect::<HashMap<_, _>>();
 
     let mut users = HashMap::new();
 
     for (user, channels) in twitter_users {
-        let user = rate_limit(|| egg_mode::user::show(&user, &token).compat())
-            .await
-            .with_context(|err| format!("failed to get the Twitter ID of {:?}: {:?}", user, err))?;
-        users.insert(user.id, channels);
+        users.insert(user_ids[&user], channels);
     }
 
-    Ok((token, users))
+    Ok(users)
 }
 
 async fn inner<'a>(
     ctx: &'a ErisContext,
-    token: &'a Token,
     users: &'a HashMap<u64, Vec<ChannelId>>,
 ) -> Result<(), Error> {
     for (&user_id, channels) in users {
@@ -89,13 +53,12 @@ async fn inner<'a>(
             State::get::<u64, _>(&state_key, &conn).context("failed to get the last tweet ID")?
         };
 
-        let timeline =
-            egg_mode::tweet::user_timeline(user_id, true, true, token).with_page_size(200);
+        let twitter = ctx.data.read().extract::<Twitter>()?.clone();
 
-        let mut tweets = rate_limit(|| timeline.call(last_tweet_id, None).compat())
+        let mut tweets = twitter.user_timeline(user_id, true, true, 200, last_tweet_id)
             .await
-            .context("failed to fetch new tweets")?
-            .response;
+            .context("failed to fetch new tweets")?;
+
         // Don't send an avalanche of tweets when first activated.
         if last_tweet_id.is_some() {
             tweets.sort_by_key(|tweet| tweet.id);
@@ -110,21 +73,17 @@ async fn inner<'a>(
                         "New tweet from {}: https://twitter.com/{}/status/{}",
                         tweet
                             .user
-                            .as_ref()
-                            .map(|user| &user.name[..])
-                            .unwrap_or("???"),
+                            .name,
                         tweet
                             .user
-                            .as_ref()
-                            .map(|user| &user.screen_name[..])
-                            .unwrap_or("a"),
+                            .screen_name,
                         tweet.id,
                     );
                     for channel in channels {
                         channel
                             .say(ctx, &message)
                             .map_err(SyncFailure::new)
-                            .context("failed to send the annoucement message")?;
+                            .context("failed to send the announcement message")?;
                     }
 
                     {
@@ -153,8 +112,8 @@ async fn inner<'a>(
 }
 
 pub async fn post_tweets(ctx: ErisContext) {
-    let (token, users) = match init(&ctx).await {
-        Ok((token, users)) => (token, users),
+    let users = match init(&ctx).await {
+        Ok(users) => users,
         Err(err) => {
             error!("failed to initialize the tweet announcer"; "error" => ?err);
             return;
@@ -165,7 +124,7 @@ pub async fn post_tweets(ctx: ErisContext) {
 
     loop {
         match timer.try_next().await {
-            Ok(Some(_)) => if let Err(err) = inner(&ctx, &token, &users).await {
+            Ok(Some(_)) => if let Err(err) = inner(&ctx, &users).await {
                 error!("Failed to announce new tweets"; "error" => ?err);
             },
             Ok(None) => break,

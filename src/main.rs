@@ -31,6 +31,7 @@ mod schema;
 mod service;
 mod stdlog;
 mod time;
+mod twitter;
 mod twitch;
 mod typemap_keys;
 mod voice_channel_tracker;
@@ -132,6 +133,9 @@ fn main() -> Result<(), failure::Error> {
 
     let mut runtime = tokio::runtime::Runtime::new().context("failed to create a Tokio runtime")?;
 
+    let twitter = runtime.block_on(crate::twitter::Twitter::new(http_client.clone(), config.twitter_api_key.clone(), config.twitter_api_secret.clone()).boxed().compat())
+        .context("failed to initialise the Twitter client")?;
+
     let mut client = serenity::Client::new(&config.discord_botsecret, handler)
         .map_err(failure::SyncFailure::new)
         .context("failed to create the Discord client")?;
@@ -205,6 +209,7 @@ fn main() -> Result<(), failure::Error> {
         data.insert::<crate::google::Calendar>(calendar);
         data.insert::<crate::google::Sheets>(spreadsheets);
         data.insert::<crate::desertbus::DesertBus>(desertbus);
+        data.insert::<crate::twitter::Twitter>(twitter);
     }
 
     let ctx = ErisContext::from_client(&client);

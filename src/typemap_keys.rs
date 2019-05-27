@@ -6,6 +6,7 @@ use crate::google::{Calendar, Sheets};
 use crate::twitch::{Kraken, Helix};
 use std::sync::Arc;
 use crate::desertbus::DesertBus;
+use crate::twitter::Twitter;
 
 // Local types
 
@@ -34,6 +35,10 @@ impl TypeMapKey for LRRbot {
 }
 
 impl TypeMapKey for Sheets {
+    type Value = Self;
+}
+
+impl TypeMapKey for Twitter {
     type Value = Self;
 }
 

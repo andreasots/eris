@@ -1,5 +1,4 @@
 use chrono_tz::Tz;
-use egg_mode::KeyPair;
 use failure::{self, Error, Fail, ResultExt};
 use ini::Ini;
 use serenity::model::prelude::*;
@@ -46,7 +45,8 @@ pub struct Config {
     pub general_channel: ChannelId,
     pub guild: GuildId,
 
-    pub twitter_api_keys: KeyPair,
+    pub twitter_api_key: String,
+    pub twitter_api_secret: String,
     pub twitter_users: HashMap<String, Vec<ChannelId>>,
 
     pub voice_channel_data: PathBuf,
@@ -143,18 +143,16 @@ impl Config {
             guild: GuildId(
                 Config::get_option_parsed(&ini, "discord_serverid")?.unwrap_or(288920509272555520),
             ),
-            twitter_api_keys: KeyPair::new(
-                Config::get_option_required(&ini, "twitter_api_key")?,
-                Config::get_option_required(&ini, "twitter_api_secret")?,
-            ),
+            twitter_api_key: Config::get_option_required(&ini, "twitter_api_key")?,
+            twitter_api_secret: Config::get_option_required(&ini, "twitter_api_secret")?,
             twitter_users: ini
                 .section(Some("eris.twitter"))
                 .map(|section| {
                     section
                         .iter()
-                        .map(|(twitter, channels)| {
+                        .map(|(name, channels)| {
                             Ok((
-                                twitter.clone(),
+                                name.to_lowercase(),
                                 channels
                                     .split(',')
                                     .map(|id| Ok(ChannelId(str::parse(id)?)))

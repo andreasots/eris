@@ -14,8 +14,6 @@ chrono-tz = "0.5.1"
 clap = "2.33.0"
 csv = "1.0.7"
 diesel = { version = "1.4.2", features = ["postgres", "r2d2", "serde_json"] }
-# 0.12.0 depends on an old OpenSSL version and uses old Tokio
-egg-mode = { git = "https://github.com/QuietMisdreavus/twitter-rs" }
 egg-mode-text = "1.14.7"
 eris-macros = { path = "eris-macros" }
 failure = "0.1.5"

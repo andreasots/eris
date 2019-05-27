@@ -10,14 +10,14 @@ use std::fmt;
 
 #[derive(Copy, Clone, Debug)]
 pub enum User<'a> {
-    Id(&'a str),
+    // Id(&'a str),
     Login(&'a str),
 }
 
 impl<'a> User<'a> {
     fn as_query(self) -> [(&'static str, &'a str); 1] {
         match self {
-            User::Id(id) => [("user_id", id)],
+            // User::Id(id) => [("user_id", id)],
             User::Login(login) => [("user_login", login)],
         }
     }
@@ -69,15 +69,17 @@ pub struct Stream {
     pub stream_type: StreamType,
 }
 
+/*
 #[derive(Deserialize)]
 struct Pagination {
     cursor: Option<String>,
 }
+*/
 
 #[derive(Deserialize)]
 struct PaginatedResponse<T> {
     data: Vec<T>,
-    pagination: Pagination,
+    // pagination: Pagination,
 }
 
 /// The New Twitch API
