@@ -1,6 +1,5 @@
 use crate::config::Config;
 use crate::models::{Game, GameEntry, Show};
-use crate::rpc::server::Channel;
 use crate::rpc::LRRbot;
 use diesel::OptionalExtension;
 use failure::{Error, ResultExt, SyncFailure};
@@ -10,6 +9,20 @@ use std::fmt::{self, Display};
 use crate::typemap_keys::PgPool;
 use crate::extract::Extract;
 use crate::context::ErisContext;
+use eris_macros::rpc_handler;
+use chrono::{DateTime, FixedOffset};
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+pub struct Channel {
+    pub display_name: Option<String>,
+    pub game: Option<String>,
+    pub name: String,
+    pub status: Option<String>,
+    pub stream_created_at: Option<DateTime<FixedOffset>>,
+    pub live: bool,
+    pub url: String,
+}
 
 struct StreamUp {
     channel: Channel,
@@ -85,8 +98,13 @@ async fn stream_up_inner(ctx: &ErisContext, channel: Channel) -> Result<(), Erro
     Ok(())
 }
 
-pub async fn stream_up(ctx: &ErisContext, channel: Channel) {
-    if let Err(err) = stream_up_inner(ctx, channel).await {
+#[rpc_handler("announcements/stream_up")]
+pub async fn stream_up(ctx: ErisContext, data: Channel) -> Result<(), Error> {
+    let res = stream_up_inner(&ctx, data).await;
+
+    if let Err(ref err) = res {
         error!("Failed to post a stream up announcement"; "error" => ?err);
     }
+
+    res
 }

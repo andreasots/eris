@@ -1,10 +1,9 @@
 use super::codec::{ClientCodec, Exception, Request};
-use failure::{Error, Fail};
+use failure::{Error, Fail, ResultExt};
 use futures::channel::{mpsc, oneshot};
 use futures::compat::{Future01CompatExt, Stream01CompatExt};
 use futures::prelude::*;
 use futures::select;
-use futures::lock::Mutex;
 use serde_json::Value;
 use slog::slog_error;
 use slog_scope::error;
@@ -67,7 +66,7 @@ impl NewClient {
 }
 
 pub struct Client {
-    channel: Mutex<mpsc::Sender<(Request, oneshot::Sender<Result<Value, Exception>>)>>,
+    channel: mpsc::Sender<(Request, oneshot::Sender<Result<Value, Exception>>)>,
 }
 
 impl Client {
@@ -84,7 +83,7 @@ impl Client {
                 .compat(),
         );
 
-        Client { channel: Mutex::new(tx) }
+        Client { channel: tx }
     }
 
     async fn dispatch<T, E>(
@@ -140,13 +139,12 @@ impl Client {
         }
     }
 
-    pub async fn call(&self, req: Request) -> Result<Result<Value, Exception>, Error> {
+    pub async fn call(&mut self, req: Request) -> Result<oneshot::Receiver<Result<Value, Exception>>, Error> {
         let (tx, rx) = oneshot::channel();
-        {
-            let mut channel = self.channel.lock().await;
-            channel.send((req, tx)).await?;
-        }
-        Ok(rx.await?)
+
+        self.channel.send((req, tx)).await.context("failed to queue the request")?;
+
+        Ok(rx)
     }
 }
 
@@ -156,9 +154,7 @@ mod tests {
     use super::Client;
     use failure::{Error, ResultExt};
     use futures::compat::Future01CompatExt;
-    use futures::poll;
     use futures::prelude::*;
-    use pin_utils::pin_mut;
     use serde_json::Value;
     use std::collections::HashMap;
     use tokio::io;
@@ -179,16 +175,10 @@ mod tests {
                     let (read, mut write) =
                         UnixStream::pair().context("failed to create a socket pair")?;
 
-                    let client = Client::from_stream(read, executor);
+                    let mut client = Client::from_stream(read, executor);
 
-                    let first = client.call((String::from("test"), vec![], HashMap::new()));
-                    let second = client.call((String::from("test"), vec![], HashMap::new()));
-
-                    pin_mut!(first);
-                    pin_mut!(second);
-
-                    assert!(poll!(&mut first).is_pending());
-                    assert!(poll!(&mut second).is_pending());
+                    let first = client.call((String::from("test"), vec![], HashMap::new())).await.context("queue first")?;
+                    let second = client.call((String::from("test"), vec![], HashMap::new())).await.context("queue second")?;
 
                     let mut buf = [0; REQUEST.len()];
                     io::read_exact(&mut write, &mut buf[..]).compat()

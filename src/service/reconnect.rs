@@ -1,50 +1,56 @@
 use crate::aiomas::{Client, Exception, NewClient, Request};
-use failure::Error;
+use failure::{Error, ResultExt};
 use serde_json::Value;
-use crate::rwlock::RwLock;
+use futures::lock::Mutex;
+use futures::channel::oneshot;
 
 // FIXME: this should be generic over the factory but that requires generic associated types and
 //  existential types.
 pub struct Reconnect {
     factory: NewClient,
-    client: RwLock<Option<Client>>,
+    client: Mutex<Option<Client>>,
 }
 
 impl Reconnect {
     pub fn new(factory: NewClient) -> Reconnect {
         Reconnect {
             factory,
-            client: RwLock::new(None),
+            client: Mutex::new(None),
+        }
+    }
+
+    async fn call_inner(&self, req: Request) -> Result<oneshot::Receiver<Result<Value, Exception>>, Error> {
+        let mut client_guard = self.client.lock().await;
+
+        if let Some(client) = &mut *client_guard {
+            let res = client.call(req).await;
+
+            if res.is_err() {
+                *client_guard = None;
+            }
+
+            res
+        } else {
+            let mut client = self.factory.new_client().await?;
+
+            let res = client.call(req).await;
+
+            if res.is_ok() {
+                *client_guard = Some(client);
+            } else {
+                *client_guard = None;
+            }
+
+            res
         }
     }
 
     pub async fn call(&self, req: Request) -> Result<Result<Value, Exception>, Error> {
-        {
-            let guard = self.client.read().await;
-
-            if let Some(client) = &*guard {
-                match client.call(req).await {
-                    Ok(res) => return Ok(res),
-                    Err(err) => {
-                        drop(guard);
-                        *self.client.write().await = None;
-                        return Err(err);
-                    }
-                }
-            }
-        }
-
-        let mut client_guard = self.client.write().await;
-        let client = self.factory.new_client().await?;
-
-        let res = client.call(req).await;
-
-        if res.is_ok() {
-            *client_guard = Some(client);
-        } else {
-            *client_guard = None;
-        }
-
-        res
+        let res = self
+            .call_inner(req)
+            .await?
+            .await
+            .context("client disconnected mid-request")?;
+        Ok(res)
     }
 }

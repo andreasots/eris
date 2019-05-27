@@ -2,7 +2,7 @@ use crate::aiomas::codec::{Exception, Request, ServerCodec};
 use failure::{Error, Fail, ResultExt};
 use futures::channel::mpsc;
 use futures::compat::{Future01CompatExt, Stream01CompatExt};
-use futures::future::FutureObj;
+use futures::future::BoxFuture;
 use futures::prelude::*;
 use serde_json::Value;
 use slog::slog_error;
@@ -21,31 +21,34 @@ use tokio::net::unix::UnixListener;
 #[cfg(not(unix))]
 use tokio::net::TcpListener;
 
-pub trait Handler {
+pub trait Handler<C> {
     fn handle(
         &self,
+        ctx: C,
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
-    ) -> FutureObj<'static, Result<Value, Exception>>;
+    ) -> BoxFuture<'static, Result<Value, Exception>>;
 }
 
-impl<Fun, Fut> Handler for Fun
+impl<C, Fun, Fut> Handler<C> for Fun
 where
-    Fun: Fn(Vec<Value>, HashMap<String, Value>) -> Fut,
+    Fun: Fn(C, Vec<Value>, HashMap<String, Value>) -> Fut,
     Fut: Future<Output = Result<Value, Exception>> + Send + 'static,
 {
     fn handle(
         &self,
+        ctx: C,
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
-    ) -> FutureObj<'static, Result<Value, Exception>> {
-        FutureObj::new(self(args, kwargs).boxed())
+    ) -> BoxFuture<'static, Result<Value, Exception>> {
+        self(ctx, args, kwargs).boxed()
     }
 }
 
-pub struct Server {
-    methods: HashMap<String, Box<Handler + Send + Sync>>,
+pub struct Server<C: 'static> {
+    methods: HashMap<String, &'static (dyn Handler<C> + Send + Sync + 'static)>,
     executor: TaskExecutor,
+    context: C,
 
     #[cfg(unix)]
     listener: UnixListener,
@@ -54,20 +57,21 @@ pub struct Server {
     listener: TcpListener,
 }
 
-impl Server {
+impl<C: Clone + Send + 'static> Server<C> {
     #[cfg(unix)]
-    pub fn new<P: AsRef<Path>>(path: P, executor: TaskExecutor) -> Result<Server, Error> {
+    pub fn new<P: AsRef<Path>>(path: P, executor: TaskExecutor, context: C) -> Result<Server<C>, Error> {
         let listener = UnixListener::bind(path).context("failed to create a listening socket")?;
 
         Ok(Server {
             listener,
             methods: HashMap::new(),
+            context,
             executor,
         })
     }
 
     #[cfg(not(unix))]
-    pub fn new(port: u16, executor: TaskExecutor) -> Result<Server, Error> {
+    pub fn new(port: u16, executor: TaskExecutor, context: C) -> Result<Server<C>, Error> {
         use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 
         let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port);
@@ -76,16 +80,17 @@ impl Server {
         Ok(Server {
             listener,
             methods: HashMap::new(),
+            context,
             executor,
         })
     }
 
-    pub fn register<S: Into<String>, H: Handler + Send + Sync + 'static>(
+    pub fn register(
         &mut self,
-        method: S,
-        handler: H,
+        method: impl Into<String>,
+        handler: &'static (dyn Handler<C> + Send + Sync + 'static),
     ) {
-        self.methods.insert(method.into(), Box::new(handler));
+        self.methods.insert(method.into(), handler);
     }
 
     pub async fn serve(self) {
@@ -93,6 +98,7 @@ impl Server {
             methods,
             listener,
             executor,
+            context,
         } = self;
 
         let mut listener = listener.incoming().compat().boxed();
@@ -106,6 +112,7 @@ impl Server {
                             methods.clone(),
                             Framed::new(socket, ServerCodec),
                             executor.clone(),
+                            context.clone(),
                         )
                         .unit_error()
                         .boxed()
@@ -119,9 +126,10 @@ impl Server {
     }
 
     async fn process<T, E>(
-        methods: Arc<HashMap<String, Box<Handler + Send + Sync + 'static>>>,
+        methods: Arc<HashMap<String, &'static (dyn Handler<C> + Send + Sync + 'static)>>,
         transport: T,
         executor: TaskExecutor,
+        context: C,
     ) where
         T: Sink01<SinkItem = (u64, Result<Value, Exception>), SinkError = E>
             + Stream01<Item = (u64, Request), Error = E>
@@ -160,10 +168,8 @@ impl Server {
                 Ok(Some((id, (method, args, kwargs)))) => {
                     let mut tx = tx.clone();
                     let future = match methods.get(&method) {
-                        Some(handler) => handler.handle(args, kwargs),
-                        None => FutureObj::new(
-                            async move { Err(format!("no such method: {}", method)) }.boxed(),
-                        ),
+                        Some(handler) => handler.handle(context.clone(), args, kwargs),
+                        None => async move { Err(format!("no such method: {}", method)) }.boxed(),
                     };
 
                     executor.spawn(

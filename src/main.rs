@@ -10,6 +10,7 @@ use futures::future::{FutureExt, TryFutureExt};
 use slog::{o, slog_error, slog_info, Drain};
 use slog_scope::{error, info};
 use crate::context::ErisContext;
+use crate::extract::Extract;
 
 mod aiomas;
 mod announcements;
@@ -22,9 +23,9 @@ mod context;
 mod desertbus;
 mod executor_ext;
 mod extract;
+mod inventory;
 mod google;
 mod models;
-mod rwlock;
 mod rpc;
 mod schema;
 mod service;
@@ -208,8 +209,22 @@ fn main() -> Result<(), failure::Error> {
 
     let ctx = ErisContext::from_client(&client);
 
-    let rpc_server = rpc::Server::new(&ctx)
+    let mut rpc_server = {
+        let data = ctx.data.read();
+        let config = data.extract::<crate::config::Config>()?;
+
+        #[cfg(unix)]
+        let server = crate::aiomas::Server::new(&config.eris_socket, runtime.executor(), ctx.clone());
+
+        #[cfg(not(unix))]
+        let server = crate::aiomas::Server::new(config.eris_port, runtime.executor(), ctx.clone());
+
+        server
+    }
         .context("failed to create the RPC server")?;
+    for handler in ::inventory::iter::<crate::inventory::AiomasHandler> {
+        rpc_server.register(handler.method, handler.handler);
+    }
     runtime.spawn(rpc_server.serve().unit_error().boxed().compat());
 
     let _handle = std::thread::spawn(channel_reaper::channel_reaper(ctx.clone()));

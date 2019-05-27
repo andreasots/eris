@@ -17,8 +17,10 @@ diesel = { version = "1.4.2", features = ["postgres", "r2d2", "serde_json"] }
 # 0.12.0 depends on an old OpenSSL version and uses old Tokio
 egg-mode = { git = "https://github.com/QuietMisdreavus/twitter-rs" }
 egg-mode-text = "1.14.7"
+eris-macros = { path = "eris-macros" }
 failure = "0.1.5"
 futures-preview = { version = "0.3.0-alpha.15", features = ["async-await", "compat", "nightly"] }
+inventory = "0.1.3"
 jsonwebtoken = "6.0.0"
 log = { version = "0.4.6", features = ["max_level_trace", "release_max_level_info", "std"] }
 openssl = "0.10.23"
