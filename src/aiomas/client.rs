@@ -108,7 +108,9 @@ impl Client {
                             let request_id = next_request_id;
                             next_request_id += 1;
 
-                            pending.insert(request_id, channel);
+                            // FIXME(rust-lang/rust#61579): this manual `drop()` is needed because
+                            //  if the result of `pending.insert()` is not used the compiler ICEs.
+                            drop(pending.insert(request_id, channel));
 
                             sink = match sink.send((request_id, request)).compat().await {
                                 Ok(sink) => sink,
