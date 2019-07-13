@@ -108,7 +108,7 @@ pub fn rpc_handler(attr: TokenStream, item: TokenStream) -> TokenStream {
                         Ok(val) => Ok(val),
                         Err(err) => Err(format!("Failed to serialize the response: {}", err)),
                     },
-                    Err(err) => Err(format!(concat!(stringify!(#function_name), "() returned an error: {}"), err)),
+                    Err(err) => Err(format!(concat!(stringify!(#function_name), "() returned an error: {:?}"), err)),
                 }
             };
 

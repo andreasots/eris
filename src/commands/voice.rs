@@ -24,15 +24,10 @@ pub fn voice(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
     let config = data.extract::<Config>()?;
 
     let name = format!("{} {}", config.temp_channel_prefix, args.rest().trim());
-    let reply = match config.guild.create_channel(
-        &ctx,
-        &name,
-        ChannelType::Voice,
-        config.voice_category,
-    ) {
+    let reply = match config.guild.create_channel(&ctx, |c| c.name(name).category(config.voice_category).kind(ChannelType::Voice)) {
         Ok(channel) => format!("Created a temporary voice channel {:?}", channel.name),
         Err(err) => format!("Failed to create a temporary voice channel: {}", err),
     };
-    msg.reply(ctx, &reply)?;
+    msg.reply(&ctx, &reply)?;
     Ok(())
 }

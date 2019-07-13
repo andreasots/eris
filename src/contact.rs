@@ -131,24 +131,25 @@ async fn inner(ctx: &ErisContext) -> Result<(), Error> {
         .ok_or_else(|| failure::err_msg("no sheets or required information missing"))?;
 
     for message in unsent {
-        let msg = mods_channel
-            .send_message(ctx, |m| {
-                m.content(format!("New message from the contact form:"))
-                    .embed(|mut embed| {
-                        embed = embed
-                            .description(message.message)
-                            .timestamp(message.timestamp.to_rfc3339());
-                        if let Some(user) = message.username {
-                            embed = embed.author(|e| e.name(user))
-                        }
-                        embed
-                    })
-            })
-            .map_err(SyncFailure::new)
+        crate::thread::run(|| {
+            Ok(mods_channel
+                .send_message(ctx, |m| {
+                    m.content(format!("New message from the contact form:"))
+                        .embed(|mut embed| {
+                            embed = embed
+                                .description(message.message)
+                                .timestamp(message.timestamp.to_rfc3339());
+                            if let Some(user) = message.username {
+                                embed = embed.author(|e| e.name(user))
+                            }
+                            embed
+                        })
+                })
+                .map_err(SyncFailure::new)
+                .context("failed to forward the message")?)
+        })
             .context("failed to forward the message")?;
-        // FIXME(rust-lang/rust#61579): manual `drop()` is needed because if the result of
-        //  `mods_channel.send_message()` is not used the compiler ICEs.
-        drop(msg);
+
 
         sheets.create_developer_metadata_for_row(
             &spreadsheet_key,

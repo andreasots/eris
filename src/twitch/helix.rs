@@ -58,7 +58,6 @@ impl<'de> Deserialize<'de> for StreamType {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Stream {
-    pub community_ids: Vec<String>,
     pub game_id: String,
     pub id: String,
     pub language: String,

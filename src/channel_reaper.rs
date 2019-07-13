@@ -1,5 +1,5 @@
 use crate::config::Config;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use failure::{self, Error};
 use serenity::model::prelude::*;
 use slog::{slog_error, slog_info};
@@ -39,7 +39,7 @@ fn reap_channels(ctx: &ErisContext) -> Result<(), Error> {
             continue;
         }
 
-        let created_at = DateTime::from_utc(channel.id.created_at(), Utc);
+        let created_at = channel.id.created_at().with_timezone(&Utc);
 
         if (now - created_at).to_std()? > MIN_CHANNEL_AGE
             && voice_users.get(&channel.id).cloned().unwrap_or(0) == 0

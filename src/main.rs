@@ -1,4 +1,4 @@
-#![feature(await_macro, async_await, const_slice_len, core_intrinsics)]
+#![feature(async_closure, async_await, const_slice_len, core_intrinsics)]
 #![recursion_limit = "256"]
 
 #[macro_use]
@@ -30,6 +30,7 @@ mod rpc;
 mod schema;
 mod service;
 mod stdlog;
+mod thread;
 mod time;
 mod twitter;
 mod twitch;
@@ -178,7 +179,7 @@ fn main() -> Result<(), failure::Error> {
                 }
             })
             .unrecognised_command(commands::static_response::static_response)
-            .help(&crate::commands::help::HELP_HELP_COMMAND)
+            .help(&crate::commands::help::HELP)
             .group(&crate::commands::calendar::CALENDAR_GROUP)
             .group(&crate::commands::voice::VOICE_GROUP)
             .group(&crate::commands::time::TIME_GROUP)
