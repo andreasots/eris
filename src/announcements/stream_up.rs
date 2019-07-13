@@ -90,9 +90,12 @@ async fn stream_up_inner(ctx: &ErisContext, channel: Channel) -> Result<(), Erro
             .unwrap_or(show.name)
     };
 
-    announcements_channel
-        .say(ctx, format_args!("{}", StreamUp { channel, what }))
-        .map_err(SyncFailure::new)
+    crate::thread::run(|| {
+        Ok(announcements_channel
+            .say(ctx, format_args!("{}", StreamUp { channel, what }))
+            .map_err(SyncFailure::new)
+            .context("failed to send the announcement message")?)
+    })
         .context("failed to send the announcement message")?;
 
     Ok(())

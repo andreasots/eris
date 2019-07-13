@@ -170,10 +170,13 @@ impl Autotopic {
             messages.push(advice);
         }
 
-        // TODO: shorten to a max of 1024 characters, whatever that means.
-        ctx.data.read().extract::<Config>()?.general_channel
-            .edit(ctx, |c| c.topic(&messages.join(" ")))
-            .map_err(SyncFailure::new)
+        crate::thread::run(|| {
+            // TODO: shorten to a max of 1024 characters, whatever that means.
+            Ok(ctx.data.read().extract::<Config>()?.general_channel
+                .edit(ctx, |c| c.topic(&messages.join(" ")))
+                .map_err(SyncFailure::new)
+                .context("failed to update the topic")?)
+        })
             .context("failed to update the topic")?;
 
         Ok(())

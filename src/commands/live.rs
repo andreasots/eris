@@ -43,7 +43,7 @@ fn live(ctx: &mut Context, msg: &Message, _: Args) -> CommandResult {
     };
 
     if streams.len() == 0 {
-        msg.reply(ctx, "No fanstreamers currently live.")?;
+        msg.reply(&ctx, "No fanstreamers currently live.")?;
     } else {
         streams.sort_by(|a, b| {
             a.channel
@@ -75,7 +75,7 @@ fn live(ctx: &mut Context, msg: &Message, _: Args) -> CommandResult {
                 output
             })
             .collect::<Vec<String>>();
-        msg.reply(ctx, &format!(
+        msg.reply(&ctx, &format!(
             "Currently live fanstreamers: {}",
             streams.join(", ")
         ))?;

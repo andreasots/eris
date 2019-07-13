@@ -157,7 +157,7 @@ impl Calendar {
             Ok(tz) => tz.0,
             Err(ArgError::Eos) => config.timezone,
             Err(ArgError::Parse(err)) => {
-                msg.reply(ctx, &format!("Failed to parse the timezone: {}", err))?;
+                msg.reply(&ctx, &format!("Failed to parse the timezone: {}", err))?;
                 return Ok(());
             },
             Err(err) => return Err(err.into()),
@@ -185,7 +185,7 @@ impl Calendar {
             builder.push_event(event, now, tz);
         }
 
-        msg.reply(ctx, &builder.build())?;
+        msg.reply(&ctx, &builder.build())?;
 
         Ok(())
     }

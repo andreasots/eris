@@ -80,13 +80,13 @@ async fn inner<'a>(
                         tweet.id,
                     );
                     for channel in channels {
-                        // FIXME(rust-lang/rust#61579): manual `drop()` is needed because if the
-                        //  result of `channel.say()` is not used the compiler ICEs.
-                        let msg = channel
-                            .say(ctx, &message)
-                            .map_err(SyncFailure::new)
+                        crate::thread::run(||
+                            Ok(channel
+                                .say(ctx, &message)
+                                .map_err(SyncFailure::new)
+                                .context("failed to send the announcement message")?)
+                        )
                             .context("failed to send the announcement message")?;
-                        drop(msg);
                     }
 
                     {

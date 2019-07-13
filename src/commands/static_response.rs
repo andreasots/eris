@@ -153,7 +153,7 @@ fn static_response_impl(ctx: &mut Context, msg: &Message, command: &str) -> Resu
                 vars.insert(
                     "user".into(),
                     msg.guild_id
-                        .and_then(|guild| msg.author.nick_in(ctx, guild))
+                        .and_then(|guild| msg.author.nick_in(&ctx, guild))
                         .unwrap_or_else(|| msg.author.name.clone()),
                 );
                 let response =
@@ -255,34 +255,35 @@ mod tests {
 
     #[test]
     fn replace_emojis() {
-        use serenity::model::id::EmojiId;
-
-        let emoji = [
-            Emoji {
-                animated: false,
-                id: EmojiId(1),
-                name: String::from("lrrDOTS"),
-                managed: true,
-                require_colons: true,
-                roles: vec![],
-            },
-            Emoji {
-                animated: false,
-                id: EmojiId(2),
-                name: String::from("lrrCIRCLE"),
-                managed: true,
-                require_colons: true,
-                roles: vec![],
-            },
-            Emoji {
-                animated: false,
-                id: EmojiId(3),
-                name: String::from("lrrARROW"),
-                managed: true,
-                require_colons: true,
-                roles: vec![],
-            },
-        ];
+        let emoji = serde_json::from_str::<Vec<Emoji>>(r#"
+            [
+                {
+                    "animated": false,
+                    "id": "1",
+                    "name": "lrrDOTS",
+                    "managed": true,
+                    "require_colons": true,
+                    "roles": []
+                },
+                {
+                    "animated": false,
+                    "id": "2",
+                    "name": "lrrCIRCLE",
+                    "managed": true,
+                    "require_colons": true,
+                    "roles": []
+                },
+                {
+                    "animated": false,
+                    "id": "3",
+                    "name": "lrrARROW",
+                    "managed": true,
+                    "require_colons": true,
+                    "roles": []
+                }
+            ]
+        "#)
+            .unwrap();
 
         assert_eq!(
             super::replace_emojis("lrrDOTS lrrCIRCLE lrrARROW Visit LoadingReadyRun: http://loadingreadyrun.com/", emoji.iter()).unwrap(),
