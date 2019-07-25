@@ -11,7 +11,7 @@ byteorder = "1.3.2"
 bytes = "0.4.12"
 chrono = "0.4.7"
 chrono-tz = "0.5.1"
-crossbeam = "0.7.1"
+crossbeam = "0.7.2"
 clap = "2.33.0"
 csv = "1.1.1"
 diesel = { version = "1.4.2", features = ["postgres", "r2d2", "serde_json"] }
