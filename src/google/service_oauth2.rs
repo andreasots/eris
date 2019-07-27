@@ -4,11 +4,15 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use failure::{Error, ResultExt};
 use futures::compat::Future01CompatExt;
 use futures::lock::Mutex;
-use jsonwebtoken::{Algorithm, Header};
+use jsonwebtoken::{Algorithm, Header, Key};
 use reqwest::r#async::Client;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::path::PathBuf;
 use tokio::fs::File;
+use base64_stream::FromBase64Writer;
+use serde::de::Unexpected;
+use std::io::Write;
+use std::borrow::Cow;
 
 const TOKEN_URI: &str = "https://www.googleapis.com/oauth2/v4/token";
 
@@ -18,21 +22,39 @@ where
 {
     use serde::de::Error;
 
-    let pem = String::deserialize(deserializer)?;
-    let private_key = openssl::rsa::Rsa::private_key_from_pem(pem.as_bytes())
-        .map_err(|err| Error::custom(format!("failed to parse the private key: {}", err)))?;
+    let pem = Cow::<str>::deserialize(deserializer)?;
+    let mut output = vec![];
+    {
+        let mut writer = FromBase64Writer::new(&mut output);
 
-    private_key.private_key_to_der().map_err(|err| {
-        Error::custom(format!(
-            "failed to serialize the private key to DER: {}",
-            err
-        ))
-    })
+        let mut iter = pem.lines().enumerate().peekable();
+        while let Some((i, line)) = iter.next() {
+            if i == 0 {
+                if line != "-----BEGIN PRIVATE KEY-----" {
+                    return Err(Error::invalid_value(Unexpected::Str(&pem), &"a valid PEM-encoded PKCS#8-encoded private key: header is incorrect"));
+                }
+                continue;
+            } else if iter.peek().is_none() {
+                if line != "-----END PRIVATE KEY-----" {
+                    return Err(Error::invalid_value(Unexpected::Str(&pem), &"a valid PEM-encoded PKCS#8-encoded private key: footer is incorrect"));
+                }
+                continue;
+            }
+            if let Err(err) = writer.write_all(line.as_bytes()) {
+                return Err(Error::invalid_value(Unexpected::Str(&pem), &"a valid PEM-encoded PKCS#8-encoded private key: content is incorrect"));
+            }
+        }
+        if let Err(err) = writer.flush() {
+            return Err(Error::invalid_value(Unexpected::Str(&pem), &"a valid PEM-encoded PKCS#8-encoded private key: content is incorrect"));
+        }
+    }
+
+    Ok(output)
 }
 
 /// Type of a service account key JSON. There are more fields but we're only interested in these.
 #[derive(Deserialize)]
-struct Key {
+struct ServiceAccountKey {
     #[serde(deserialize_with = "pem_to_der")]
     private_key: Vec<u8>,
     client_email: String,
@@ -92,7 +114,7 @@ impl ServiceAccount {
                 .compat()
                 .await
                 .context("failed to read the service account key JSON file")?;
-            let key = serde_json::from_slice::<'_, Key>(&content)
+            let key = serde_json::from_slice::<'_, ServiceAccountKey>(&content)
                 .context("failed to parse the service account key JSON")?;
 
             let jwt = jsonwebtoken::encode(
@@ -104,7 +126,7 @@ impl ServiceAccount {
                     iat: now.timestamp(),
                     exp: (now + Duration::seconds(3600)).timestamp(),
                 },
-                &key.private_key,
+                Key::Pkcs8(&key.private_key),
             )
             .context("failed to create a JWT token")?;
 
