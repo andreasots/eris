@@ -10,7 +10,6 @@ use serenity::prelude::*;
 use serenity::utils::Colour;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use slog::{slog_error, slog_info};
 use slog_scope::{error, info};
 use crate::typemap_keys::Executor;
 use crate::extract::Extract;

@@ -7,7 +7,7 @@ extern crate diesel;
 use failure::ResultExt;
 
 use futures::future::{FutureExt, TryFutureExt};
-use slog::{o, slog_error, slog_info, Drain};
+use slog::{o, Drain};
 use slog_scope::{error, info};
 use crate::context::ErisContext;
 use crate::extract::Extract;

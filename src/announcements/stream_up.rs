@@ -3,7 +3,6 @@ use crate::models::{Game, GameEntry, Show};
 use crate::rpc::LRRbot;
 use diesel::OptionalExtension;
 use failure::{Error, ResultExt, SyncFailure};
-use slog::slog_error;
 use slog_scope::error;
 use std::fmt::{self, Display};
 use crate::typemap_keys::PgPool;

@@ -10,7 +10,6 @@ use failure::{Error, ResultExt, SyncFailure};
 use futures::compat::Stream01CompatExt;
 use futures::prelude::*;
 use separator::FixedPlaceSeparatable;
-use slog::slog_error;
 use slog_scope::error;
 use std::fmt;
 use std::time::{Duration, Instant};

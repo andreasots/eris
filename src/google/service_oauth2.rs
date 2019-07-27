@@ -13,6 +13,7 @@ use base64_stream::FromBase64Writer;
 use serde::de::Unexpected;
 use std::io::Write;
 use std::borrow::Cow;
+use slog_scope::error;
 
 const TOKEN_URI: &str = "https://www.googleapis.com/oauth2/v4/token";
 
@@ -41,10 +42,12 @@ where
                 continue;
             }
             if let Err(err) = writer.write_all(line.as_bytes()) {
+                error!("Failed to decode the private key"; "error" => ?err);
                 return Err(Error::invalid_value(Unexpected::Str(&pem), &"a valid PEM-encoded PKCS#8-encoded private key: content is incorrect"));
             }
         }
         if let Err(err) = writer.flush() {
+            error!("Failed to decode the private key"; "error" => ?err);
             return Err(Error::invalid_value(Unexpected::Str(&pem), &"a valid PEM-encoded PKCS#8-encoded private key: content is incorrect"));
         }
     }

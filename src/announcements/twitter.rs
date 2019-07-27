@@ -4,7 +4,6 @@ use failure::{Error, ResultExt, SyncFailure};
 use futures::compat::Stream01CompatExt;
 use futures::prelude::*;
 use serenity::model::id::ChannelId;
-use slog::slog_error;
 use slog_scope::error;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};

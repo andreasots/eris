@@ -2,7 +2,6 @@ use crate::config::Config;
 use chrono::Utc;
 use failure::{self, Error};
 use serenity::model::prelude::*;
-use slog::{slog_error, slog_info};
 use slog_scope::{error, info};
 use std::collections::HashMap;
 use std::thread;

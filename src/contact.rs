@@ -5,7 +5,6 @@ use chrono::{DateTime, Utc};
 use failure::{Error, ResultExt, SyncFailure};
 use futures::compat::Stream01CompatExt;
 use futures::TryStreamExt;
-use slog::{slog_error, slog_info};
 use slog_scope::{error, info};
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;

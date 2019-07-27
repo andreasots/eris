@@ -5,7 +5,6 @@ use failure::{bail, format_err, Error, ResultExt};
 use serde::Serialize;
 use serenity::model::prelude::*;
 use serenity::prelude::*;
-use slog::slog_error;
 use slog_scope::error;
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};

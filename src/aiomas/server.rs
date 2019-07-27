@@ -5,7 +5,6 @@ use futures::compat::{Future01CompatExt, Stream01CompatExt};
 use futures::future::BoxFuture;
 use futures::prelude::*;
 use serde_json::Value;
-use slog::slog_error;
 use slog_scope::error;
 use std::collections::HashMap;
 use std::path::Path;
