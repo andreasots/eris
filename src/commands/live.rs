@@ -1,14 +1,14 @@
 use crate::config::Config;
 use crate::executor_ext::ExecutorExt;
+use crate::extract::Extract;
 use crate::models::User;
 use crate::twitch::Kraken;
+use crate::typemap_keys::{Executor, PgPool};
 use diesel::prelude::*;
-use serenity::framework::standard::{Args, CommandResult};
 use serenity::framework::standard::macros::{command, group};
+use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
-use crate::typemap_keys::{PgPool, Executor};
-use crate::extract::Extract;
 
 group!({
     name: "Fanstreams",
@@ -16,7 +16,6 @@ group!({
         live,
     ],
 });
-
 
 #[command]
 #[help_available]
@@ -75,10 +74,10 @@ fn live(ctx: &mut Context, msg: &Message, _: Args) -> CommandResult {
                 output
             })
             .collect::<Vec<String>>();
-        msg.reply(&ctx, &format!(
-            "Currently live fanstreamers: {}",
-            streams.join(", ")
-        ))?;
+        msg.reply(
+            &ctx,
+            &format!("Currently live fanstreamers: {}", streams.join(", ")),
+        )?;
     }
 
     Ok(())

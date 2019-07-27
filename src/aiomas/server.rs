@@ -58,7 +58,11 @@ pub struct Server<C: 'static> {
 
 impl<C: Clone + Send + 'static> Server<C> {
     #[cfg(unix)]
-    pub fn new<P: AsRef<Path>>(path: P, executor: TaskExecutor, context: C) -> Result<Server<C>, Error> {
+    pub fn new<P: AsRef<Path>>(
+        path: P,
+        executor: TaskExecutor,
+        context: C,
+    ) -> Result<Server<C>, Error> {
         let listener = UnixListener::bind(path).context("failed to create a listening socket")?;
 
         Ok(Server {

@@ -7,11 +7,11 @@ pub struct AiomasHandler {
 }
 
 impl AiomasHandler {
-    pub fn new(method: &'static str, handler: &'static (dyn Handler<ErisContext> + Send + Sync + 'static)) -> AiomasHandler {
-        AiomasHandler {
-            method,
-            handler,
-        }
+    pub fn new(
+        method: &'static str,
+        handler: &'static (dyn Handler<ErisContext> + Send + Sync + 'static),
+    ) -> AiomasHandler {
+        AiomasHandler { method, handler }
     }
 }
 

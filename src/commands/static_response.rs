@@ -1,19 +1,19 @@
 use crate::executor_ext::ExecutorExt;
+use crate::extract::Extract;
 use crate::rpc::LRRbot;
+use crate::typemap_keys::Executor;
 use failure::{Error, ResultExt, SyncFailure};
 use rand::seq::SliceRandom;
 use regex::Regex;
 use serde::{Deserialize, Deserializer};
+use serenity::framework::standard::{Args, Delimiter};
 use serenity::model::channel::Message;
 use serenity::model::guild::Emoji;
 use serenity::prelude::*;
 use serenity::utils::Colour;
+use slog_scope::{error, info};
 use std::borrow::Cow;
 use std::collections::HashMap;
-use slog_scope::{error, info};
-use crate::typemap_keys::Executor;
-use crate::extract::Extract;
-use serenity::framework::standard::{Args, Delimiter};
 
 #[derive(Deserialize, Debug, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "lowercase")]
@@ -127,11 +127,11 @@ fn static_response_impl(ctx: &mut Context, msg: &Message, command: &str) -> Resu
         let command = String::from(command);
 
         data.extract::<Executor>()?
-            .block_on(
-                async move {
-                    lrrbot.get_data::<Response>(vec![String::from("responses"), command]).await
-                },
-            )
+            .block_on(async move {
+                lrrbot
+                    .get_data::<Response>(vec![String::from("responses"), command])
+                    .await
+            })
             .context("failed to fetch the command")?
     };
 
@@ -187,10 +187,13 @@ pub fn static_response(ctx: &mut Context, msg: &Message, command: &str) {
                 "error" => ?err,
             );
 
-            let _ = msg.reply(ctx, &format!(
-                "Simple text response command resulted in an unexpected error: {}.",
-                err
-            ));
+            let _ = msg.reply(
+                ctx,
+                &format!(
+                    "Simple text response command resulted in an unexpected error: {}.",
+                    err
+                ),
+            );
         }
     }
 }
@@ -254,7 +257,8 @@ mod tests {
 
     #[test]
     fn replace_emojis() {
-        let emoji = serde_json::from_str::<Vec<Emoji>>(r#"
+        let emoji = serde_json::from_str::<Vec<Emoji>>(
+            r#"
             [
                 {
                     "animated": false,
@@ -281,8 +285,9 @@ mod tests {
                     "roles": []
                 }
             ]
-        "#)
-            .unwrap();
+        "#,
+        )
+        .unwrap();
 
         assert_eq!(
             super::replace_emojis("lrrDOTS lrrCIRCLE lrrARROW Visit LoadingReadyRun: http://loadingreadyrun.com/", emoji.iter()).unwrap(),
@@ -292,8 +297,14 @@ mod tests {
 
     #[test]
     fn extract_command() {
-        assert_eq!(super::extract_command(" \t ! \t some \t command \t ", "some"), "some command");
+        assert_eq!(
+            super::extract_command(" \t ! \t some \t command \t ", "some"),
+            "some command"
+        );
         assert_eq!(super::extract_command("!command", "command"), "command");
-        assert_eq!(super::extract_command("<@!1234> some command", "some"), "some command");
+        assert_eq!(
+            super::extract_command("<@!1234> some command", "some"),
+            "some command"
+        );
     }
 }

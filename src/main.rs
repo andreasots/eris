@@ -6,11 +6,11 @@ extern crate diesel;
 
 use failure::ResultExt;
 
+use crate::context::ErisContext;
+use crate::extract::Extract;
 use futures::future::{FutureExt, TryFutureExt};
 use slog::{o, Drain};
 use slog_scope::{error, info};
-use crate::context::ErisContext;
-use crate::extract::Extract;
 
 mod aiomas;
 mod announcements;
@@ -23,8 +23,8 @@ mod context;
 mod desertbus;
 mod executor_ext;
 mod extract;
-mod inventory;
 mod google;
+mod inventory;
 mod models;
 mod rpc;
 mod schema;
@@ -32,8 +32,8 @@ mod service;
 mod stdlog;
 mod thread;
 mod time;
-mod twitter;
 mod twitch;
+mod twitter;
 mod typemap_keys;
 mod voice_channel_tracker;
 
@@ -105,7 +105,7 @@ fn main() -> Result<(), failure::Error> {
         .get_matches();
 
     let config = config::Config::load_from_file(matches.value_of_os("conf").unwrap())
-            .context("failed to load the config file")?;
+        .context("failed to load the config file")?;
 
     let pg_pool = diesel::r2d2::Pool::new(diesel::r2d2::ConnectionManager::<
         diesel::pg::PgConnection,
@@ -134,13 +134,25 @@ fn main() -> Result<(), failure::Error> {
 
     let mut runtime = tokio::runtime::Runtime::new().context("failed to create a Tokio runtime")?;
 
-    let twitter = runtime.block_on(crate::twitter::Twitter::new(http_client.clone(), config.twitter_api_key.clone(), config.twitter_api_secret.clone()).boxed().compat())
+    let twitter = runtime
+        .block_on(
+            crate::twitter::Twitter::new(
+                http_client.clone(),
+                config.twitter_api_key.clone(),
+                config.twitter_api_secret.clone(),
+            )
+            .boxed()
+            .compat(),
+        )
         .context("failed to initialise the Twitter client")?;
 
     let mut client = serenity::Client::new(&config.discord_botsecret, handler)
         .map_err(failure::SyncFailure::new)
         .context("failed to create the Discord client")?;
-    let current_application_info = client.cache_and_http.http.get_current_application_info()
+    let current_application_info = client
+        .cache_and_http
+        .http
+        .get_current_application_info()
         .context("failed to fetch the current application information")?;
     client.with_framework(
         serenity::framework::StandardFramework::new()
@@ -168,10 +180,10 @@ fn main() -> Result<(), failure::Error> {
                         "error" => ?err,
                     );
 
-                    let _ = message.reply(ctx, &format!(
-                        "Command resulted in an unexpected error: {}.",
-                        err.0
-                    ));
+                    let _ = message.reply(
+                        ctx,
+                        &format!("Command resulted in an unexpected error: {}.", err.0),
+                    );
                 } else {
                     info!("Command processed successfully";
                         "message.id" => ?message.id.0,
@@ -200,7 +212,10 @@ fn main() -> Result<(), failure::Error> {
     {
         let mut data = client.data.write();
 
-        data.insert::<crate::rpc::LRRbot>(std::sync::Arc::new(crate::rpc::LRRbot::new(&config, runtime.executor())));
+        data.insert::<crate::rpc::LRRbot>(std::sync::Arc::new(crate::rpc::LRRbot::new(
+            &config,
+            runtime.executor(),
+        )));
 
         data.insert::<crate::config::Config>(config);
         data.insert::<crate::typemap_keys::Executor>(runtime.executor());
@@ -220,14 +235,15 @@ fn main() -> Result<(), failure::Error> {
         let config = data.extract::<crate::config::Config>()?;
 
         #[cfg(unix)]
-        let server = crate::aiomas::Server::new(&config.eris_socket, runtime.executor(), ctx.clone());
+        let server =
+            crate::aiomas::Server::new(&config.eris_socket, runtime.executor(), ctx.clone());
 
         #[cfg(not(unix))]
         let server = crate::aiomas::Server::new(config.eris_port, runtime.executor(), ctx.clone());
 
         server
     }
-        .context("failed to create the RPC server")?;
+    .context("failed to create the RPC server")?;
     for handler in ::inventory::iter::<crate::inventory::AiomasHandler> {
         rpc_server.register(handler.method, handler.handler);
     }
@@ -244,9 +260,9 @@ fn main() -> Result<(), failure::Error> {
 
     runtime.spawn(
         autotopic::autotopic(ctx.clone())
-        .unit_error()
-        .boxed()
-        .compat(),
+            .unit_error()
+            .boxed()
+            .compat(),
     );
 
     runtime.spawn(

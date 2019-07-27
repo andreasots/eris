@@ -1,9 +1,9 @@
 use crate::config::Config;
-use serenity::framework::standard::{Args, CommandResult};
+use crate::extract::Extract;
 use serenity::framework::standard::macros::{command, group};
+use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
-use crate::extract::Extract;
 
 group!({
     name: "Voice",
@@ -24,7 +24,11 @@ pub fn voice(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
     let config = data.extract::<Config>()?;
 
     let name = format!("{} {}", config.temp_channel_prefix, args.rest().trim());
-    let reply = match config.guild.create_channel(&ctx, |c| c.name(name).category(config.voice_category).kind(ChannelType::Voice)) {
+    let reply = match config.guild.create_channel(&ctx, |c| {
+        c.name(name)
+            .category(config.voice_category)
+            .kind(ChannelType::Voice)
+    }) {
         Ok(channel) => format!("Created a temporary voice channel {:?}", channel.name),
         Err(err) => format!("Failed to create a temporary voice channel: {}", err),
     };

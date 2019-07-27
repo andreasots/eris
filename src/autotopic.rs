@@ -1,8 +1,14 @@
+use crate::config::Config;
+use crate::context::ErisContext;
 use crate::desertbus::DesertBus;
+use crate::extract::Extract;
 use crate::google::calendar::{Calendar, Event, LRR};
 use crate::models::{Game, GameEntry, Show};
+use crate::rpc::LRRbot;
 use crate::time::HumanReadable;
 use crate::twitch::helix::User;
+use crate::twitch::Helix;
+use crate::typemap_keys::PgPool;
 use chrono::{DateTime, FixedOffset, Utc};
 use chrono_tz::Tz;
 use diesel::OptionalExtension;
@@ -14,12 +20,6 @@ use slog_scope::error;
 use std::fmt;
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;
-use crate::context::ErisContext;
-use crate::extract::Extract;
-use crate::rpc::LRRbot;
-use crate::typemap_keys::PgPool;
-use crate::twitch::Helix;
-use crate::config::Config;
 
 struct EventDisplay<'a> {
     event: &'a Event,
@@ -64,9 +64,11 @@ pub async fn autotopic(ctx: ErisContext) {
 
     loop {
         match timer.try_next().await {
-            Ok(Some(_)) => if let Err(err) = Autotopic.update_topic(&ctx).await {
-                error!("Failed to update the topic"; "error" => ?err);
-            },
+            Ok(Some(_)) => {
+                if let Err(err) = Autotopic.update_topic(&ctx).await {
+                    error!("Failed to update the topic"; "error" => ?err);
+                }
+            }
             Ok(None) => break,
             Err(err) => {
                 error!("Timer error"; "error" => ?err);
@@ -82,14 +84,20 @@ impl Autotopic {
     async fn update_topic(self, ctx: &ErisContext) -> Result<(), Error> {
         let header = {
             let lrrbot = ctx.data.read().extract::<LRRbot>()?.clone();
-            lrrbot.get_header_info().await.context("failed to fetch header info")?
+            lrrbot
+                .get_header_info()
+                .await
+                .context("failed to fetch header info")?
         };
 
         let mut messages = vec![];
 
         if header.is_live {
             let (game, show, game_entry) = {
-                let conn = ctx.data.read().extract::<PgPool>()?
+                let conn = ctx
+                    .data
+                    .read()
+                    .extract::<PgPool>()?
                     .get()
                     .context("failed to get a database connection from the pool")?;
 
@@ -144,7 +152,8 @@ impl Autotopic {
             let now = Utc::now();
 
             let calendar = ctx.data.read().extract::<Calendar>()?.clone();
-            let events = calendar.get_upcoming_events(LRR, now)
+            let events = calendar
+                .get_upcoming_events(LRR, now)
                 .await
                 .context("failed to get the next scheduled stream")?;
             let events = Calendar::get_next_event(&events, now, false);
@@ -154,14 +163,11 @@ impl Autotopic {
                 messages.extend(desertbus);
             } else {
                 let tz = ctx.data.read().extract::<Config>()?.timezone;
-                messages.extend(events.iter().map(|event| {
-                    EventDisplay {
-                        event,
-                        now,
-                        tz,
-                    }
-                    .to_string()
-                }));
+                messages.extend(
+                    events
+                        .iter()
+                        .map(|event| EventDisplay { event, now, tz }.to_string()),
+                );
             }
         }
 
@@ -171,19 +177,24 @@ impl Autotopic {
 
         crate::thread::run(|| {
             // TODO: shorten to a max of 1024 characters, whatever that means.
-            Ok(ctx.data.read().extract::<Config>()?.general_channel
+            Ok(ctx
+                .data
+                .read()
+                .extract::<Config>()?
+                .general_channel
                 .edit(ctx, |c| c.topic(&messages.join(" ")))
                 .map_err(SyncFailure::new)
                 .context("failed to update the topic")?)
         })
-            .context("failed to update the topic")?;
+        .context("failed to update the topic")?;
 
         Ok(())
     }
 
     async fn uptime_msg<'a>(self, ctx: &'a ErisContext, channel: &'a str) -> Result<String, Error> {
         let helix = ctx.data.read().extract::<Helix>()?.clone();
-        Ok(helix.get_stream(User::Login(channel))
+        Ok(helix
+            .get_stream(User::Login(channel))
             .await
             .context("failed to get the stream")?
             .map(|stream| {
@@ -195,7 +206,12 @@ impl Autotopic {
             .unwrap_or_else(|| String::from("The stream is not live.")))
     }
 
-    async fn desertbus<'a>(self, ctx: &'a ErisContext, now: DateTime<Utc>, events: &'a [Event]) -> Result<Vec<String>, Error> {
+    async fn desertbus<'a>(
+        self,
+        ctx: &'a ErisContext,
+        now: DateTime<Utc>,
+        events: &'a [Event],
+    ) -> Result<Vec<String>, Error> {
         let start = DesertBus::start_time().with_timezone(&Utc);
         let announce_start = start - chrono::Duration::days(2);
         let announce_end = start + chrono::Duration::days(7);

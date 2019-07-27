@@ -164,29 +164,29 @@ impl Sheets {
         spreadsheet: &'a str,
         fields: &'a str,
     ) -> Result<Spreadsheet, Error> {
-        let token = self.oauth2.get_token()
+        let token = self
+            .oauth2
+            .get_token()
             .await
             .context("failed to get a service account OAuth2 token")?;
-        Ok(
-            self
-                .client
-                .get(&format!(
-                    "https://sheets.googleapis.com/v4/spreadsheets/{}",
-                    spreadsheet
-                ))
-                .header(AUTHORIZATION, format!("Bearer {}", token))
-                .query(&[("fields", fields)])
-                .send()
-                .compat()
-                .await
-                .context("failed to send the request")?
-                .error_for_status()
-                .context("request failed")?
-                .json::<Spreadsheet>()
-                .compat()
-                .await
-                .context("failed to read the response")?
-        )
+        Ok(self
+            .client
+            .get(&format!(
+                "https://sheets.googleapis.com/v4/spreadsheets/{}",
+                spreadsheet
+            ))
+            .header(AUTHORIZATION, format!("Bearer {}", token))
+            .query(&[("fields", fields)])
+            .send()
+            .compat()
+            .await
+            .context("failed to send the request")?
+            .error_for_status()
+            .context("request failed")?
+            .json::<Spreadsheet>()
+            .compat()
+            .await
+            .context("failed to read the response")?)
     }
 
     pub async fn create_developer_metadata_for_row<'a>(
@@ -197,11 +197,12 @@ impl Sheets {
         key: &'a str,
         value: &'a str,
     ) -> Result<(), Error> {
-        let token = self.oauth2.get_token()
+        let token = self
+            .oauth2
+            .get_token()
             .await
             .context("failed to get a service account OAuth2 token")?;
-        self
-            .client
+        self.client
             .post(&format!(
                 "https://sheets.googleapis.com/v4/spreadsheets/{}:batchUpdate",
                 spreadsheet

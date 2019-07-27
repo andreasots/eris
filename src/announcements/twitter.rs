@@ -1,5 +1,9 @@
 use crate::config::Config;
+use crate::context::ErisContext;
+use crate::extract::Extract;
 use crate::models::State;
+use crate::twitter::Twitter;
+use crate::typemap_keys::PgPool;
 use failure::{Error, ResultExt, SyncFailure};
 use futures::compat::Stream01CompatExt;
 use futures::prelude::*;
@@ -8,20 +12,20 @@ use slog_scope::error;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;
-use crate::context::ErisContext;
-use crate::typemap_keys::PgPool;
-use crate::extract::Extract;
-use crate::twitter::Twitter;
 
 async fn init(ctx: &ErisContext) -> Result<HashMap<u64, Vec<ChannelId>>, Error> {
     let (twitter, twitter_users) = {
         let data = ctx.data.read();
 
-        (data.extract::<Twitter>()?.clone(), data.extract::<Config>()?.twitter_users.clone())
+        (
+            data.extract::<Twitter>()?.clone(),
+            data.extract::<Config>()?.twitter_users.clone(),
+        )
     };
 
     let usernames = twitter_users.keys().map(|s| &s[..]).collect::<Vec<&str>>();
-    let user_ids = twitter.users_lookup(&usernames)
+    let user_ids = twitter
+        .users_lookup(&usernames)
         .await
         .context("failed to fetch the Twitter IDs for watched users")?
         .into_iter()
@@ -45,7 +49,8 @@ async fn inner<'a>(
         let state_key = &format!("eris.announcements.twitter.{}.last_tweet_id", user_id);
         let last_tweet_id = {
             let data = ctx.data.read();
-            let conn = data.extract::<PgPool>()?
+            let conn = data
+                .extract::<PgPool>()?
                 .get()
                 .context("failed to get a DB connection from the connection pool")?;
 
@@ -54,7 +59,8 @@ async fn inner<'a>(
 
         let twitter = ctx.data.read().extract::<Twitter>()?.clone();
 
-        let mut tweets = twitter.user_timeline(user_id, true, true, 200, last_tweet_id)
+        let mut tweets = twitter
+            .user_timeline(user_id, true, true, 200, last_tweet_id)
             .await
             .context("failed to fetch new tweets")?;
 
@@ -70,27 +76,22 @@ async fn inner<'a>(
                 {
                     let message = format!(
                         "New tweet from {}: https://twitter.com/{}/status/{}",
-                        tweet
-                            .user
-                            .name,
-                        tweet
-                            .user
-                            .screen_name,
-                        tweet.id,
+                        tweet.user.name, tweet.user.screen_name, tweet.id,
                     );
                     for channel in channels {
-                        crate::thread::run(||
+                        crate::thread::run(|| {
                             Ok(channel
                                 .say(ctx, &message)
                                 .map_err(SyncFailure::new)
                                 .context("failed to send the announcement message")?)
-                        )
-                            .context("failed to send the announcement message")?;
+                        })
+                        .context("failed to send the announcement message")?;
                     }
 
                     {
                         let data = ctx.data.read();
-                        let conn = data.extract::<PgPool>()?
+                        let conn = data
+                            .extract::<PgPool>()?
                             .get()
                             .context("failed to get a DB connection from the connection pool")?;
                         State::set(&state_key, tweet.id, &conn)
@@ -100,7 +101,8 @@ async fn inner<'a>(
             }
         } else {
             let data = ctx.data.read();
-            let conn = data.extract::<PgPool>()?
+            let conn = data
+                .extract::<PgPool>()?
                 .get()
                 .context("failed to get a DB connection from the connection pool")?;
 
@@ -126,9 +128,11 @@ pub async fn post_tweets(ctx: ErisContext) {
 
     loop {
         match timer.try_next().await {
-            Ok(Some(_)) => if let Err(err) = inner(&ctx, &users).await {
-                error!("Failed to announce new tweets"; "error" => ?err);
-            },
+            Ok(Some(_)) => {
+                if let Err(err) = inner(&ctx, &users).await {
+                    error!("Failed to announce new tweets"; "error" => ?err);
+                }
+            }
             Ok(None) => break,
             Err(err) => error!("Timer error"; "error" => ?err),
         }

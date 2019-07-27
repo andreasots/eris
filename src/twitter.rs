@@ -1,7 +1,7 @@
+use failure::{Error, ResultExt};
+use futures::compat::Future01CompatExt;
 use reqwest::r#async::Client;
 use serde::{Deserialize, Serialize};
-use futures::compat::Future01CompatExt;
-use failure::{Error, ResultExt};
 use std::borrow::Borrow;
 
 #[derive(Serialize)]
@@ -51,14 +51,16 @@ impl Twitter {
     pub async fn new(client: Client, key: String, secret: String) -> Result<Twitter, Error> {
         let token = Self::fetch_token(&client, &key, &secret).await?;
 
-        Ok(Twitter {
-            client,
-            token,
-        })
+        Ok(Twitter { client, token })
     }
 
-    async fn fetch_token<'a>(client: &'a Client, key: &'a str, secret: &'a str) -> Result<String, Error> {
-        let res = client.post("https://api.twitter.com/oauth2/token")
+    async fn fetch_token<'a>(
+        client: &'a Client,
+        key: &'a str,
+        secret: &'a str,
+    ) -> Result<String, Error> {
+        let res = client
+            .post("https://api.twitter.com/oauth2/token")
             .basic_auth(key, Some(secret))
             .form(&OAuth2TokenRequest {
                 grant_type: "client_credentials",
@@ -77,12 +79,20 @@ impl Twitter {
         if res.token_type == "bearer" {
             Ok(res.access_token)
         } else {
-            Err(failure::err_msg(format!("OAuth2 token request returned a non-Bearer token, got {:?}", res.token_type)))
+            Err(failure::err_msg(format!(
+                "OAuth2 token request returned a non-Bearer token, got {:?}",
+                res.token_type
+            )))
         }
     }
 
-    pub async fn users_lookup<'a>(&'a self, users: &'a [impl Borrow<str>]) -> Result<Vec<User>, Error> {
-        let users = self.client.get("https://api.twitter.com/1.1/users/lookup.json")
+    pub async fn users_lookup<'a>(
+        &'a self,
+        users: &'a [impl Borrow<str>],
+    ) -> Result<Vec<User>, Error> {
+        let users = self
+            .client
+            .get("https://api.twitter.com/1.1/users/lookup.json")
             .bearer_auth(&self.token)
             .query(&[("screen_name", users.join(","))])
             .send()
@@ -98,15 +108,24 @@ impl Twitter {
         Ok(users)
     }
 
-    pub async fn user_timeline(&self, user_id: u64, with_replies: bool, with_retweets: bool, count: u32, since_id: Option<u64>) -> Result<Vec<Tweet>, Error> {
-        let tweets = self.client.get("https://api.twitter.com/1.1/statuses/user_timeline.json")
+    pub async fn user_timeline(
+        &self,
+        user_id: u64,
+        with_replies: bool,
+        with_retweets: bool,
+        count: u32,
+        since_id: Option<u64>,
+    ) -> Result<Vec<Tweet>, Error> {
+        let tweets = self
+            .client
+            .get("https://api.twitter.com/1.1/statuses/user_timeline.json")
             .bearer_auth(&self.token)
             .query(&UserTimelineRequest {
                 user_id,
                 exclude_replies: !with_replies,
                 include_rts: with_retweets,
                 count,
-                since_id
+                since_id,
             })
             .send()
             .compat()

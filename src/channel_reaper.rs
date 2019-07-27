@@ -1,4 +1,6 @@
 use crate::config::Config;
+use crate::context::ErisContext;
+use crate::extract::Extract;
 use chrono::Utc;
 use failure::{self, Error};
 use serenity::model::prelude::*;
@@ -6,8 +8,6 @@ use slog_scope::{error, info};
 use std::collections::HashMap;
 use std::thread;
 use std::time::Duration;
-use crate::context::ErisContext;
-use crate::extract::Extract;
 
 const STARTUP_DELAY: Duration = Duration::from_secs(5);
 const REAP_INTERVAL: Duration = Duration::from_secs(60);
@@ -16,7 +16,11 @@ const MIN_CHANNEL_AGE: Duration = Duration::from_secs(15 * 60);
 fn reap_channels(ctx: &ErisContext) -> Result<(), Error> {
     let data = ctx.data.read();
     let config = data.extract::<Config>()?;
-    let guild = ctx.cache_and_http.cache.read().guild(config.guild)
+    let guild = ctx
+        .cache_and_http
+        .cache
+        .read()
+        .guild(config.guild)
         .ok_or_else(|| failure::err_msg("failed to get the guild"))?;
 
     let mut voice_users = HashMap::new();

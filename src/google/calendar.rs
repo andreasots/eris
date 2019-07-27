@@ -58,7 +58,10 @@ pub struct Calendar {
 
 impl Calendar {
     pub fn new(client: Client, config: &Config) -> Calendar {
-        Calendar { client, key: config.google_key.clone() }
+        Calendar {
+            client,
+            key: config.google_key.clone(),
+        }
     }
 
     pub async fn get_upcoming_events<'a, Tz: TimeZone + 'a>(
@@ -66,32 +69,30 @@ impl Calendar {
         calendar: &'a str,
         after: DateTime<Tz>,
     ) -> Result<Vec<Event>, Error> {
-        Ok(
-            self
-                .client
-                .get(&format!(
-                    "https://www.googleapis.com/calendar/v3/calendars/{}/events",
-                    calendar
-                ))
-                .query(&ListEventsRequest {
-                    maxResults: 10,
-                    orderBy: "startTime",
-                    singleEvents: true,
-                    timeMin: after,
-                    key: &self.key,
-                })
-                .send()
-                .compat()
-                .await
-                .context("failed to get calendar events")?
-                .error_for_status()
-                .context("request failed")?
-                .json::<ListEventsResponse>()
-                .compat()
-                .await
-                .context("failed to parse calendar events")?
-                .items
-        )
+        Ok(self
+            .client
+            .get(&format!(
+                "https://www.googleapis.com/calendar/v3/calendars/{}/events",
+                calendar
+            ))
+            .query(&ListEventsRequest {
+                maxResults: 10,
+                orderBy: "startTime",
+                singleEvents: true,
+                timeMin: after,
+                key: &self.key,
+            })
+            .send()
+            .compat()
+            .await
+            .context("failed to get calendar events")?
+            .error_for_status()
+            .context("request failed")?
+            .json::<ListEventsResponse>()
+            .compat()
+            .await
+            .context("failed to parse calendar events")?
+            .items)
     }
 
     pub fn get_next_event<Tz: TimeZone>(

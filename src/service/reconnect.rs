@@ -1,8 +1,8 @@
 use crate::aiomas::{Client, Exception, NewClient, Request};
 use failure::{Error, ResultExt};
-use serde_json::Value;
-use futures::lock::Mutex;
 use futures::channel::oneshot;
+use futures::lock::Mutex;
+use serde_json::Value;
 
 // FIXME: this should be generic over the factory but that requires generic associated types and
 //  existential types.
@@ -19,7 +19,10 @@ impl Reconnect {
         }
     }
 
-    async fn call_inner(&self, req: Request) -> Result<oneshot::Receiver<Result<Value, Exception>>, Error> {
+    async fn call_inner(
+        &self,
+        req: Request,
+    ) -> Result<oneshot::Receiver<Result<Value, Exception>>, Error> {
         let mut client_guard = self.client.lock().await;
 
         if let Some(client) = &mut *client_guard {

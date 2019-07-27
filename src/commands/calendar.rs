@@ -1,20 +1,20 @@
+use crate::config::Config;
 use crate::executor_ext::ExecutorExt;
+use crate::extract::Extract;
 use crate::google::calendar::{Calendar as GoogleCalendar, Event, FANSTREAMS, LRR};
 use crate::time::HumanReadable;
+use crate::typemap_keys::Executor;
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
 use failure::{Compat, Error};
-use serenity::framework::standard::{ArgError, Args, CommandResult};
 use serenity::framework::standard::macros::{command, group};
+use serenity::framework::standard::{ArgError, Args, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
 use serenity::utils::MessageBuilder;
 use std::fmt::Display;
 use std::str::FromStr;
 use url::Url;
-use crate::config::Config;
-use crate::extract::Extract;
-use crate::typemap_keys::Executor;
 
 group!({
     name: "Calendar",
@@ -80,8 +80,7 @@ impl PushEvent for MessageBuilder {
         let text = text.to_string();
         let mut last_index = 0;
         for entity in egg_mode_text::url_entities(&text) {
-            self
-                .push_safe(&text[last_index..entity.range.0])
+            self.push_safe(&text[last_index..entity.range.0])
                 .push("<")
                 .push_safe(url_normalise(&entity.substr(&text)))
                 .push(">");
@@ -99,8 +98,7 @@ impl PushEvent for MessageBuilder {
 
         if let Some(ref desc) = event.description {
             // TODO: shorten to 200 characters.
-            self
-                .push(" (")
+            self.push(" (")
                 .push_safer(GoogleCalendar::format_description(desc))
                 .push(")");
         }
@@ -114,8 +112,7 @@ impl PushEvent for MessageBuilder {
         let start = event.start.with_timezone(&Utc);
         self.push(" (");
         if start > now {
-            self
-                .push(HumanReadable::new(start - now))
+            self.push(HumanReadable::new(start - now))
                 .push(" from now)");
         } else {
             self.push(HumanReadable::new(now - start)).push(" ago)");
@@ -159,7 +156,7 @@ impl Calendar {
             Err(ArgError::Parse(err)) => {
                 msg.reply(&ctx, &format!("Failed to parse the timezone: {}", err))?;
                 return Ok(());
-            },
+            }
             Err(err) => return Err(err.into()),
         };
 
@@ -168,9 +165,8 @@ impl Calendar {
         let events = {
             let google_calendar = google_calendar.clone();
             let calendar = self.calendar;
-            executor.block_on(
-                async move { google_calendar.get_upcoming_events(calendar, now).await },
-            )?
+            executor
+                .block_on(async move { google_calendar.get_upcoming_events(calendar, now).await })?
         };
 
         let events = GoogleCalendar::get_next_event(&events, now, self.include_current);

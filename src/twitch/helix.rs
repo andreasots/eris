@@ -98,24 +98,22 @@ impl Helix {
     }
 
     pub async fn get_stream<'a>(&'a self, user: User<'a>) -> Result<Option<Stream>, Error> {
-        Ok(
-            self
-                .client
-                .get("https://api.twitch.tv/helix/streams")
-                .header("Client-ID", self.client_id.clone())
-                .query(&user.as_query()[..])
-                .send()
-                .compat()
-                .await
-                .context("failed to send the request")?
-                .error_for_status()
-                .context("request failed")?
-                .json::<PaginatedResponse<Stream>>()
-                .compat()
-                .await
-                .context("failed to read the response")?
-                .data
-                .pop()
-        )
+        Ok(self
+            .client
+            .get("https://api.twitch.tv/helix/streams")
+            .header("Client-ID", self.client_id.clone())
+            .query(&user.as_query()[..])
+            .send()
+            .compat()
+            .await
+            .context("failed to send the request")?
+            .error_for_status()
+            .context("request failed")?
+            .json::<PaginatedResponse<Stream>>()
+            .compat()
+            .await
+            .context("failed to read the response")?
+            .data
+            .pop())
     }
 }

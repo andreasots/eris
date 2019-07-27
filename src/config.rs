@@ -134,11 +134,14 @@ impl Config {
                     .unwrap_or(289166968307712000),
             ),
             general_channel: ChannelId(
-                if let Some(channel_id) = Config::get_option_parsed(&ini, "discord_channel_general")? {
+                if let Some(channel_id) =
+                    Config::get_option_parsed(&ini, "discord_channel_general")?
+                {
                     channel_id
                 } else {
-                    Config::get_option_parsed(&ini, "discord_serverid")?.unwrap_or(288920509272555520)
-                }
+                    Config::get_option_parsed(&ini, "discord_serverid")?
+                        .unwrap_or(288920509272555520)
+                },
             ),
             guild: GuildId(
                 Config::get_option_parsed(&ini, "discord_serverid")?.unwrap_or(288920509272555520),

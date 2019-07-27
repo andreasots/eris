@@ -1,16 +1,16 @@
 use crate::config::Config;
+use crate::context::ErisContext;
+use crate::extract::Extract;
 use crate::models::{Game, GameEntry, Show};
 use crate::rpc::LRRbot;
+use crate::typemap_keys::PgPool;
+use chrono::{DateTime, FixedOffset};
 use diesel::OptionalExtension;
+use eris_macros::rpc_handler;
 use failure::{Error, ResultExt, SyncFailure};
+use serde::Deserialize;
 use slog_scope::error;
 use std::fmt::{self, Display};
-use crate::typemap_keys::PgPool;
-use crate::extract::Extract;
-use crate::context::ErisContext;
-use eris_macros::rpc_handler;
-use chrono::{DateTime, FixedOffset};
-use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct Channel {
@@ -30,7 +30,13 @@ struct StreamUp {
 
 impl Display for StreamUp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.channel.display_name.as_ref().unwrap_or(&self.channel.name))?;
+        f.write_str(
+            &self
+                .channel
+                .display_name
+                .as_ref()
+                .unwrap_or(&self.channel.name),
+        )?;
         f.write_str(" is live with ")?;
         f.write_str(&self.what)?;
         if let Some(ref status) = self.channel.status {
@@ -49,14 +55,26 @@ async fn stream_up_inner(ctx: &ErisContext, channel: Channel) -> Result<(), Erro
     let (lrrbot, announcements_channel) = {
         let data = ctx.data.read();
 
-        (data.extract::<LRRbot>()?.clone(), data.extract::<Config>()?.announcements)
+        (
+            data.extract::<LRRbot>()?.clone(),
+            data.extract::<Config>()?.announcements,
+        )
     };
 
-    let game_id = lrrbot.get_game_id().await.context("failed to get the game ID")?;
-    let show_id = lrrbot.get_show_id().await.context("failed to get the show ID")?;
+    let game_id = lrrbot
+        .get_game_id()
+        .await
+        .context("failed to get the game ID")?;
+    let show_id = lrrbot
+        .get_show_id()
+        .await
+        .context("failed to get the show ID")?;
 
     let (game, show, game_entry) = {
-        let conn = ctx.data.read().extract::<PgPool>()?
+        let conn = ctx
+            .data
+            .read()
+            .extract::<PgPool>()?
             .get()
             .context("failed to get a database connection from the pool")?;
 
@@ -95,7 +113,7 @@ async fn stream_up_inner(ctx: &ErisContext, channel: Channel) -> Result<(), Erro
             .map_err(SyncFailure::new)
             .context("failed to send the announcement message")?)
     })
-        .context("failed to send the announcement message")?;
+    .context("failed to send the announcement message")?;
 
     Ok(())
 }

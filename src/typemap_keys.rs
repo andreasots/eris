@@ -1,12 +1,12 @@
-use serenity::prelude::TypeMapKey;
 use crate::config::Config;
-use crate::rpc::LRRbot;
-use tokio::runtime::TaskExecutor;
-use crate::google::{Calendar, Sheets};
-use crate::twitch::{Kraken, Helix};
-use std::sync::Arc;
 use crate::desertbus::DesertBus;
+use crate::google::{Calendar, Sheets};
+use crate::rpc::LRRbot;
+use crate::twitch::{Helix, Kraken};
 use crate::twitter::Twitter;
+use serenity::prelude::TypeMapKey;
+use std::sync::Arc;
+use tokio::runtime::TaskExecutor;
 
 // Local types
 

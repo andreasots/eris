@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::extract::Extract;
 use chrono::{DateTime, Utc};
 use csv::{Writer, WriterBuilder};
 use failure::{bail, format_err, Error, ResultExt};
@@ -10,7 +11,6 @@ use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{Seek, SeekFrom};
 use std::sync::{Arc, Mutex};
-use crate::extract::Extract;
 
 #[derive(Serialize)]
 enum Event {
@@ -78,7 +78,12 @@ impl EventHandler for VoiceChannelTracker {
     fn ready(&self, ctx: Context, _data_about_bot: Ready) {
         let data = ctx.data.read();
         let config = data.extract::<Config>().unwrap();
-        ctx.set_activity(Activity::listening(&format!("{}help || v{}-pre.{}", config.command_prefix, env!("CARGO_PKG_VERSION"), option_env!("TRAVIS_BUILD_NUMBER").unwrap_or("---"))));
+        ctx.set_activity(Activity::listening(&format!(
+            "{}help || v{}-pre.{}",
+            config.command_prefix,
+            env!("CARGO_PKG_VERSION"),
+            option_env!("TRAVIS_BUILD_NUMBER").unwrap_or("---")
+        )));
     }
 
     fn channel_create(&self, ctx: Context, channel: Arc<RwLock<GuildChannel>>) {

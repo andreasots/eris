@@ -1,19 +1,19 @@
 //! Creating OAuth2 bearer tokens for Google service accounts
 
+use base64_stream::FromBase64Writer;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use failure::{Error, ResultExt};
 use futures::compat::Future01CompatExt;
 use futures::lock::Mutex;
 use jsonwebtoken::{Algorithm, Header, Key};
 use reqwest::r#async::Client;
+use serde::de::Unexpected;
 use serde::{Deserialize, Deserializer, Serialize};
+use slog_scope::error;
+use std::borrow::Cow;
+use std::io::Write;
 use std::path::PathBuf;
 use tokio::fs::File;
-use base64_stream::FromBase64Writer;
-use serde::de::Unexpected;
-use std::io::Write;
-use std::borrow::Cow;
-use slog_scope::error;
 
 const TOKEN_URI: &str = "https://www.googleapis.com/oauth2/v4/token";
 
@@ -32,23 +32,35 @@ where
         while let Some((i, line)) = iter.next() {
             if i == 0 {
                 if line != "-----BEGIN PRIVATE KEY-----" {
-                    return Err(Error::invalid_value(Unexpected::Str(&pem), &"a valid PEM-encoded PKCS#8-encoded private key: header is incorrect"));
+                    return Err(Error::invalid_value(
+                        Unexpected::Str(&pem),
+                        &"a valid PEM-encoded PKCS#8-encoded private key: header is incorrect",
+                    ));
                 }
                 continue;
             } else if iter.peek().is_none() {
                 if line != "-----END PRIVATE KEY-----" {
-                    return Err(Error::invalid_value(Unexpected::Str(&pem), &"a valid PEM-encoded PKCS#8-encoded private key: footer is incorrect"));
+                    return Err(Error::invalid_value(
+                        Unexpected::Str(&pem),
+                        &"a valid PEM-encoded PKCS#8-encoded private key: footer is incorrect",
+                    ));
                 }
                 continue;
             }
             if let Err(err) = writer.write_all(line.as_bytes()) {
                 error!("Failed to decode the private key"; "error" => ?err);
-                return Err(Error::invalid_value(Unexpected::Str(&pem), &"a valid PEM-encoded PKCS#8-encoded private key: content is incorrect"));
+                return Err(Error::invalid_value(
+                    Unexpected::Str(&pem),
+                    &"a valid PEM-encoded PKCS#8-encoded private key: content is incorrect",
+                ));
             }
         }
         if let Err(err) = writer.flush() {
             error!("Failed to decode the private key"; "error" => ?err);
-            return Err(Error::invalid_value(Unexpected::Str(&pem), &"a valid PEM-encoded PKCS#8-encoded private key: content is incorrect"));
+            return Err(Error::invalid_value(
+                Unexpected::Str(&pem),
+                &"a valid PEM-encoded PKCS#8-encoded private key: content is incorrect",
+            ));
         }
     }
 
@@ -133,7 +145,9 @@ impl ServiceAccount {
             )
             .context("failed to create a JWT token")?;
 
-            let new_token = self.client.post(TOKEN_URI)
+            let new_token = self
+                .client
+                .post(TOKEN_URI)
                 .form(&[
                     ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
                     ("assertion", &jwt),

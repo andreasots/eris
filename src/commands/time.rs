@@ -1,10 +1,10 @@
 use crate::config::Config;
+use crate::extract::Extract;
 use chrono::Utc;
-use serenity::framework::standard::{Args, CommandResult};
 use serenity::framework::standard::macros::{command, group};
+use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
-use crate::extract::Extract;
 
 group!({
     name: "Time",
@@ -27,7 +27,10 @@ fn time(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
     };
 
     let now = Utc::now().with_timezone(&ctx.data.read().extract::<Config>()?.timezone);
-    msg.reply(ctx, &format!("Current moonbase time: {}", now.format(format)))?;
+    msg.reply(
+        ctx,
+        &format!("Current moonbase time: {}", now.format(format)),
+    )?;
 
     Ok(())
 }

@@ -1,4 +1,6 @@
 use crate::config::Config;
+use crate::context::ErisContext;
+use crate::extract::Extract;
 use crate::google::sheets::{CellData, ExtendedValue, Sheets, Spreadsheet};
 use chrono::TimeZone;
 use chrono::{DateTime, Utc};
@@ -8,13 +10,13 @@ use futures::TryStreamExt;
 use slog_scope::{error, info};
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;
-use crate::context::ErisContext;
-use crate::extract::Extract;
 
 const SENT_KEY: &str = "lrrbot.sent";
 
 pub async fn post_messages(ctx: ErisContext) {
-    let spreadsheet_set = ctx.data.read()
+    let spreadsheet_set = ctx
+        .data
+        .read()
         .extract::<Config>()
         .map(|config| config.contact_spreadsheet.is_some())
         .unwrap_or(false);
@@ -27,9 +29,11 @@ pub async fn post_messages(ctx: ErisContext) {
 
     loop {
         match timer.try_next().await {
-            Ok(Some(_)) => if let Err(err) = inner(&ctx).await {
-                error!("Failed to post new messages"; "error" => ?err);
-            },
+            Ok(Some(_)) => {
+                if let Err(err) = inner(&ctx).await {
+                    error!("Failed to post new messages"; "error" => ?err);
+                }
+            }
             Ok(None) => break,
             Err(err) => error!("Timer error"; "error" => ?err),
         }
@@ -115,7 +119,10 @@ async fn inner(ctx: &ErisContext) -> Result<(), Error> {
 
         let config = data.extract::<Config>()?;
 
-        let spreadsheet_key = config.contact_spreadsheet.clone().ok_or(failure::err_msg("Contact spreadsheet is not set"))?;
+        let spreadsheet_key = config
+            .contact_spreadsheet
+            .clone()
+            .ok_or(failure::err_msg("Contact spreadsheet is not set"))?;
 
         let sheets = data.extract::<Sheets>()?.clone();
 
@@ -147,16 +154,16 @@ async fn inner(ctx: &ErisContext) -> Result<(), Error> {
                 .map_err(SyncFailure::new)
                 .context("failed to forward the message")?)
         })
-            .context("failed to forward the message")?;
+        .context("failed to forward the message")?;
 
-
-        sheets.create_developer_metadata_for_row(
-            &spreadsheet_key,
-            sheet_id,
-            message.row,
-            SENT_KEY,
-            "1"
-        )
+        sheets
+            .create_developer_metadata_for_row(
+                &spreadsheet_key,
+                sheet_id,
+                message.row,
+                SENT_KEY,
+                "1",
+            )
             .await
             .context("failed to set the message as sent")?;
     }

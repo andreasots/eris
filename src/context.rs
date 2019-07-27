@@ -1,7 +1,7 @@
-use serenity::{CacheAndHttp, Client};
-use serenity::prelude::{ShareMap, RwLock};
-use std::sync::Arc;
 use serenity::http::raw::Http;
+use serenity::prelude::{RwLock, ShareMap};
+use serenity::{CacheAndHttp, Client};
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct ErisContext {

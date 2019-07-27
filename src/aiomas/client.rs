@@ -140,10 +140,16 @@ impl Client {
         }
     }
 
-    pub async fn call(&mut self, req: Request) -> Result<oneshot::Receiver<Result<Value, Exception>>, Error> {
+    pub async fn call(
+        &mut self,
+        req: Request,
+    ) -> Result<oneshot::Receiver<Result<Value, Exception>>, Error> {
         let (tx, rx) = oneshot::channel();
 
-        self.channel.send((req, tx)).await.context("failed to queue the request")?;
+        self.channel
+            .send((req, tx))
+            .await
+            .context("failed to queue the request")?;
 
         Ok(rx)
     }
@@ -178,23 +184,28 @@ mod tests {
 
                     let mut client = Client::from_stream(read, executor);
 
-                    let first = client.call((String::from("test"), vec![], HashMap::new())).await.context("queue first")?;
-                    let second = client.call((String::from("test"), vec![], HashMap::new())).await.context("queue second")?;
+                    let first = client
+                        .call((String::from("test"), vec![], HashMap::new()))
+                        .await
+                        .context("queue first")?;
+                    let second = client
+                        .call((String::from("test"), vec![], HashMap::new()))
+                        .await
+                        .context("queue second")?;
 
                     let mut buf = [0; REQUEST.len()];
-                    io::read_exact(&mut write, &mut buf[..]).compat()
+                    io::read_exact(&mut write, &mut buf[..])
+                        .compat()
                         .await
                         .context("failed to read request")?;
                     assert_eq!(&buf[..], REQUEST);
-                    io::write_all(&mut write, RESPONSE).compat()
+                    io::write_all(&mut write, RESPONSE)
+                        .compat()
                         .await
                         .context("failed to write response")?;
 
                     assert_eq!(first.await.context("first")?, Ok(Value::Number(0.into())));
-                    assert_eq!(
-                        second.await.context("second")?,
-                        Ok(Value::Number(1.into()))
-                    );
+                    assert_eq!(second.await.context("second")?, Ok(Value::Number(1.into())));
 
                     Ok(())
                 }

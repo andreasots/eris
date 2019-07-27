@@ -105,6 +105,6 @@ impl Kraken {
             Some(token),
             "streams",
         )
-            .await
+        .await
     }
 }
