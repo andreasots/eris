@@ -23,7 +23,7 @@ futures-preview = { version = "0.3.0-alpha.17", features = ["async-await", "comp
 inventory = "0.1.3"
 # jsonwebtoken = "7.0.0"
 jsonwebtoken = { git = "https://github.com/Keats/jsonwebtoken", branch = "next"}
-log = { version = "0.4.7", features = ["max_level_trace", "release_max_level_info", "std"] }
+log = { version = "0.4.8", features = ["max_level_trace", "release_max_level_info", "std"] }
 rand = "0.7.0"
 regex = "1.2.0"
 reqwest = { version = "0.9.19", default-features = false, features = ["rustls-tls"] }
