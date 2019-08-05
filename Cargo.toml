@@ -7,7 +7,7 @@ readme = "README.md"
 edition = "2018"
 
 [dependencies]
-base64-stream = "1.0.6"
+base64-stream = "1.0.7"
 byteorder = "1.3.2"
 bytes = "0.4.12"
 chrono = "0.4.7"
