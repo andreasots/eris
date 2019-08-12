@@ -19,7 +19,7 @@ diesel = { version = "1.4.2", features = ["postgres", "r2d2", "serde_json"] }
 egg-mode-text = "1.14.7"
 eris-macros = { path = "eris-macros" }
 failure = "0.1.5"
-futures-preview = { version = "0.3.0-alpha.17", features = ["async-await", "compat", "nightly"] }
+futures-preview = { version = "0.3.0-alpha.18", features = ["async-await", "compat", "nightly"] }
 inventory = "0.1.3"
 # jsonwebtoken = "7.0.0"
 jsonwebtoken = { git = "https://github.com/Keats/jsonwebtoken", branch = "next"}
