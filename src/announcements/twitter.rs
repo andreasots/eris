@@ -4,7 +4,7 @@ use crate::extract::Extract;
 use crate::models::State;
 use crate::twitter::Twitter;
 use crate::typemap_keys::PgPool;
-use failure::{Error, ResultExt, SyncFailure};
+use failure::{Error, ResultExt};
 use futures::compat::Stream01CompatExt;
 use futures::prelude::*;
 use serenity::model::id::ChannelId;
@@ -79,13 +79,10 @@ async fn inner<'a>(
                         tweet.user.name, tweet.user.screen_name, tweet.id,
                     );
                     for channel in channels {
-                        crate::thread::run(|| {
-                            Ok(channel
-                                .say(ctx, &message)
-                                .map_err(SyncFailure::new)
-                                .context("failed to send the announcement message")?)
-                        })
-                        .context("failed to send the announcement message")?;
+                        crate::blocking::blocking(|| channel.say(ctx, &message))
+                            .await
+                            .context("failed to exit the runtime")?
+                            .context("failed to send the announcement message")?;
                     }
 
                     {

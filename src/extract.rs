@@ -1,6 +1,6 @@
 use failure::Error;
 use serenity::prelude::*;
-use std::intrinsics::type_name;
+use std::any::type_name;
 
 pub trait Extract {
     fn extract<T>(&self) -> Result<&T::Value, Error>
@@ -19,10 +19,8 @@ impl Extract for ShareMap {
         T: TypeMapKey,
         T::Value: Send + Sync,
     {
-        self.get::<T>().ok_or_else(|| {
-            let type_name = unsafe { type_name::<T>() };
-            failure::err_msg(format!("{} not in the sharemap", type_name))
-        })
+        self.get::<T>()
+            .ok_or_else(|| failure::err_msg(format!("{} not in the sharemap", type_name::<T>())))
     }
 
     fn extract_mut<T>(&mut self) -> Result<&mut T::Value, Error>
@@ -30,9 +28,7 @@ impl Extract for ShareMap {
         T: TypeMapKey,
         T::Value: Send + Sync,
     {
-        self.get_mut::<T>().ok_or_else(|| {
-            let type_name = unsafe { type_name::<T>() };
-            failure::err_msg(format!("{} not in the sharemap", type_name))
-        })
+        self.get_mut::<T>()
+            .ok_or_else(|| failure::err_msg(format!("{} not in the sharemap", type_name::<T>())))
     }
 }

@@ -4,7 +4,7 @@ use crate::extract::Extract;
 use crate::google::sheets::{CellData, ExtendedValue, Sheets, Spreadsheet};
 use chrono::TimeZone;
 use chrono::{DateTime, Utc};
-use failure::{Error, ResultExt, SyncFailure};
+use failure::{Error, ResultExt};
 use futures::compat::Stream01CompatExt;
 use futures::TryStreamExt;
 use slog_scope::{error, info};
@@ -137,23 +137,22 @@ async fn inner(ctx: &ErisContext) -> Result<(), Error> {
         .ok_or_else(|| failure::err_msg("no sheets or required information missing"))?;
 
     for message in unsent {
-        crate::thread::run(|| {
-            Ok(mods_channel
-                .send_message(ctx, |m| {
-                    m.content(format!("New message from the contact form:"))
-                        .embed(|mut embed| {
-                            embed = embed
-                                .description(message.message)
-                                .timestamp(message.timestamp.to_rfc3339());
-                            if let Some(user) = message.username {
-                                embed = embed.author(|e| e.name(user))
-                            }
-                            embed
-                        })
-                })
-                .map_err(SyncFailure::new)
-                .context("failed to forward the message")?)
+        crate::blocking::blocking(|| {
+            mods_channel.send_message(ctx, |m| {
+                m.content(format!("New message from the contact form:"))
+                    .embed(|mut embed| {
+                        embed = embed
+                            .description(message.message)
+                            .timestamp(message.timestamp.to_rfc3339());
+                        if let Some(user) = message.username {
+                            embed = embed.author(|e| e.name(user))
+                        }
+                        embed
+                    })
+            })
         })
+        .await
+        .context("failed to exit the runtime")?
         .context("failed to forward the message")?;
 
         sheets

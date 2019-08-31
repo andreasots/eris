@@ -7,7 +7,7 @@ use crate::typemap_keys::PgPool;
 use chrono::{DateTime, FixedOffset};
 use diesel::OptionalExtension;
 use eris_macros::rpc_handler;
-use failure::{Error, ResultExt, SyncFailure};
+use failure::{Error, ResultExt};
 use serde::Deserialize;
 use slog_scope::error;
 use std::fmt::{self, Display};
@@ -107,12 +107,11 @@ async fn stream_up_inner(ctx: &ErisContext, channel: Channel) -> Result<(), Erro
             .unwrap_or(show.name)
     };
 
-    crate::thread::run(|| {
-        Ok(announcements_channel
-            .say(ctx, format_args!("{}", StreamUp { channel, what }))
-            .map_err(SyncFailure::new)
-            .context("failed to send the announcement message")?)
+    crate::blocking::blocking(|| {
+        announcements_channel.say(ctx, format_args!("{}", StreamUp { channel, what }))
     })
+    .await
+    .context("failed to exit the runtime")?
     .context("failed to send the announcement message")?;
 
     Ok(())

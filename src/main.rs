@@ -1,4 +1,3 @@
-#![feature(async_closure, async_await, const_slice_len, core_intrinsics)]
 #![recursion_limit = "256"]
 
 #[macro_use]
@@ -15,6 +14,7 @@ use slog_scope::{error, info};
 mod aiomas;
 mod announcements;
 mod autotopic;
+mod blocking;
 mod channel_reaper;
 mod commands;
 mod config;
@@ -30,7 +30,6 @@ mod rpc;
 mod schema;
 mod service;
 mod stdlog;
-mod thread;
 mod time;
 mod twitch;
 mod twitter;
@@ -192,10 +191,10 @@ fn main() -> Result<(), failure::Error> {
             })
             .unrecognised_command(commands::static_response::static_response)
             .help(&crate::commands::help::HELP)
+            .group(&crate::commands::live::FANSTREAMS_GROUP)
             .group(&crate::commands::calendar::CALENDAR_GROUP)
-            .group(&crate::commands::voice::VOICE_GROUP)
             .group(&crate::commands::time::TIME_GROUP)
-            .group(&crate::commands::live::FANSTREAMS_GROUP),
+            .group(&crate::commands::voice::VOICE_GROUP),
     );
 
     #[cfg(unix)]

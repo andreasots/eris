@@ -8,6 +8,9 @@ use serenity::prelude::*;
 
 group!({
     name: "Time",
+    options: {
+        description: "Time commands",
+    },
     commands: [
         time,
     ],

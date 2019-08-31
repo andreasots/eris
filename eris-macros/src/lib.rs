@@ -11,7 +11,7 @@ fn extract_ident(pattern: &Pat) -> Option<&Ident> {
     match pattern {
         Pat::Ident(pat) => Some(&pat.ident),
         Pat::Box(pat) => extract_ident(&pat.pat),
-        Pat::Ref(pat) => extract_ident(&pat.pat),
+        Pat::Reference(pat) => extract_ident(&pat.pat),
         _ => None,
     }
 }
@@ -21,22 +21,16 @@ pub fn rpc_handler(attr: TokenStream, item: TokenStream) -> TokenStream {
     let name = parse_macro_input!(attr as LitStr);
     let function = parse_macro_input!(item as ItemFn);
 
-    let function_name = &function.ident;
+    let function_name = &function.sig.ident;
 
     let mut args = vec![];
-    for arg in &function.decl.inputs {
+    for arg in &function.sig.inputs {
         match arg {
-            FnArg::SelfRef(..) | FnArg::SelfValue(..) => {
+            FnArg::Receiver(..) => {
                 return Error::new(arg.span(), "#[rpc_handler] on methods not yet implemented").to_compile_error().into();
             },
-            FnArg::Captured(arg) => {
+            FnArg::Typed(arg) => {
                 args.push((extract_ident(&arg.pat), &arg.ty));
-            },
-            FnArg::Inferred(..) => {
-                return Error::new(arg.span(), "type information missing on an argument").to_compile_error().into();
-            },
-            FnArg::Ignored(ref arg) => {
-                args.push((None, arg));
             },
         }
     }
@@ -93,12 +87,7 @@ pub fn rpc_handler(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     TokenStream::from(quote! {
         ::inventory::submit! {
-            static HANDLER: &'static (dyn crate::aiomas::Handler<crate::context::ErisContext> + Send + Sync + 'static) =
-                &async move |
-                    ctx: crate::context::ErisContext,
-                    args: Vec<serde_json::Value>,
-                    mut kwargs: std::collections::HashMap<String, serde_json::Value>
-                | -> Result<serde_json::Value, String> {
+            async fn handler(ctx: crate::context::ErisContext, args: Vec<serde_json::Value>, mut kwargs: std::collections::HashMap<String, serde_json::Value>) -> Result<serde_json::Value, String> {
                 let mut args = args.into_iter().fuse();
 
                 #(#deserialized_args);*
@@ -110,7 +99,9 @@ pub fn rpc_handler(attr: TokenStream, item: TokenStream) -> TokenStream {
                     },
                     Err(err) => Err(format!(concat!(stringify!(#function_name), "() returned an error: {:?}"), err)),
                 }
-            };
+            }
+
+            static HANDLER: &'static (dyn crate::aiomas::Handler<crate::context::ErisContext> + Send + Sync + 'static) = &handler;
 
             crate::inventory::AiomasHandler::new(#name, HANDLER)
         }

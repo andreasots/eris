@@ -193,7 +193,9 @@ mod tests {
                         .await
                         .context("queue second")?;
 
-                    let mut buf = [0; REQUEST.len()];
+                    // FIXME: `REQUEST` has a constant size so an array could be used instead but
+                    //  this currently requires `#![feature(const_slice_len)]`.
+                    let mut buf = vec![0; REQUEST.len()];
                     io::read_exact(&mut write, &mut buf[..])
                         .compat()
                         .await

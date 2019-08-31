@@ -12,6 +12,9 @@ use serenity::prelude::*;
 
 group!({
     name: "Fanstreams",
+    options: {
+        description: "Fanstream commands",
+    },
     commands: [
         live,
     ],

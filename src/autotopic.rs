@@ -12,7 +12,7 @@ use crate::typemap_keys::PgPool;
 use chrono::{DateTime, FixedOffset, Utc};
 use chrono_tz::Tz;
 use diesel::OptionalExtension;
-use failure::{Error, ResultExt, SyncFailure};
+use failure::{Error, ResultExt};
 use futures::compat::Stream01CompatExt;
 use futures::prelude::*;
 use separator::FixedPlaceSeparatable;
@@ -175,18 +175,13 @@ impl Autotopic {
             messages.push(advice);
         }
 
-        crate::thread::run(|| {
-            // TODO: shorten to a max of 1024 characters, whatever that means.
-            Ok(ctx
-                .data
-                .read()
-                .extract::<Config>()?
-                .general_channel
-                .edit(ctx, |c| c.topic(&messages.join(" ")))
-                .map_err(SyncFailure::new)
-                .context("failed to update the topic")?)
-        })
-        .context("failed to update the topic")?;
+        let general_channel = ctx.data.read().extract::<Config>()?.general_channel;
+
+        // TODO: shorten to a max of 1024 characters, whatever that means.
+        crate::blocking::blocking(|| general_channel.edit(ctx, |c| c.topic(&messages.join(" "))))
+            .await
+            .context("failed to exit the runtime")?
+            .context("failed to update the topic")?;
 
         Ok(())
     }
