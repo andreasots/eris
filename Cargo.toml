@@ -7,39 +7,42 @@ readme = "README.md"
 edition = "2018"
 
 [dependencies]
-base64-stream = "1.0.7"
-byteorder = "1.3.2"
-bytes = "0.4.12"
-chrono = "0.4.8"
-chrono-tz = "0.5.1"
-crossbeam = "0.7.2"
-clap = "2.33.0"
-csv = "1.1.1"
-diesel = { version = "1.4.2", features = ["postgres", "r2d2", "serde_json"] }
-egg-mode-text = "1.14.7"
+base64-stream = { version = "1.0.7", default-features = false }
+bytes = { version = "0.4.12", default-features = false }
+chrono = { version = "0.4.8", default-features = false }
+chrono-tz = { version = "0.5.1", default-features = false }
+clap = { version = "2.33.0", default-features = false }
+csv = { version = "1.1.1", default-features = false }
+diesel = { version = "1.4.2", default-features = false, features = ["postgres", "r2d2", "serde_json"] }
+egg-mode-text = { version = "1.14.7", default-features = false }
 eris-macros = { path = "eris-macros" }
-failure = "0.1.5"
-futures-preview = { version = "0.3.0-alpha.18", features = ["async-await", "compat", "nightly"] }
-inventory = "0.1.4"
+failure = { version = "0.1.5", default-features = false }
+futures-preview = { version = "0.3.0-alpha.18", default-features = false, features = ["async-await", "compat", "nightly"] }
+inventory = { version = "0.1.4", default-features = false }
 # jsonwebtoken = "7.0.0"
-jsonwebtoken = { git = "https://github.com/Keats/jsonwebtoken", branch = "next"}
-log = { version = "0.4.8", features = ["max_level_trace", "release_max_level_info", "std"] }
-rand = "0.7.0"
-regex = "1.2.1"
+jsonwebtoken = { git = "https://github.com/Keats/jsonwebtoken", branch = "next", default-features = false }
+log = { version = "0.4.8", default-features = false, features = ["max_level_trace", "release_max_level_info", "std"] }
+rand = { version = "0.7.0", default-features = false }
+regex = { version = "1.2.1", default-features = false }
 reqwest = { version = "0.9.19", default-features = false, features = ["rustls-tls"] }
-rust-ini = "0.13.0"
-separator = "0.4.1"
-serde = { version = "1.0.99", features = ["derive"] }
-serde_json = "1.0.40"
-serenity = "0.7.0"
-slog = { version = "2.5.2", features = ["max_level_trace", "release_max_level_debug"] }
-slog-async = "2.3.0"
-slog-scope = "4.1.2"
-slog-term = "2.4.1"
-strfmt = "0.1.6"
-tokio = "0.1.22"
-tokio-threadpool = "0.1.15"
-url = "2.1.0"
+rust-ini = { version = "0.13.0", default-features = false }
+separator = { version = "0.4.1", default-features = false }
+serde = { version = "1.0.99", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0.40", default-features = false }
+serenity = { version = "0.7.0", default-features = false, features = ["cache", "rustls_backend", "standard_framework"] }
+slog = { version = "2.5.2", default-features = false, features = ["max_level_trace", "release_max_level_debug"] }
+slog-async = { version = "2.3.0", default-features = false }
+slog-scope = { version = "4.1.2", default-features = false }
+slog-term = { version = "2.4.1", default-features = false }
+strfmt = { version = "0.1.6", default-features = false }
+tokio-threadpool = { version = "0.1.15", default-features = false }
+url = { version = "2.1.0", default-features = false }
+
+[target.'cfg(unix)'.dependencies]
+tokio = { version = "0.1.22", default-features = false, features = ["codec", "fs", "uds"] }
+
+[target.'cfg(not(unix))'.dependencies]
+tokio = { version = "0.1.22", default-features = false, features = ["codec", "fs", "tcp"] }
 
 [dev-dependencies]
-pin-utils = "0.1.0-alpha.4"
+pin-utils = { version = "0.1.0-alpha.4", default-features = false }

@@ -1,4 +1,3 @@
-use byteorder::{BigEndian, ByteOrder};
 use bytes::{BufMut, BytesMut};
 use serde::de::{Error as DeserializationError, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -68,7 +67,7 @@ fn decode_frame<T: for<'de> Deserialize<'de>>(
     if src.len() < 4 {
         return Ok(None);
     }
-    let len = BigEndian::read_u32(&src[0..4]) as usize;
+    let len = u32::from_le_bytes([src[0], src[1], src[2], src[3]]) as usize;
     if src.len() < 4 + len {
         return Ok(None);
     }
