@@ -3,6 +3,7 @@ use failure::{Error, ResultExt};
 use futures::compat::Future01CompatExt;
 use reqwest::header::AUTHORIZATION;
 use reqwest::r#async::Client;
+use reqwest::Url;
 use serde::Deserialize;
 use serde_json::json;
 use std::path::PathBuf;
@@ -159,23 +160,38 @@ impl Sheets {
         }
     }
 
+    async fn get_token(&self) -> Result<String, Error> {
+        let mut token = self.oauth2.get_token().await?;
+        token.insert_str(0, "Bearer ");
+        Ok(token)
+    }
+
     pub async fn get_spreadsheet<'a>(
         &'a self,
         spreadsheet: &'a str,
         fields: &'a str,
     ) -> Result<Spreadsheet, Error> {
         let token = self
-            .oauth2
             .get_token()
             .await
             .context("failed to get a service account OAuth2 token")?;
+
+        let url = {
+            let mut url = Url::parse("https://sheets.googleapis.com/v4/spreadsheets")
+                .context("failed to parse the base URL")?;
+            {
+                let mut path_segments = url
+                    .path_segments_mut()
+                    .map_err(|()| failure::err_msg("https URL is cannot-be-a-base?"))?;
+                path_segments.push(spreadsheet);
+            }
+            url
+        };
+
         Ok(self
             .client
-            .get(&format!(
-                "https://sheets.googleapis.com/v4/spreadsheets/{}",
-                spreadsheet
-            ))
-            .header(AUTHORIZATION, format!("Bearer {}", token))
+            .get(url)
+            .header(AUTHORIZATION, token)
             .query(&[("fields", fields)])
             .send()
             .compat()
@@ -198,16 +214,27 @@ impl Sheets {
         value: &'a str,
     ) -> Result<(), Error> {
         let token = self
-            .oauth2
             .get_token()
             .await
             .context("failed to get a service account OAuth2 token")?;
+
+        let url = {
+            let mut url = Url::parse("https://sheets.googleapis.com/v4/spreadsheets")
+                .context("failed to parse the base URL")?;
+            {
+                let mut path_segments = url
+                    .path_segments_mut()
+                    .map_err(|()| failure::err_msg("https URL is cannot-be-a-base?"))?;
+                let mut segment = String::from(spreadsheet);
+                segment.push_str(":batchUpdate");
+                path_segments.push(&segment);
+            }
+            url
+        };
+
         self.client
-            .post(&format!(
-                "https://sheets.googleapis.com/v4/spreadsheets/{}:batchUpdate",
-                spreadsheet
-            ))
-            .header(AUTHORIZATION, format!("Bearer {}", token))
+            .post(url)
+            .header(AUTHORIZATION, token)
             .json(&json!({
                 "requests": [
                     {

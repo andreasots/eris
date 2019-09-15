@@ -4,6 +4,7 @@ use chrono::{DateTime, FixedOffset, TimeZone};
 use failure::{Error, ResultExt};
 use futures::compat::Future01CompatExt;
 use reqwest::r#async::Client;
+use reqwest::Url;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::cmp;
 
@@ -69,12 +70,23 @@ impl Calendar {
         calendar: &'a str,
         after: DateTime<Tz>,
     ) -> Result<Vec<Event>, Error> {
+        let url = {
+            let mut url = Url::parse("https://www.googleapis.com/calendar/v3/calendars")
+                .context("failed to parse the base URL")?;
+            {
+                let mut path_segments = url
+                    .path_segments_mut()
+                    .map_err(|()| failure::err_msg("https URL is cannot-be-a-base?"))?;
+                path_segments.push(calendar);
+                path_segments.push("events");
+            }
+
+            url
+        };
+
         Ok(self
             .client
-            .get(&format!(
-                "https://www.googleapis.com/calendar/v3/calendars/{}/events",
-                calendar
-            ))
+            .get(url)
             .query(&ListEventsRequest {
                 maxResults: 10,
                 orderBy: "startTime",

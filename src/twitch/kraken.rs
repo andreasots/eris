@@ -65,7 +65,7 @@ impl Kraken {
                 req = req.header(AUTHORIZATION, token.clone());
             }
             let value = req
-                .query(&[("offset", &format!("{}", data.len())[..]), ("limit", "25")])
+                .query(&[("offset", &data.len().to_string()[..]), ("limit", "25")])
                 .send()
                 .compat()
                 .await
