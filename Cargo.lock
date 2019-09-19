@@ -87,7 +87,7 @@ version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "educe 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "educe 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -391,7 +391,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "educe"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "proc-macro2 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2375,7 +2375,7 @@ dependencies = [
 "checksum digest 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "f3d0c8c8752312f9713efd397ff63acb9f85585afbf179282e720e7704954dd5"
 "checksum dirs 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "3fd78930633bd1c6e35c4b42b1df7b0cbc6bc191146e512bb3bedf243fcc3901"
 "checksum dtoa 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "ea57b42383d091c85abcc2706240b94ab2a8fa1fc81c10ff23c4de06e2a90b5e"
-"checksum educe 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "c3f77b1c2ba3e9edf0300314f4a29b694fcff606a39495aa8e2cd0f8b320f6f1"
+"checksum educe 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "d27c760a73a13abb1ddf417c06bc2b8d14b0607dd19097316e0ca9412a971088"
 "checksum egg-mode-text 1.14.7 (registry+https://github.com/rust-lang/crates.io-index)" = "63b1e56fd3cc20beed6947ebf1b774e20507ab44d5e73b0a4fbc790e1b2b4dcb"
 "checksum either 1.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
 "checksum encoding_rs 0.8.20 (registry+https://github.com/rust-lang/crates.io-index)" = "87240518927716f79692c2ed85bfe6e98196d18c6401ec75355760233a7e12e9"
