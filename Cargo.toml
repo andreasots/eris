@@ -5,6 +5,10 @@ authors = ["Andreas Ots <qrpth@qrpth.eu>"]
 license = "Apache-2.0"
 readme = "README.md"
 edition = "2018"
+build = "build.rs"
+
+[build-dependencies]
+lalrpop = { version = "0.17.2", default-features = false }
 
 [dependencies]
 base64-stream = { version = "1.0.10", default-features = false }
@@ -13,7 +17,8 @@ chrono = { version = "0.4.9", default-features = false }
 chrono-tz = { version = "0.5.1", default-features = false }
 clap = { version = "2.33.0", default-features = false }
 csv = { version = "1.1.1", default-features = false }
-diesel = { version = "1.4.2", default-features = false, features = ["postgres", "r2d2", "serde_json"] }
+diesel = { version = "1.4.2", default-features = false, features = ["chrono", "postgres", "r2d2", "serde_json"] }
+diesel_full_text_search = { version = "1.0.1", default-features = false }
 egg-mode-text = { version = "1.14.7", default-features = false }
 eris-macros = { path = "eris-macros" }
 failure = { version = "0.1.5", default-features = false }
@@ -21,9 +26,11 @@ futures-preview = { version = "0.3.0-alpha.18", default-features = false, featur
 inventory = { version = "0.1.4", default-features = false }
 # jsonwebtoken = "7.0.0"
 jsonwebtoken = { git = "https://github.com/Keats/jsonwebtoken", branch = "next", default-features = false }
+lalrpop-util = { version = "0.17.2", default-features = false }
+lazy_static = { version = "1.4.0", default-features = false }
 log = { version = "0.4.8", default-features = false, features = ["max_level_trace", "release_max_level_info", "std"] }
 rand = { version = "0.7.2", default-features = false }
-regex = { version = "1.3.1", default-features = false }
+regex = { version = "1.3.1", default-features = false, features = ["perf", "std", "unicode"] }
 reqwest = { version = "0.9.19", default-features = false, features = ["rustls-tls"] }
 rust-ini = { version = "0.13.0", default-features = false }
 separator = { version = "0.4.1", default-features = false }
@@ -36,6 +43,7 @@ slog-scope = { version = "4.1.2", default-features = false }
 slog-term = { version = "2.4.1", default-features = false }
 strfmt = { version = "0.1.6", default-features = false }
 tokio-threadpool = { version = "0.1.15", default-features = false }
+unicode-width = "0.1.6"
 url = { version = "2.1.0", default-features = false }
 
 [target.'cfg(unix)'.dependencies]

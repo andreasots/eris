@@ -1,10 +1,12 @@
 use crate::schema::*;
+use chrono::NaiveDate;
 use diesel::pg::upsert::excluded;
 use diesel::pg::Pg;
 use diesel::prelude::*;
 use failure::Error;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::fmt::{Display, Formatter};
 
 #[derive(Identifiable, Debug, Queryable)]
 #[primary_key(game_id, show_id)]
@@ -37,6 +39,34 @@ pub struct Game {
 impl Game {
     pub fn find<C: Connection<Backend = Pg>>(id: i32, conn: &C) -> QueryResult<Game> {
         games::table.find(id).first::<Game>(conn)
+    }
+}
+
+#[derive(Identifiable, Debug, Queryable)]
+pub struct Quote {
+    pub id: i32,
+    pub quote: String,
+    pub attrib_name: Option<String>,
+    pub attrib_date: Option<NaiveDate>,
+    pub deleted: bool,
+    pub context: Option<String>,
+    pub game_id: Option<i32>,
+    pub show_id: Option<i32>,
+}
+
+impl Display for Quote {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "#{}: \"{}\"", self.id, self.quote)?;
+        if let Some(ref name) = self.attrib_name {
+            write!(f, " —{}", name)?;
+        }
+        if let Some(ref context) = self.context {
+            write!(f, ", {}", context)?;
+        }
+        if let Some(ref date) = self.attrib_date {
+            write!(f, " [{}]", date)?;
+        }
+        Ok(())
     }
 }
 

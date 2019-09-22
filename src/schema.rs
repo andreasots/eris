@@ -15,6 +15,19 @@ table! {
 }
 
 table! {
+    quotes (id) {
+        id -> Int4,
+        quote -> Text,
+        attrib_name -> Nullable<Text>,
+        attrib_date -> Nullable<Date>,
+        deleted -> Bool,
+        context -> Nullable<Text>,
+        game_id -> Nullable<Int4>,
+        show_id -> Nullable<Int4>,
+    }
+}
+
+table! {
     shows (id) {
         id -> Int4,
         string_id -> Text,
@@ -48,5 +61,7 @@ table! {
 
 joinable!(game_per_show_data -> games (game_id));
 joinable!(game_per_show_data -> shows (show_id));
+joinable!(quotes -> games (game_id));
+joinable!(quotes -> shows (show_id));
 
-allow_tables_to_appear_in_same_query!(game_per_show_data, games, shows, state, users,);
+allow_tables_to_appear_in_same_query!(game_per_show_data, games, quotes, shows, state, users,);

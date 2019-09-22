@@ -1,0 +1,89 @@
+use std::borrow::Cow;
+use super::{Column, Expr, Op, unescape};
+use serenity::utils::parse_emoji;
+
+grammar;
+
+extern {
+    type Error = std::convert::Infallible;
+}
+
+pub Query: Expr<'input> = {
+    Disjunction,
+}
+
+Disjunction: Expr<'input> = {
+    <left:Disjunction> "|" <right:Conjunction> => left.or(right),
+    Conjunction,
+}
+
+Conjunction: Expr<'input> = {
+    <left:Conjunction> <right:Term> => left.and(right),
+    Term,
+}
+
+Term: Expr<'input> = {
+    <column:Column> <op:Op> <term:String> => Expr::Column {<>},
+    String => Expr::Bare(<>),
+    "(" <Disjunction> ")",
+}
+
+Op: Op = {
+    ":" => Op::Fuzzy,
+    "<" => Op::Less,
+    "=" => Op::Equal,
+    ">" => Op::Greater,
+    "<=" => Op::LessEqual,
+    ">=" => Op::GreaterEqual,
+}
+
+Column: Column = {
+    "context" => Column::Context,
+    "date" => Column::Date,
+    "from" => Column::Name,
+    "game" => Column::Game,
+    "id" => Column::Id,
+    "name" => Column::Name,
+    "quote" => Column::Quote,
+    "show" => Column::Show,
+    "text" => Column::Quote,
+}
+
+String: Cow<'input, str> = {
+    QuotedString => unescape(<>),
+    UnquotedWord => Cow::Borrowed(<>),
+    EmojiName => Cow::Borrowed(<>.trim_matches(':')),
+    FullEmoji => Cow::Owned(parse_emoji(<>).expect("invalid emoji?").name),
+
+    // Copied from the `Column` rule as otherwise you get a parse error when a column name is used
+    // as a bare word.
+    "context" => Cow::Borrowed(<>),
+    "date" => Cow::Borrowed(<>),
+    "from" => Cow::Borrowed(<>),
+    "game" => Cow::Borrowed(<>),
+    "id" => Cow::Borrowed(<>),
+    "name" => Cow::Borrowed(<>),
+    "quote" => Cow::Borrowed(<>),
+    "show" => Cow::Borrowed(<>),
+    "text" => Cow::Borrowed(<>),
+}
+
+match {
+    // Column names are case-insensitive.
+    r"(?i)context" => "context",
+    r"(?i)date" => "date",
+    r"(?i)from" => "from",
+    r"(?i)game" => "game",
+    r"(?i)id" => "id",
+    r"(?i)name" => "name",
+    r"(?i)quote" => "quote",
+    r"(?i)show" => "show",
+    r"(?i)text" => "text",
+
+    r#""([^"]|\\.)*""# => QuotedString,
+    r":\w+:" => EmojiName,
+    r"<:\w+:\d+>" => FullEmoji,
+} else {
+    r"[^\p{space}\p{gc=Control}\p{gc=Unassigned}:|<=>()]+" => UnquotedWord,
+    _,
+}
