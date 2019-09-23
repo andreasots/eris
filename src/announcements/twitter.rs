@@ -8,7 +8,7 @@ use failure::{Error, ResultExt};
 use futures::compat::Stream01CompatExt;
 use futures::prelude::*;
 use serenity::model::id::ChannelId;
-use slog_scope::error;
+use slog_scope::{error, info};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;
@@ -79,6 +79,17 @@ async fn inner<'a>(
                         tweet.user.name, tweet.user.screen_name, tweet.id,
                     );
                     for channel in channels {
+                        if let Some(retweeted_user_id) = tweet.retweeted_status.as_ref().map(|tweet| tweet.user.id) {
+                            if let Some(channels) = users.get(&retweeted_user_id) {
+                                if channels.contains(channel) {
+                                    info!("Skipping posting a retweet because the target already gets posted to this channel";
+                                        "channel" => channel.0,
+                                        "msg" => ?message,
+                                    );
+                                    continue;
+                                }
+                            }
+                        }
                         crate::blocking::blocking(|| channel.say(ctx, &message))
                             .await
                             .context("failed to exit the runtime")?

@@ -38,6 +38,7 @@ pub struct Tweet {
     pub id: u64,
     pub user: User,
     pub in_reply_to_user_id: Option<u64>,
+    pub retweeted_status: Option<Box<Tweet>>,
 }
 
 #[derive(Clone)]
