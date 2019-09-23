@@ -138,7 +138,13 @@ sql_function!(fn coalesce(x: Nullable<Text>, y: Text) -> Text);
 impl<'a> Expr<'a> {
     fn and(self, right: Expr<'a>) -> Expr<'a> {
         match (self, right) {
-            (Expr::And { mut exprs }, right) => {
+            (mut left @ Expr::And { .. }, Expr::And { exprs }) => {
+                for expr in exprs {
+                    left = left.and(expr);
+                }
+                left
+            },
+            (right, Expr::And { mut exprs }) | (Expr::And { mut exprs }, right) => {
                 match right {
                     Expr::Column {
                         column,
@@ -232,12 +238,18 @@ impl<'a> Expr<'a> {
     }
 
     fn or(self, right: Expr<'a>) -> Expr<'a> {
-        match self {
-            Expr::Or { mut exprs } => {
+        match (self, right) {
+            (mut left @ Expr::Or { .. }, Expr::Or { exprs }) => {
+                for expr in exprs {
+                    left = left.or(expr);
+                }
+                left
+            },
+            (right, Expr::Or{ mut exprs }) | (Expr::Or { mut exprs }, right) => {
                 exprs.push(right);
                 Expr::Or { exprs }
             }
-            left => Expr::Or {
+            (left, right) => Expr::Or {
                 exprs: vec![left, right],
             },
         }
