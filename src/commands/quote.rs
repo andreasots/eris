@@ -23,17 +23,44 @@ use std::fmt::Display;
 use unicode_width::UnicodeWidthStr;
 use crate::pg_fts::{english, plainto_tsquery, to_tsvector};
 
+// We want to register these commands and also have help texts for all* of them:
+//  * `!quote` and `!findquote` => `quote`
+//  * `!quote details` => `details`
+//  * `!quote query_debugger` => `query_debugger` (* we don't actually want the help text for this)
+//
+// A single group with `prefixes: ["quote"]` gets us everything except `!findquote` and also
+// creates an unnecessary alias for `!quote`.
+//
+// A single top-level command `!quote` gets us only help text for the top level command and some
+// unnecesary aliases `!findquote details` etc.
+//
+// Subgroups gets us everything we want but parts of this seem very hacky and probably need issues
+// filed against Serenity. The user facing downside of this approach is a visible subgroup in
+// `!help`.
 group!({
     name: "Quote",
     options: {
-        description: "Commands for querying the quote database.\n\nA bare `quote` command is the same as `quote find`.\n\nPlease keep in mind that many of the following quotes are taken out of context, be it for comedic effect or out of necessity. Take all of them with a grain of salt and bear in mind they don't necessarily reflect their originators' views and opinions. That being said, if you find any quote to be particularly awful, please notify the moderator of your choice to have its removal evaluated.",
-        prefixes: ["quote"],
-        default_command: find,
+        description: "Commands for querying the quote database.\n\nPlease keep in mind that many of the following quotes are taken out of context, be it for comedic effect or out of necessity. Take all of them with a grain of salt and bear in mind they don't necessarily reflect their originators' views and opinions. That being said, if you find any quote to be particularly awful, please notify the moderator of your choice to have its removal evaluated.",
     },
     commands: [
-        find,
-        details,
-        query_debugger,
+        // The subgroup seems to override matching `!quote` so in effect this only registers the
+        // `!findquote` and the help text for `!quote`.
+        quote,
+    ],
+    sub_groups: [
+        {
+            name: "detailed_information",
+            help_name: "Detailed information",
+            options: {
+                prefixes: ["quote"],
+                // Enable matching of the bare `!quote`.
+                default_command: quote,
+            },
+            commands: [
+                details,
+                query_debugger,
+            ]
+        },
     ],
 });
 
@@ -430,9 +457,10 @@ When a query matches multiple quotes a random one is picked. An empty query matc
  * `!quote date >= 2019-01-01`
  * `!quote (show:\"IDDQDerp\" | show:\"Let's NOPE\" | show:\"Watch and Play\") from:Alex \"long pig\"`
 "]
+#[aliases(findquote)]
 #[usage = "[ID | QUERY]"]
 #[example = "from:alex butts"]
-fn find(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
+fn quote(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
     let data = ctx.data.read();
     let conn = data.extract::<PgPool>()?.get()?;
 
