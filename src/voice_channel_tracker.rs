@@ -78,12 +78,12 @@ impl EventHandler for VoiceChannelTracker {
     fn ready(&self, ctx: Context, _data_about_bot: Ready) {
         let data = ctx.data.read();
         let config = data.extract::<Config>().unwrap();
-        ctx.set_activity(Activity::listening(&format!(
-            "{}help || v{}-pre.{}",
-            config.command_prefix,
-            env!("CARGO_PKG_VERSION"),
-            option_env!("TRAVIS_BUILD_NUMBER").unwrap_or("---")
-        )));
+        let activity = if let Some(build_number) = option_env!("TRAVIS_BUILD_NUMBER") {
+            format!("{}help || v{}+{}", config.command_prefix, env!("CARGO_PKG_VERSION"), build_number)
+        } else {
+            format!("{}help || v{}", config.command_prefix, env!("CARGO_PKG_VERSION"))
+        };
+        ctx.set_activity(Activity::listening(&activity));
     }
 
     fn channel_create(&self, ctx: Context, channel: Arc<RwLock<GuildChannel>>) {
