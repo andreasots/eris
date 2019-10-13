@@ -478,7 +478,7 @@ dependencies = [
 
 [[package]]
 name = "eris"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64-stream 1.0.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",

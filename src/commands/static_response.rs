@@ -121,6 +121,15 @@ fn replace_emojis<'a, S: Into<String>, I: Iterator<Item = &'a Emoji>>(
 }
 
 fn static_response_impl(ctx: &mut Context, msg: &Message, command: &str) -> Result<(), Error> {
+    info!("Static command received";
+        "command_name" => ?command,
+        "message" => ?&msg.content,
+        "message.id" => ?msg.id.0,
+        "from.id" => ?msg.author.id.0,
+        "from.name" => ?&msg.author.name,
+        "from.discriminator" => ?msg.author.discriminator,
+    );
+
     let response = {
         let data = ctx.data.read();
         let lrrbot = data.extract::<LRRbot>()?.clone();
@@ -136,15 +145,6 @@ fn static_response_impl(ctx: &mut Context, msg: &Message, command: &str) -> Resu
     };
 
     if let Response::Some { access, response } = response {
-        info!("Static command received";
-            "command_name" => ?command,
-            "message" => ?&msg.content,
-            "message.id" => ?msg.id.0,
-            "from.id" => ?msg.author.id.0,
-            "from.name" => ?&msg.author.name,
-            "from.discriminator" => ?msg.author.discriminator,
-        );
-
         if access.user_has_access(ctx, msg) {
             let response = response.choose(&mut rand::thread_rng());
             if let Some(response) = response {
