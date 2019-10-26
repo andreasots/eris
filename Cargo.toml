@@ -39,7 +39,7 @@ serde_json = { version = "1.0.41", default-features = false }
 serenity = { version = "0.7.2", default-features = false, features = ["cache", "rustls_backend", "standard_framework"] }
 slog = { version = "2.5.2", default-features = false, features = ["max_level_trace", "release_max_level_debug"] }
 slog-async = { version = "2.3.0", default-features = false }
-slog-scope = { version = "4.2.0", default-features = false }
+slog-scope = { version = "4.3.0", default-features = false }
 slog-term = { version = "2.4.1", default-features = false }
 strfmt = { version = "0.1.6", default-features = false }
 tokio-threadpool = { version = "0.1.16", default-features = false }
