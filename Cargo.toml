@@ -40,7 +40,7 @@ serenity = { version = "0.7.2", default-features = false, features = ["cache", "
 slog = { version = "2.5.2", default-features = false, features = ["max_level_trace", "release_max_level_debug"] }
 slog-async = { version = "2.3.0", default-features = false }
 slog-scope = { version = "4.3.0", default-features = false }
-slog-term = { version = "2.4.1", default-features = false }
+slog-term = { version = "2.4.2", default-features = false }
 strfmt = { version = "0.1.6", default-features = false }
 tokio-threadpool = { version = "0.1.16", default-features = false }
 unicode-width = "0.1.6"
