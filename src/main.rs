@@ -21,9 +21,11 @@ mod config;
 mod contact;
 mod context;
 mod desertbus;
+mod discord_events;
 mod executor_ext;
 mod extract;
 mod google;
+mod influxdb;
 mod inventory;
 mod models;
 mod pg_fts;
@@ -35,7 +37,6 @@ mod time;
 mod twitch;
 mod twitter;
 mod typemap_keys;
-mod voice_channel_tracker;
 
 fn main() -> Result<(), failure::Error> {
     let decorator = slog_term::TermDecorator::new().build();
@@ -129,8 +130,7 @@ fn main() -> Result<(), failure::Error> {
 
     let desertbus = desertbus::DesertBus::new(http_client.clone());
 
-    let handler = voice_channel_tracker::VoiceChannelTracker::new(&config)
-        .context("failed to create the voice channel tracker")?;
+    let handler = crate::discord_events::DiscordEvents::new();
 
     let mut runtime = tokio::runtime::Runtime::new().context("failed to create a Tokio runtime")?;
 
@@ -217,6 +217,10 @@ fn main() -> Result<(), failure::Error> {
             &config,
             runtime.executor(),
         )));
+
+        if let Some(url) = config.influxdb.as_ref() {
+            data.insert::<crate::influxdb::InfluxDB>(crate::influxdb::InfluxDB::new(http_client.clone(), url.clone()));
+        }
 
         data.insert::<crate::config::Config>(config);
         data.insert::<crate::typemap_keys::Executor>(runtime.executor());
