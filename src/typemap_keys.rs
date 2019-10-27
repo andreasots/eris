@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::desertbus::DesertBus;
 use crate::google::{Calendar, Sheets};
+use crate::influxdb::InfluxDB;
 use crate::rpc::LRRbot;
 use crate::twitch::{Helix, Kraken};
 use crate::twitter::Twitter;
@@ -23,6 +24,10 @@ impl TypeMapKey for DesertBus {
 }
 
 impl TypeMapKey for Helix {
+    type Value = Self;
+}
+
+impl TypeMapKey for InfluxDB {
     type Value = Self;
 }
 
