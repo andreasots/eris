@@ -171,7 +171,7 @@ impl EventHandler for DiscordEvents {
                         let mut measurement = Measurement::new("voice_channels", Timestamp::Now)
                             .add_tag("channel_id", channel.id.to_string())
                             .add_tag("channel_name", channel.name.clone())
-                            .add_tag("event", "create")
+                            .add_tag("event", "guild_create")
                             .add_field("count", i64::try_from(users.len()).unwrap_or(std::i64::MAX));
                         if ! users.is_empty() {
                             measurement = measurement.add_field("users", users.join_with(',').to_string());
