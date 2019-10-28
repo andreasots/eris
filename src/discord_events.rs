@@ -165,18 +165,34 @@ impl EventHandler for DiscordEvents {
                 let measurements = guild.channels.values()
                     .map(|channel| channel.read())
                     .filter(|channel| channel.kind == ChannelType::Voice)
-                    .map(|channel| {
-                        let users = Self::users_for(&guild, channel.id);
+                    .filter_map(|channel| {
+                        match channel.kind {
+                            ChannelType::Text => {
+                                let mut measurement = Measurement::new("text_channels", Timestamp::Now)
+                                    .add_tag("channel_id", channel.id.to_string())
+                                    .add_tag("channel_name", channel.name.clone())
+                                    .add_tag("event", "guild_create")
+                                    .add_field("count", 0);
+                                if let Some(category_id) = channel.category_id {
+                                    measurement = measurement.add_tag("category_id", category_id.to_string());
+                                }
+                                Some(measurement)
+                            },
+                            ChannelType::Voice => {
+                                let users = Self::users_for(&guild, channel.id);
 
-                        let mut measurement = Measurement::new("voice_channels", Timestamp::Now)
-                            .add_tag("channel_id", channel.id.to_string())
-                            .add_tag("channel_name", channel.name.clone())
-                            .add_tag("event", "guild_create")
-                            .add_field("count", i64::try_from(users.len()).unwrap_or(std::i64::MAX));
-                        if ! users.is_empty() {
-                            measurement = measurement.add_field("users", users.join_with(',').to_string());
+                                let mut measurement = Measurement::new("voice_channels", Timestamp::Now)
+                                    .add_tag("channel_id", channel.id.to_string())
+                                    .add_tag("channel_name", channel.name.clone())
+                                    .add_tag("event", "guild_create")
+                                    .add_field("count", i64::try_from(users.len()).unwrap_or(std::i64::MAX));
+                                if ! users.is_empty() {
+                                    measurement = measurement.add_field("users", users.join_with(',').to_string());
+                                }
+                                Some(measurement)
+                            },
+                            _ => None
                         }
-                        measurement
                     })
                     .collect::<Vec<_>>();
 
@@ -252,12 +268,15 @@ impl EventHandler for DiscordEvents {
                 if let Some(channel) = new_message.channel(&ctx).and_then(Channel::guild) {
                     let channel = channel.read();
 
-                    let measurement = Measurement::new("text_channels", Timestamp::Now)
+                    let mut measurement = Measurement::new("text_channels", Timestamp::Now)
                         .add_tag("channel_id", channel.id.to_string())
                         .add_tag("channel_name", channel.name.clone())
                         .add_tag("event", "message")
                         .add_tag("user_id", new_message.author.id.to_string())
                         .add_field("count", 1);
+                    if let Some(category_id) = channel.category_id {
+                        measurement = measurement.add_tag("category_id", category_id.to_string());
+                    }
 
                     let influxdb = influxdb.clone();
                     executor.block_on(async move { influxdb.write(&[measurement]).await })

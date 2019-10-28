@@ -126,7 +126,7 @@ impl Measurement<'_, Complete> {
                 buf.push(b',');
                 Self::append_escaped(buf, key, Self::is_special_for_tag_keys_tag_values_and_field_keys);
                 buf.push(b'=');
-                Self::append_escaped(buf, value, Self::is_special_for_tag_keys_tag_values_and_field_keys);
+                Self::append_escaped(buf, value.trim_end_matches('\\'), Self::is_special_for_tag_keys_tag_values_and_field_keys);
             }
         }
         buf.push(b' ');
