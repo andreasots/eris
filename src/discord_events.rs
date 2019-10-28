@@ -164,7 +164,6 @@ impl EventHandler for DiscordEvents {
 
                 let measurements = guild.channels.values()
                     .map(|channel| channel.read())
-                    .filter(|channel| channel.kind == ChannelType::Voice)
                     .filter_map(|channel| {
                         match channel.kind {
                             ChannelType::Text => {
