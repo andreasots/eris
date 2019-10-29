@@ -5,7 +5,7 @@ use serenity::model::prelude::*;
 use serenity::prelude::*;
 use slog_scope::error;
 use std::sync::Arc;
-use crate::influxdb::{InfluxDB, Timestamp, Measurement};
+use crate::influxdb::{InfluxDB, Timestamp, Measurement, New};
 use joinery::Joinable;
 use std::convert::TryFrom;
 use crate::typemap_keys::Executor;
@@ -44,6 +44,24 @@ impl DiscordEvents {
         };
         ctx.set_activity(Activity::listening(&activity));
     }
+
+    fn create_measurement_for_channel(&self, channel: &GuildChannel, event: &'static str) -> Measurement<'static, New> {
+        let kind = match channel.kind {
+            ChannelType::Voice => "voice_channels",
+            ChannelType::Text => "text_channels",
+            kind => unimplemented!("channel type: {:?}", kind),
+        };
+
+        let mut measurement = Measurement::new(kind, Timestamp::Now)
+            .add_tag("channel_id", channel.id.to_string())
+            .add_tag("channel_name", channel.name.clone())
+            .add_tag("event", event);
+        if let Some(category_id) = channel.category_id {
+            measurement = measurement.add_tag("category_id", category_id.to_string());
+        }
+
+        measurement
+    }
 }
 
 impl EventHandler for DiscordEvents {
@@ -62,25 +80,28 @@ impl EventHandler for DiscordEvents {
                 let executor = data.extract::<Executor>()?;
 
                 let channel = channel.read();
-                if channel.kind != ChannelType::Voice {
-                    return Ok(());
-                }
+                let measurement = match channel.kind {
+                    ChannelType::Voice => {
+                        let guild = match channel.guild(&ctx) {
+                            Some(guild) => guild,
+                            None => bail!("failed to get the guild for the channel {:?}", channel.name),
+                        };
 
-                let guild = match channel.guild(&ctx) {
-                    Some(guild) => guild,
-                    None => bail!("failed to get the guild for the channel {:?}", channel.name),
+                        let users = Self::users_for(&guild.read(), channel.id);
+
+                        let mut measurement = self.create_measurement_for_channel(&channel, "create")
+                            .add_field("count", i64::try_from(users.len()).unwrap_or(std::i64::MAX));
+                        if ! users.is_empty() {
+                            measurement = measurement.add_field("users", users.join_with(',').to_string());
+                        }
+                        measurement
+                    },
+                    ChannelType::Text => {
+                        self.create_measurement_for_channel(&channel, "create")
+                            .add_field("count", 0)
+                    },
+                    _ => return Ok(()),
                 };
-
-                let users = Self::users_for(&guild.read(), channel.id);
-
-                let mut measurement = Measurement::new("voice_channels", Timestamp::Now)
-                    .add_tag("channel_id", channel.id.to_string())
-                    .add_tag("channel_name", channel.name.clone())
-                    .add_tag("event", "create")
-                    .add_field("count", i64::try_from(users.len()).unwrap_or(std::i64::MAX));
-                if ! users.is_empty() {
-                    measurement = measurement.add_field("users", users.join_with(',').to_string());
-                }
 
                 let influxdb = influxdb.clone();
                 executor.block_on(async move { influxdb.write(&[measurement]).await })
@@ -97,15 +118,17 @@ impl EventHandler for DiscordEvents {
                 let executor = data.extract::<Executor>()?;
 
                 let channel = channel.read();
-                if channel.kind != ChannelType::Voice {
-                    return Ok(());
-                }
-
-                let measurement = Measurement::new("voice_channels", Timestamp::Now)
-                    .add_tag("channel_id", channel.id.to_string())
-                    .add_tag("channel_name", channel.name.clone())
-                    .add_tag("event", "delete")
-                    .add_field("count", 0);
+                let measurement = match channel.kind {
+                    ChannelType::Voice => {
+                        self.create_measurement_for_channel(&channel, "delete")
+                            .add_field("count", 0)
+                    },
+                    ChannelType::Text => {
+                        self.create_measurement_for_channel(&channel, "delete")
+                            .add_field("count", 0)
+                    },
+                    _ => return Ok(()),
+                };
 
                 let influxdb = influxdb.clone();
                 executor.block_on(async move { influxdb.write(&[measurement]).await })
@@ -127,26 +150,28 @@ impl EventHandler for DiscordEvents {
                     return Ok(())
                 };
                 let channel = channel.read();
+                let measurement = match channel.kind {
+                    ChannelType::Voice => {
+                        let guild = match channel.guild(&ctx) {
+                            Some(guild) => guild,
+                            None => bail!("failed to get the guild for the channel {:?}", channel.name),
+                        };
 
-                if channel.kind != ChannelType::Voice {
-                    return Ok(());
-                }
+                        let users = Self::users_for(&guild.read(), channel.id);
 
-                let guild = match channel.guild(&ctx) {
-                    Some(guild) => guild,
-                    None => bail!("failed to get the guild for the channel {:?}", channel.name),
+                        let mut measurement = self.create_measurement_for_channel(&channel, "update")
+                            .add_field("count", i64::try_from(users.len()).unwrap_or(std::i64::MAX));
+                        if ! users.is_empty() {
+                            measurement = measurement.add_field("users", users.join_with(',').to_string());
+                        }
+                        measurement
+                    },
+                    ChannelType::Text => {
+                        self.create_measurement_for_channel(&channel, "update")
+                            .add_field("count", 0)
+                    },
+                    _ => return Ok(()),
                 };
-
-                let users = Self::users_for(&guild.read(), channel.id);
-
-                let mut measurement = Measurement::new("voice_channels", Timestamp::Now)
-                    .add_tag("channel_id", channel.id.to_string())
-                    .add_tag("channel_name", channel.name.clone())
-                    .add_tag("event", "update")
-                    .add_field("count", i64::try_from(users.len()).unwrap_or(std::i64::MAX));
-                if ! users.is_empty() {
-                    measurement = measurement.add_field("users", users.join_with(',').to_string());
-                }
 
                 let influxdb = influxdb.clone();
                 executor.block_on(async move { influxdb.write(&[measurement]).await })
@@ -167,23 +192,14 @@ impl EventHandler for DiscordEvents {
                     .filter_map(|channel| {
                         match channel.kind {
                             ChannelType::Text => {
-                                let mut measurement = Measurement::new("text_channels", Timestamp::Now)
-                                    .add_tag("channel_id", channel.id.to_string())
-                                    .add_tag("channel_name", channel.name.clone())
-                                    .add_tag("event", "guild_create")
+                                let measurement = self.create_measurement_for_channel(&channel, "guild_create")
                                     .add_field("count", 0);
-                                if let Some(category_id) = channel.category_id {
-                                    measurement = measurement.add_tag("category_id", category_id.to_string());
-                                }
                                 Some(measurement)
                             },
                             ChannelType::Voice => {
                                 let users = Self::users_for(&guild, channel.id);
 
-                                let mut measurement = Measurement::new("voice_channels", Timestamp::Now)
-                                    .add_tag("channel_id", channel.id.to_string())
-                                    .add_tag("channel_name", channel.name.clone())
-                                    .add_tag("event", "guild_create")
+                                let mut measurement = self.create_measurement_for_channel(&channel, "guild_create")
                                     .add_field("count", i64::try_from(users.len()).unwrap_or(std::i64::MAX));
                                 if ! users.is_empty() {
                                     measurement = measurement.add_field("users", users.join_with(',').to_string());
@@ -238,10 +254,7 @@ impl EventHandler for DiscordEvents {
 
                     let users = Self::users_for(&guild, channel.id);
 
-                    let mut measurement = Measurement::new("voice_channels", Timestamp::Now)
-                        .add_tag("channel_id", channel.id.to_string())
-                        .add_tag("channel_name", channel.name.clone())
-                        .add_tag("event", "state_update")
+                    let mut measurement = self.create_measurement_for_channel(&channel, "state_update")
                         .add_field("count", i64::try_from(users.len()).unwrap_or(std::i64::MAX));
                     if ! users.is_empty() {
                         measurement = measurement.add_field("users", users.join_with(',').to_string());
@@ -267,15 +280,9 @@ impl EventHandler for DiscordEvents {
                 if let Some(channel) = new_message.channel(&ctx).and_then(Channel::guild) {
                     let channel = channel.read();
 
-                    let mut measurement = Measurement::new("text_channels", Timestamp::Now)
-                        .add_tag("channel_id", channel.id.to_string())
-                        .add_tag("channel_name", channel.name.clone())
-                        .add_tag("event", "message")
+                    let measurement = self.create_measurement_for_channel(&channel, "message")
                         .add_tag("user_id", new_message.author.id.to_string())
                         .add_field("count", 1);
-                    if let Some(category_id) = channel.category_id {
-                        measurement = measurement.add_tag("category_id", category_id.to_string());
-                    }
 
                     let influxdb = influxdb.clone();
                     executor.block_on(async move { influxdb.write(&[measurement]).await })
