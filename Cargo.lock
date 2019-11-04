@@ -916,7 +916,7 @@ dependencies = [
 [[package]]
 name = "jsonwebtoken"
 version = "7.0.0"
-source = "git+https://github.com/Keats/jsonwebtoken?branch=next#6e2f461a1bf5b7ba3e4f2b522834d6c326d1622d"
+source = "git+https://github.com/Keats/jsonwebtoken?branch=next#639915f25b4b0457106f2a8a04249ab2758900c6"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)",
