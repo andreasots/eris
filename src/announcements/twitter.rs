@@ -79,7 +79,9 @@ async fn inner<'a>(
                         tweet.user.name, tweet.user.screen_name, tweet.id,
                     );
                     for channel in channels {
-                        if let Some(retweeted_user_id) = tweet.retweeted_status.as_ref().map(|tweet| tweet.user.id) {
+                        if let Some(retweeted_user_id) =
+                            tweet.retweeted_status.as_ref().map(|tweet| tweet.user.id)
+                        {
                             if let Some(channels) = users.get(&retweeted_user_id) {
                                 if channels.contains(channel) {
                                     info!("Skipping posting a retweet because the target already gets posted to this channel";

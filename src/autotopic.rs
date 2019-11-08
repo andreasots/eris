@@ -209,7 +209,7 @@ impl Autotopic {
     ) -> Result<Vec<String>, Error> {
         let start = DesertBus::start_time().with_timezone(&Utc);
         let announce_start = start - chrono::Duration::days(2);
-        let announce_end = start + chrono::Duration::days(7);
+        let announce_end = start + chrono::Duration::days(9);
         let mut messages = vec![];
 
         if announce_start <= now && now <= announce_end {
@@ -253,7 +253,9 @@ impl Autotopic {
                     "${} raised.",
                     money_raised.separated_string_with_fixed_place(2)
                 ));
-            } else if now <= start + chrono::Duration::hours(total_hours) {
+            } else if now <= start + chrono::Duration::hours(total_hours)
+                || self.is_desertbus_live(ctx).await
+            {
                 messages.push(String::from(
                     "DESERT BUS! (https://desertbus.org/ or https://twitch.tv/desertbus)",
                 ));
@@ -272,5 +274,15 @@ impl Autotopic {
         }
 
         Ok(messages)
+    }
+
+    async fn is_desertbus_live(self, ctx: &ErisContext) -> bool {
+        let helix = ctx.data.read().extract::<Helix>().unwrap().clone();
+
+        helix
+            .get_stream(User::Login("desertbus"))
+            .await
+            .unwrap_or(None)
+            .is_some()
     }
 }

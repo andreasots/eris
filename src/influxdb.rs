@@ -1,14 +1,14 @@
-use reqwest::r#async::{Body, Client};
-use std::marker::PhantomData;
 use failure::{Error, ResultExt};
-use std::collections::HashMap;
-use url::Url;
 use futures::compat::Future01CompatExt;
+use reqwest::r#async::{Body, Client};
 use serde::Deserialize;
-use std::io::Write;
-use tokio::prelude::Stream as Stream01;
 use std::borrow::Cow;
+use std::collections::HashMap;
+use std::io::Write;
+use std::marker::PhantomData;
 use std::sync::Arc;
+use tokio::prelude::Stream as Stream01;
+use url::Url;
 
 pub enum New {}
 pub enum Complete {}
@@ -76,15 +76,23 @@ impl<'a> Measurement<'a, New> {
 }
 
 impl<'a, State> Measurement<'a, State> {
-    pub fn add_tag<K: Into<Cow<'a, str>>, V: Into<Cow<'a, str>>>(mut self, tag: K, value: V) -> Self {
+    pub fn add_tag<K: Into<Cow<'a, str>>, V: Into<Cow<'a, str>>>(
+        mut self,
+        tag: K,
+        value: V,
+    ) -> Self {
         let value = value.into();
-        if ! value.is_empty() {
+        if !value.is_empty() {
             self.tags.insert(tag.into(), value);
         }
         self
     }
 
-    pub fn add_field<K: Into<Cow<'a, str>>, V: Into<Value<'a>>>(mut self, tag: K, value: V) -> Measurement<'a, Complete> {
+    pub fn add_field<K: Into<Cow<'a, str>>, V: Into<Value<'a>>>(
+        mut self,
+        tag: K,
+        value: V,
+    ) -> Measurement<'a, Complete> {
         self.fields.insert(tag.into(), value.into());
 
         Measurement {
@@ -121,12 +129,20 @@ impl Measurement<'_, Complete> {
 
     fn serialize(&self, buf: &mut Vec<u8>) {
         Self::append_escaped(buf, &self.measurement, Self::is_special_for_measurement);
-        if ! self.tags.is_empty() {
+        if !self.tags.is_empty() {
             for (key, value) in self.tags.iter() {
                 buf.push(b',');
-                Self::append_escaped(buf, key, Self::is_special_for_tag_keys_tag_values_and_field_keys);
+                Self::append_escaped(
+                    buf,
+                    key,
+                    Self::is_special_for_tag_keys_tag_values_and_field_keys,
+                );
                 buf.push(b'=');
-                Self::append_escaped(buf, value.trim_end_matches('\\'), Self::is_special_for_tag_keys_tag_values_and_field_keys);
+                Self::append_escaped(
+                    buf,
+                    value.trim_end_matches('\\'),
+                    Self::is_special_for_tag_keys_tag_values_and_field_keys,
+                );
             }
         }
         buf.push(b' ');
@@ -134,17 +150,25 @@ impl Measurement<'_, Complete> {
             if i != 0 {
                 buf.push(b',');
             }
-            Self::append_escaped(buf, key, Self::is_special_for_tag_keys_tag_values_and_field_keys);
+            Self::append_escaped(
+                buf,
+                key,
+                Self::is_special_for_tag_keys_tag_values_and_field_keys,
+            );
             buf.push(b'=');
             match value {
-                Value::Float(x) => write!(buf, "{}", x).expect("failed to write a `f64` to the buffer"),
-                Value::Integer(x) => write!(buf, "{}", x).expect("failed to write a `i64` to the buffer"),
+                Value::Float(x) => {
+                    write!(buf, "{}", x).expect("failed to write a `f64` to the buffer")
+                }
+                Value::Integer(x) => {
+                    write!(buf, "{}", x).expect("failed to write a `i64` to the buffer")
+                }
                 Value::String(x) => {
                     buf.push(b'"');
                     Self::append_escaped(buf, x, Self::is_special_for_string_field_value);
                     buf.push(b'"');
                 }
-                Value::Boolean(x) => buf.push(if *x { b't'} else { b'f' }),
+                Value::Boolean(x) => buf.push(if *x { b't' } else { b'f' }),
             }
         }
         match self.timestamp {
@@ -187,21 +211,44 @@ impl InfluxDB {
 
     pub async fn write(&self, req: &[Measurement<'_, Complete>]) -> Result<(), Error> {
         if req.is_empty() {
-            return Ok(())
+            return Ok(());
         }
 
-        let mut res = self.client.post(self.url.as_str()).body(WriteRequest(req)).send().compat().await.context("failed to send the request")?;
+        let mut res = self
+            .client
+            .post(self.url.as_str())
+            .body(WriteRequest(req))
+            .send()
+            .compat()
+            .await
+            .context("failed to send the request")?;
         // For some reason if you `match` on `res.status()` a `&Response` gets saved in the generator, making it not `Sync`.
         let status = res.status();
         match status {
             status if status.is_success() => Ok(()),
             status if status.is_client_error() || status.is_server_error() => {
-                let error = res.json::<InfluxError>().compat().await.context("failed to read the response")?;
-                Err(failure::err_msg(error.error).context("server returned an error").into())
-            },
+                let error = res
+                    .json::<InfluxError>()
+                    .compat()
+                    .await
+                    .context("failed to read the response")?;
+                Err(failure::err_msg(error.error)
+                    .context("server returned an error")
+                    .into())
+            }
             status => {
-                let body = res.into_body().concat2().compat().await.context("failed to read the response")?;
-                unimplemented!("status code {} {}, response: {:?}", status.as_str(), status.canonical_reason().unwrap_or(""), &body[..])
+                let body = res
+                    .into_body()
+                    .concat2()
+                    .compat()
+                    .await
+                    .context("failed to read the response")?;
+                unimplemented!(
+                    "status code {} {}, response: {:?}",
+                    status.as_str(),
+                    status.canonical_reason().unwrap_or(""),
+                    &body[..]
+                )
             }
         }
     }

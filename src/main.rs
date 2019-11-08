@@ -219,7 +219,10 @@ fn main() -> Result<(), failure::Error> {
         )));
 
         if let Some(url) = config.influxdb.as_ref() {
-            data.insert::<crate::influxdb::InfluxDB>(crate::influxdb::InfluxDB::new(http_client.clone(), url.clone()));
+            data.insert::<crate::influxdb::InfluxDB>(crate::influxdb::InfluxDB::new(
+                http_client.clone(),
+                url.clone(),
+            ));
         }
 
         data.insert::<crate::config::Config>(config);

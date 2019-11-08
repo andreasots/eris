@@ -1,7 +1,7 @@
-use diesel_full_text_search::{TsQuery, TsVector};
-use diesel::SqlType;
-use diesel::sql_types::Text;
 use diesel::expression::SqlLiteral;
+use diesel::sql_types::Text;
+use diesel::SqlType;
+use diesel_full_text_search::{TsQuery, TsVector};
 
 #[derive(SqlType)]
 #[postgres(type_name = "regconfig")]
@@ -12,7 +12,6 @@ pub struct Regconfig;
 pub fn english() -> SqlLiteral<Regconfig> {
     diesel::dsl::sql("'english'::regconfig")
 }
-
 
 sql_function!(fn plainto_tsquery(config: Regconfig, querytext: Text) -> TsQuery);
 sql_function!(fn to_tsvector(config: Regconfig, document: Text) -> TsVector);

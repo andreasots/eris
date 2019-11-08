@@ -182,11 +182,11 @@ impl Config {
                 .get_from(Some("lrrbot"), "discord_contact_spreadsheet")
                 .map(String::from),
 
-            influxdb:
-                ini.get_from(Some("eris"), "influxdb")
-                    .map(Url::parse)
-                    .transpose()
-                    .context("failed to parse `[eris].influxdb`")?,
+            influxdb: ini
+                .get_from(Some("eris"), "influxdb")
+                .map(Url::parse)
+                .transpose()
+                .context("failed to parse `[eris].influxdb`")?,
         })
     }
 

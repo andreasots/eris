@@ -1,5 +1,6 @@
 use crate::extract::Extract;
 use crate::models::{Game, GameEntry, Quote, Show};
+use crate::pg_fts::{english, plainto_tsquery, to_tsvector};
 use crate::schema::{game_per_show_data as game_entries, games, quotes, shows};
 use crate::typemap_keys::PgPool;
 use chrono::NaiveDate;
@@ -21,7 +22,6 @@ use std::borrow::Cow;
 use std::convert::Infallible;
 use std::fmt::Display;
 use unicode_width::UnicodeWidthStr;
-use crate::pg_fts::{english, plainto_tsquery, to_tsvector};
 
 // We want to register these commands and also have help texts for all* of them:
 //  * `!quote` and `!findquote` => `quote`
@@ -170,7 +170,7 @@ impl<'a> Expr<'a> {
                     left = left.and(expr);
                 }
                 left
-            },
+            }
             (right, Expr::And { mut exprs }) | (Expr::And { mut exprs }, right) => {
                 match right {
                     Expr::Column {
@@ -271,8 +271,8 @@ impl<'a> Expr<'a> {
                     left = left.or(expr);
                 }
                 left
-            },
-            (right, Expr::Or{ mut exprs }) | (Expr::Or { mut exprs }, right) => {
+            }
+            (right, Expr::Or { mut exprs }) | (Expr::Or { mut exprs }, right) => {
                 exprs.push(right);
                 Expr::Or { exprs }
             }
@@ -330,7 +330,10 @@ impl<'a> Expr<'a> {
                     }))
                 }
                 Column::Context => Ok(single_predicate(quotes::context, *op, term, |c, v| {
-                    c.is_not_null().and(to_tsvector(english(), coalesce(c, "")).matches(plainto_tsquery(english(), v)))
+                    c.is_not_null().and(
+                        to_tsvector(english(), coalesce(c, ""))
+                            .matches(plainto_tsquery(english(), v)),
+                    )
                 })),
                 Column::Game => {
                     let subquery =
