@@ -68,11 +68,17 @@ async fn inner<'a>(
         if last_tweet_id.is_some() {
             tweets.sort_by_key(|tweet| tweet.id);
             for tweet in &tweets {
-                // Non-reply tweet or a reply to an account we're watching.
+                // (Non-reply tweet or a reply to an account we're watching) and (a retweet or doesn't start with a user mention)
                 if tweet
                     .in_reply_to_user_id
                     .map(|user_id| users.contains_key(&user_id))
                     .unwrap_or(true)
+                    && (tweet.retweeted_status.is_some()
+                        || tweet
+                            .entities
+                            .user_mentions
+                            .iter()
+                            .all(|mention| mention.indices.0 != 0))
                 {
                     let message = format!(
                         "New tweet from {}: https://twitter.com/{}/status/{}",

@@ -39,6 +39,17 @@ pub struct Tweet {
     pub user: User,
     pub in_reply_to_user_id: Option<u64>,
     pub retweeted_status: Option<Box<Tweet>>,
+    pub entities: Entities,
+}
+
+#[derive(Deserialize)]
+pub struct Entities {
+    pub user_mentions: Vec<UserMention>,
+}
+
+#[derive(Deserialize)]
+pub struct UserMention {
+    pub indices: (usize, usize),
 }
 
 #[derive(Clone)]
