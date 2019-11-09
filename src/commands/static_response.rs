@@ -205,7 +205,7 @@ fn extract_command(msg: &str, command: &str) -> String {
 
     let mut command = String::from(command);
     while let Some(arg) = args.trimmed().current() {
-        if arg.len() > 0 {
+        if !arg.is_empty() {
             command.push(' ');
             command.push_str(arg);
         }

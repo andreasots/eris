@@ -122,7 +122,7 @@ async fn inner(ctx: &ErisContext) -> Result<(), Error> {
         let spreadsheet_key = config
             .contact_spreadsheet
             .clone()
-            .ok_or(failure::err_msg("Contact spreadsheet is not set"))?;
+            .ok_or_else(|| failure::err_msg("Contact spreadsheet is not set"))?;
 
         let sheets = data.extract::<Sheets>()?.clone();
 
@@ -139,7 +139,7 @@ async fn inner(ctx: &ErisContext) -> Result<(), Error> {
     for message in unsent {
         crate::blocking::blocking(|| {
             mods_channel.send_message(ctx, |m| {
-                m.content(format!("New message from the contact form:"))
+                m.content("New message from the contact form:")
                     .embed(|mut embed| {
                         embed = embed
                             .description(message.message)

@@ -287,7 +287,7 @@ impl<'a> Expr<'a> {
     ) -> Result<Box<dyn BoxableExpression<quotes::table, Pg, SqlType = Bool> + '_>, String> {
         match self {
             Expr::Or { exprs } => {
-                let mut iter = exprs.into_iter();
+                let mut iter = exprs.iter();
                 let mut ast = iter
                     .next()
                     .ok_or_else(|| "empty `Or` node".to_string())?
@@ -298,7 +298,7 @@ impl<'a> Expr<'a> {
                 Ok(ast)
             }
             Expr::And { exprs } => {
-                let mut iter = exprs.into_iter();
+                let mut iter = exprs.iter();
                 let mut ast = iter
                     .next()
                     .ok_or_else(|| "empty `And` node".to_string())?
@@ -385,11 +385,11 @@ fn unescape(s: &str) -> Cow<str> {
         }
     }
 
-    assert!(s.starts_with("\"") && s.ends_with("\""));
+    assert!(s.starts_with('\"') && s.ends_with('\"'));
     RE_ESCAPE.replace_all(&s[1..s.len() - 1], Expander)
 }
 
-lalrpop_util::lalrpop_mod!(pub parser, "/commands/quote.rs");
+lalrpop_util::lalrpop_mod!(#[allow(clippy::all)] pub parser, "/commands/quote.rs");
 
 fn safe<T: Display>(val: T) -> String {
     MessageBuilder::new().push_safe(val).build()
@@ -486,8 +486,7 @@ fn quote(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
         let query = quotes::table
             .filter(query.to_predicate()?)
             .filter(diesel::dsl::not(quotes::deleted));
-        let res = query.load(&conn)?;
-        res
+        query.load(&conn)?
     };
 
     match quotes.choose(&mut rand::thread_rng()) {
@@ -512,7 +511,7 @@ fn query_debugger(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult
     let query = args.rest().trim();
 
     if query.is_empty() {
-        msg.reply(&ctx, format!("Query: pick a random quote"))?;
+        msg.reply(&ctx, "Query: pick a random quote")?;
     } else if let Ok(id) = query.parse::<i32>() {
         msg.reply(&ctx, format!("Query: fetch quote #{}", id))?;
     } else {

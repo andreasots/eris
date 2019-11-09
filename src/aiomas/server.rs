@@ -145,19 +145,14 @@ impl<C: Clone + Send + 'static> Server<C> {
         let (tx, mut rx) = mpsc::channel(16);
         executor.spawn(
             async move {
-                loop {
-                    match rx.next().await {
-                        Some(response) => {
-                            sink = match sink.send(response).compat().await {
-                                Ok(sink) => sink,
-                                Err(err) => {
-                                    error!("Failed to send a response"; "error" => ?err);
-                                    break;
-                                }
-                            };
+                while let Some(response) = rx.next().await {
+                    sink = match sink.send(response).compat().await {
+                        Ok(sink) => sink,
+                        Err(err) => {
+                            error!("Failed to send a response"; "error" => ?err);
+                            break;
                         }
-                        None => break,
-                    }
+                    };
                 }
             }
                 .unit_error()

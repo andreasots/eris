@@ -1,3 +1,5 @@
+#![allow(clippy::unreadable_literal)]
+
 use chrono_tz::Tz;
 use failure::{self, Error, Fail, ResultExt};
 use ini::Ini;

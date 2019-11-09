@@ -127,11 +127,7 @@ impl Encoder for ServerCodec {
             FrameType::Exception
         };
         encode_frame(
-            &(
-                ty,
-                request_id,
-                payload.unwrap_or_else(|err| Value::String(err)),
-            ),
+            &(ty, request_id, payload.unwrap_or_else(Value::String)),
             dst,
         )
     }

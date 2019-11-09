@@ -44,7 +44,7 @@ fn live(ctx: &mut Context, msg: &Message, _: Args) -> CommandResult {
             .block_on(async move { kraken.get_streams_followed(token).await })?
     };
 
-    if streams.len() == 0 {
+    if streams.is_empty() {
         msg.reply(&ctx, "No fanstreamers currently live.")?;
     } else {
         streams.sort_by(|a, b| {

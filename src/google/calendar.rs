@@ -140,7 +140,7 @@ impl Calendar {
             }
         }
 
-        &events[start..end + 1]
+        &events[start..=end]
     }
 
     pub fn format_description(description: &str) -> String {
