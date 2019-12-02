@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::context::ErisContext;
 use crate::extract::Extract;
 use crate::google::sheets::{CellData, ExtendedValue, Sheets, Spreadsheet};
+use crate::truncate::truncate;
 use chrono::TimeZone;
 use chrono::{DateTime, Utc};
 use failure::{Error, ResultExt};
@@ -141,9 +142,13 @@ async fn inner(ctx: &ErisContext) -> Result<(), Error> {
             mods_channel.send_message(ctx, |m| {
                 m.content("New message from the contact form:")
                     .embed(|mut embed| {
-                        embed = embed
-                            .description(message.message)
-                            .timestamp(message.timestamp.to_rfc3339());
+                        if message.message.chars().count() > 2000 {
+                            embed = embed
+                                .description(format!("{}[...]", truncate(message.message, 2000).0));
+                        } else {
+                            embed = embed.description(message.message);
+                        }
+                        embed = embed.timestamp(message.timestamp.to_rfc3339());
                         if let Some(user) = message.username {
                             embed = embed.author(|e| e.name(user))
                         }

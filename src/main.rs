@@ -34,6 +34,7 @@ mod schema;
 mod service;
 mod stdlog;
 mod time;
+mod truncate;
 mod twitch;
 mod twitter;
 mod typemap_keys;
