@@ -40,7 +40,7 @@ slog-async = { version = "2.3.0", default-features = false }
 slog-scope = { version = "4.3.0", default-features = false }
 slog-term = { version = "2.4.2", default-features = false }
 strfmt = { version = "0.1.6", default-features = false }
-tokio-threadpool = { version = "0.1.16", default-features = false }
+tokio-threadpool = { version = "0.1.17", default-features = false }
 unicode-width = "0.1.6"
 url = { version = "2.1.0", default-features = false }
 
