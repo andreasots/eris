@@ -1,8 +1,7 @@
 use crate::config::Config;
 use failure::{self, Error, ResultExt};
-use futures::compat::Future01CompatExt;
 use reqwest::header::{HeaderValue, ACCEPT, AUTHORIZATION};
-use reqwest::r#async::Client;
+use reqwest::Client;
 use serde::Deserialize;
 use serde_json::{self, Value};
 
@@ -67,13 +66,11 @@ impl Kraken {
             let value = req
                 .query(&[("offset", &data.len().to_string()[..]), ("limit", "25")])
                 .send()
-                .compat()
                 .await
                 .context("failed to send the request")?
                 .error_for_status()
                 .context("request failed")?
                 .json::<Value>()
-                .compat()
                 .await
                 .context("failed to parse the response")?;
             data.extend(

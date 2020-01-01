@@ -7,14 +7,12 @@ use failure::ResultExt;
 
 use crate::context::ErisContext;
 use crate::extract::Extract;
-use futures::future::{FutureExt, TryFutureExt};
 use slog::{o, Drain};
 use slog_scope::{error, info};
 
 mod aiomas;
 mod announcements;
 mod autotopic;
-mod blocking;
 mod channel_reaper;
 mod commands;
 mod config;
@@ -114,7 +112,8 @@ fn main() -> Result<(), failure::Error> {
     >::new(&config.database_url[..]))
     .context("failed to create the database pool")?;
 
-    let http_client = reqwest::r#async::ClientBuilder::new()
+    let http_client = reqwest::ClientBuilder::new()
+        .user_agent("LRRbot/2.0 (https://lrrbot.com)")
         .build()
         .context("failed to create the HTTP client")?;
 
@@ -142,8 +141,6 @@ fn main() -> Result<(), failure::Error> {
                 config.twitter_api_key.clone(),
                 config.twitter_api_secret.clone(),
             )
-            .boxed()
-            .compat(),
         )
         .context("failed to initialise the Twitter client")?;
 
@@ -214,10 +211,7 @@ fn main() -> Result<(), failure::Error> {
     {
         let mut data = client.data.write();
 
-        data.insert::<crate::rpc::LRRbot>(std::sync::Arc::new(crate::rpc::LRRbot::new(
-            &config,
-            runtime.executor(),
-        )));
+        data.insert::<crate::rpc::LRRbot>(std::sync::Arc::new(crate::rpc::LRRbot::new(&config)));
 
         if let Some(url) = config.influxdb.as_ref() {
             data.insert::<crate::influxdb::InfluxDB>(crate::influxdb::InfluxDB::new(
@@ -227,7 +221,7 @@ fn main() -> Result<(), failure::Error> {
         }
 
         data.insert::<crate::config::Config>(config);
-        data.insert::<crate::typemap_keys::Executor>(runtime.executor());
+        data.insert::<crate::typemap_keys::Executor>(runtime.handle().clone());
         data.insert::<crate::typemap_keys::PgPool>(pg_pool);
         data.insert::<crate::twitch::Kraken>(kraken);
         data.insert::<crate::twitch::Helix>(helix);
@@ -245,10 +239,10 @@ fn main() -> Result<(), failure::Error> {
 
         #[cfg(unix)]
         let server =
-            crate::aiomas::Server::new(&config.eris_socket, runtime.executor(), ctx.clone());
+            crate::aiomas::Server::new(&config.eris_socket, ctx.clone());
 
         #[cfg(not(unix))]
-        let server = crate::aiomas::Server::new(config.eris_port, runtime.executor(), ctx.clone());
+        let server = crate::aiomas::Server::new(config.eris_port, ctx.clone());
 
         server
     }
@@ -256,30 +250,15 @@ fn main() -> Result<(), failure::Error> {
     for handler in ::inventory::iter::<crate::inventory::AiomasHandler> {
         rpc_server.register(handler.method, handler.handler);
     }
-    runtime.spawn(rpc_server.serve().unit_error().boxed().compat());
+    runtime.spawn(rpc_server.serve());
 
     let _handle = std::thread::spawn(channel_reaper::channel_reaper(ctx.clone()));
 
-    runtime.spawn(
-        announcements::post_tweets(ctx.clone())
-            .unit_error()
-            .boxed()
-            .compat(),
-    );
+    runtime.spawn(announcements::post_tweets(ctx.clone()));
 
-    runtime.spawn(
-        autotopic::autotopic(ctx.clone())
-            .unit_error()
-            .boxed()
-            .compat(),
-    );
+    runtime.spawn(autotopic::autotopic(ctx.clone()));
 
-    runtime.spawn(
-        contact::post_messages(ctx.clone())
-            .unit_error()
-            .boxed()
-            .compat(),
-    );
+    runtime.spawn(contact::post_messages(ctx.clone()));
 
     client
         .start()

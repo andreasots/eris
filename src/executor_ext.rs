@@ -1,22 +1,14 @@
 use futures::prelude::*;
-use tokio::runtime::TaskExecutor;
+use tokio::runtime::Handle;
 
 pub trait ExecutorExt {
     fn block_on<T: Send + 'static, F: Future<Output = T> + Send + 'static>(&self, future: F) -> T;
 }
 
-impl ExecutorExt for TaskExecutor {
+impl ExecutorExt for Handle {
     fn block_on<T: Send + 'static, F: Future<Output = T> + Send + 'static>(&self, future: F) -> T {
         let (tx, rx) = std::sync::mpsc::channel();
-        self.spawn(
-            async move {
-                let res = future.await;
-                tx.send(res).unwrap();
-            }
-                .unit_error()
-                .boxed()
-                .compat(),
-        );
+        self.spawn(future.map(move |res| tx.send(res).unwrap()));
         rx.recv().unwrap()
     }
 }

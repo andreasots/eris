@@ -5,13 +5,10 @@ use crate::models::State;
 use crate::twitter::Twitter;
 use crate::typemap_keys::PgPool;
 use failure::{Error, ResultExt};
-use futures::compat::Stream01CompatExt;
-use futures::prelude::*;
 use serenity::model::id::ChannelId;
 use slog_scope::{error, info};
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
-use tokio::timer::Interval;
+use std::time::{Duration};
 
 async fn init(ctx: &ErisContext) -> Result<HashMap<u64, Vec<ChannelId>>, Error> {
     let (twitter, twitter_users) = {
@@ -98,9 +95,7 @@ async fn inner<'a>(
                                 }
                             }
                         }
-                        crate::blocking::blocking(|| channel.say(ctx, &message))
-                            .await
-                            .context("failed to exit the runtime")?
+                        tokio::task::block_in_place(|| channel.say(ctx, &message))
                             .context("failed to send the announcement message")?;
                     }
 
@@ -140,17 +135,13 @@ pub async fn post_tweets(ctx: ErisContext) {
         }
     };
 
-    let mut timer = Interval::new(Instant::now(), Duration::from_secs(10)).compat();
+    let mut timer = tokio::time::interval(Duration::from_secs(10));
 
     loop {
-        match timer.try_next().await {
-            Ok(Some(_)) => {
-                if let Err(err) = inner(&ctx, &users).await {
-                    error!("Failed to announce new tweets"; "error" => ?err);
-                }
-            }
-            Ok(None) => break,
-            Err(err) => error!("Timer error"; "error" => ?err),
+        timer.tick().await;
+
+        if let Err(err) = inner(&ctx, &users).await {
+            error!("Failed to announce new tweets"; "error" => ?err);
         }
     }
 }

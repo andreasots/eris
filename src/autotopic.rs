@@ -13,13 +13,10 @@ use chrono::{DateTime, FixedOffset, Utc};
 use chrono_tz::Tz;
 use diesel::OptionalExtension;
 use failure::{Error, ResultExt};
-use futures::compat::Stream01CompatExt;
-use futures::prelude::*;
 use separator::FixedPlaceSeparatable;
 use slog_scope::error;
 use std::fmt;
-use std::time::{Duration, Instant};
-use tokio::timer::Interval;
+use std::time::{Duration};
 
 struct EventDisplay<'a> {
     event: &'a Event,
@@ -60,19 +57,13 @@ impl<'a> fmt::Display for EventDisplay<'a> {
 }
 
 pub async fn autotopic(ctx: ErisContext) {
-    let mut timer = Interval::new(Instant::now(), Duration::from_secs(60)).compat();
+    let mut timer = tokio::time::interval(Duration::from_secs(60));
 
     loop {
-        match timer.try_next().await {
-            Ok(Some(_)) => {
-                if let Err(err) = Autotopic.update_topic(&ctx).await {
-                    error!("Failed to update the topic"; "error" => ?err);
-                }
-            }
-            Ok(None) => break,
-            Err(err) => {
-                error!("Timer error"; "error" => ?err);
-            }
+        timer.tick().await;
+
+        if let Err(err) = Autotopic.update_topic(&ctx).await {
+            error!("Failed to update the topic"; "error" => ?err);
         }
     }
 }
@@ -178,9 +169,7 @@ impl Autotopic {
         let general_channel = ctx.data.read().extract::<Config>()?.general_channel;
 
         // TODO: shorten to a max of 1024 characters, whatever that means.
-        crate::blocking::blocking(|| general_channel.edit(ctx, |c| c.topic(&messages.join(" "))))
-            .await
-            .context("failed to exit the runtime")?
+        tokio::task::block_in_place(|| general_channel.edit(ctx, |c| c.topic(&messages.join(" "))))
             .context("failed to update the topic")?;
 
         Ok(())

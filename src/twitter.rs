@@ -1,6 +1,5 @@
 use failure::{Error, ResultExt};
-use futures::compat::Future01CompatExt;
-use reqwest::r#async::Client;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 
@@ -78,13 +77,11 @@ impl Twitter {
                 grant_type: "client_credentials",
             })
             .send()
-            .compat()
             .await
             .context("failed to send the bearer token request")?
             .error_for_status()
             .context("bearer token request failed")?
             .json::<OAuth2TokenResponse>()
-            .compat()
             .await
             .context("failed to parse the bearer token")?;
 
@@ -108,13 +105,11 @@ impl Twitter {
             .bearer_auth(&self.token)
             .query(&[("screen_name", users.join(","))])
             .send()
-            .compat()
             .await
             .context("failed to send the users lookup request")?
             .error_for_status()
             .context("users lookup request failed")?
             .json::<Vec<User>>()
-            .compat()
             .await
             .context("failed to parse users")?;
         Ok(users)
@@ -140,13 +135,11 @@ impl Twitter {
                 since_id,
             })
             .send()
-            .compat()
             .await
             .context("failed to send the timeline request")?
             .error_for_status()
             .context("timeline request failed")?
             .json::<Vec<Tweet>>()
-            .compat()
             .await
             .context("failed to parse the timeline")?;
         Ok(tweets)

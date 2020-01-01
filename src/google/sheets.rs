@@ -1,8 +1,7 @@
 use crate::google::ServiceAccount;
 use failure::{Error, ResultExt};
-use futures::compat::Future01CompatExt;
 use reqwest::header::AUTHORIZATION;
-use reqwest::r#async::Client;
+use reqwest::Client;
 use reqwest::Url;
 use serde::Deserialize;
 use serde_json::json;
@@ -194,13 +193,11 @@ impl Sheets {
             .header(AUTHORIZATION, token)
             .query(&[("fields", fields)])
             .send()
-            .compat()
             .await
             .context("failed to send the request")?
             .error_for_status()
             .context("request failed")?
             .json::<Spreadsheet>()
-            .compat()
             .await
             .context("failed to read the response")?)
     }
@@ -258,7 +255,6 @@ impl Sheets {
                 "includeSpreadsheetInResponse": false,
             }))
             .send()
-            .compat()
             .await
             .context("failed to send the request")?
             .error_for_status()

@@ -107,12 +107,8 @@ async fn stream_up_inner(ctx: &ErisContext, channel: Channel) -> Result<(), Erro
             .unwrap_or(show.name)
     };
 
-    crate::blocking::blocking(|| {
-        announcements_channel.say(ctx, format_args!("{}", StreamUp { channel, what }))
-    })
-    .await
-    .context("failed to exit the runtime")?
-    .context("failed to send the announcement message")?;
+    tokio::task::block_in_place(|| announcements_channel.say(ctx, format_args!("{}", StreamUp { channel, what })))
+        .context("failed to send the announcement message")?;
 
     Ok(())
 }

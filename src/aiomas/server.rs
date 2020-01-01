@@ -1,7 +1,6 @@
 use crate::aiomas::codec::{Exception, Request, ServerCodec};
 use failure::{Error, Fail, ResultExt};
 use futures::channel::mpsc;
-use futures::compat::{Future01CompatExt, Stream01CompatExt};
 use futures::future::BoxFuture;
 use futures::prelude::*;
 use serde_json::Value;
@@ -9,13 +8,10 @@ use slog_scope::error;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
-use tokio::codec::Framed;
-use tokio::prelude::Sink as Sink01;
-use tokio::prelude::Stream as Stream01;
-use tokio::runtime::TaskExecutor;
+use tokio_util::codec::Framed;
 
 #[cfg(unix)]
-use tokio::net::unix::UnixListener;
+use tokio::net::UnixListener;
 
 #[cfg(not(unix))]
 use tokio::net::TcpListener;
@@ -46,7 +42,6 @@ where
 
 pub struct Server<C: 'static> {
     methods: HashMap<String, &'static (dyn Handler<C> + Send + Sync + 'static)>,
-    executor: TaskExecutor,
     context: C,
 
     #[cfg(unix)]
@@ -60,7 +55,6 @@ impl<C: Clone + Send + 'static> Server<C> {
     #[cfg(unix)]
     pub fn new<P: AsRef<Path>>(
         path: P,
-        executor: TaskExecutor,
         context: C,
     ) -> Result<Server<C>, Error> {
         let listener = UnixListener::bind(path).context("failed to create a listening socket")?;
@@ -69,12 +63,11 @@ impl<C: Clone + Send + 'static> Server<C> {
             listener,
             methods: HashMap::new(),
             context,
-            executor,
         })
     }
 
     #[cfg(not(unix))]
-    pub fn new(port: u16, executor: TaskExecutor, context: C) -> Result<Server<C>, Error> {
+    pub fn new(port: u16, context: C) -> Result<Server<C>, Error> {
         use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 
         let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port);
@@ -84,7 +77,6 @@ impl<C: Clone + Send + 'static> Server<C> {
             listener,
             methods: HashMap::new(),
             context,
-            executor,
         })
     }
 
@@ -99,27 +91,22 @@ impl<C: Clone + Send + 'static> Server<C> {
     pub async fn serve(self) {
         let Server {
             methods,
-            listener,
-            executor,
+            mut listener,
             context,
         } = self;
 
-        let mut listener = listener.incoming().compat().boxed();
+        let mut listener = listener.incoming();
         let methods = Arc::new(methods);
 
         loop {
             match listener.try_next().await {
                 Ok(Some(socket)) => {
-                    executor.spawn(
+                    tokio::spawn(
                         Server::process(
                             methods.clone(),
                             Framed::new(socket, ServerCodec),
-                            executor.clone(),
                             context.clone(),
                         )
-                        .unit_error()
-                        .boxed()
-                        .compat(),
                     );
                 }
                 Ok(None) => return,
@@ -131,35 +118,27 @@ impl<C: Clone + Send + 'static> Server<C> {
     async fn process<T, E>(
         methods: Arc<HashMap<String, &'static (dyn Handler<C> + Send + Sync + 'static)>>,
         transport: T,
-        executor: TaskExecutor,
         context: C,
     ) where
-        T: Sink01<SinkItem = (u64, Result<Value, Exception>), SinkError = E>
-            + Stream01<Item = (u64, Request), Error = E>
+        T: Sink<(u64, Result<Value, Exception>), Error = E>
+            + Stream<Item = Result<(u64, Request), E>>
             + Send
             + Sync
             + 'static,
         E: Fail,
     {
-        let (mut sink, stream) = transport.split();
+        let (mut sink, mut stream) = transport.split();
         let (tx, mut rx) = mpsc::channel(16);
-        executor.spawn(
+        tokio::spawn(
             async move {
                 while let Some(response) = rx.next().await {
-                    sink = match sink.send(response).compat().await {
-                        Ok(sink) => sink,
-                        Err(err) => {
-                            error!("Failed to send a response"; "error" => ?err);
-                            break;
-                        }
-                    };
+                    if let Err(err) = sink.send(response).await {
+                        error!("Failed to send a response"; "error" => ?err);
+                        break;
+                    }
                 }
             }
-                .unit_error()
-                .boxed()
-                .compat(),
         );
-        let mut stream = stream.compat();
 
         loop {
             match stream.try_next().await {
@@ -170,17 +149,9 @@ impl<C: Clone + Send + 'static> Server<C> {
                         None => async move { Err(format!("no such method: {}", method)) }.boxed(),
                     };
 
-                    executor.spawn(
-                        future
-                            .then(move |res| {
-                                async move {
-                                    let _ = tx.send((id, res)).await;
-                                }
-                            })
-                            .unit_error()
-                            .boxed()
-                            .compat(),
-                    );
+                    tokio::spawn(async move {
+                        let _ = tx.send((id, future.await)).await;
+                    });
                 }
                 Ok(None) => break,
                 Err(err) => {
