@@ -150,11 +150,7 @@ pub struct Sheets {
 impl Sheets {
     pub fn new<P: Into<PathBuf>>(client: Client, key_file_path: P) -> Sheets {
         Sheets {
-            oauth2: Arc::new(ServiceAccount::new(
-                key_file_path.into(),
-                client.clone(),
-                SCOPES,
-            )),
+            oauth2: Arc::new(ServiceAccount::new(key_file_path.into(), client.clone(), SCOPES)),
             client,
         }
     }
@@ -170,10 +166,8 @@ impl Sheets {
         spreadsheet: &'a str,
         fields: &'a str,
     ) -> Result<Spreadsheet, Error> {
-        let token = self
-            .get_token()
-            .await
-            .context("failed to get a service account OAuth2 token")?;
+        let token =
+            self.get_token().await.context("failed to get a service account OAuth2 token")?;
 
         let url = {
             let mut url = Url::parse("https://sheets.googleapis.com/v4/spreadsheets")
@@ -210,10 +204,8 @@ impl Sheets {
         key: &'a str,
         value: &'a str,
     ) -> Result<(), Error> {
-        let token = self
-            .get_token()
-            .await
-            .context("failed to get a service account OAuth2 token")?;
+        let token =
+            self.get_token().await.context("failed to get a service account OAuth2 token")?;
 
         let url = {
             let mut url = Url::parse("https://sheets.googleapis.com/v4/spreadsheets")

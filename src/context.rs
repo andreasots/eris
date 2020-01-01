@@ -11,10 +11,7 @@ pub struct ErisContext {
 
 impl ErisContext {
     pub fn from_client(client: &Client) -> ErisContext {
-        ErisContext {
-            cache_and_http: client.cache_and_http.clone(),
-            data: client.data.clone(),
-        }
+        ErisContext { cache_and_http: client.cache_and_http.clone(), data: client.data.clone() }
     }
 }
 

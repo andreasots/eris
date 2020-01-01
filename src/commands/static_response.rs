@@ -50,10 +50,7 @@ impl Access {
                 .guild(ctx)
                 .and_then(|guild| {
                     guild.read().members.get(&msg.author.id).map(|member| {
-                        member
-                            .permissions(ctx)
-                            .map(|p| p.administrator())
-                            .unwrap_or(false)
+                        member.permissions(ctx).map(|p| p.administrator()).unwrap_or(false)
                     })
                 })
                 .unwrap_or(false),
@@ -137,9 +134,7 @@ fn static_response_impl(ctx: &mut Context, msg: &Message, command: &str) -> Resu
 
         data.extract::<Executor>()?
             .block_on(async move {
-                lrrbot
-                    .get_data::<Response>(vec![String::from("responses"), command])
-                    .await
+                lrrbot.get_data::<Response>(vec![String::from("responses"), command]).await
             })
             .context("failed to fetch the command")?
     };
@@ -189,10 +184,7 @@ pub fn static_response(ctx: &mut Context, msg: &Message, command: &str) {
 
             let _ = msg.reply(
                 ctx,
-                &format!(
-                    "Simple text response command resulted in an unexpected error: {}.",
-                    err
-                ),
+                &format!("Simple text response command resulted in an unexpected error: {}.", err),
             );
         }
     }
@@ -237,10 +229,7 @@ fn test_deserialize_multi_response() {
             .unwrap();
     assert_eq!(
         res,
-        Response::Some {
-            access: Access::Sub,
-            response: vec!["peach".into(), "barf".into()]
-        }
+        Response::Some { access: Access::Sub, response: vec!["peach".into(), "barf".into()] }
     );
 }
 
@@ -297,14 +286,8 @@ mod tests {
 
     #[test]
     fn extract_command() {
-        assert_eq!(
-            super::extract_command(" \t ! \t some \t command \t ", "some"),
-            "some command"
-        );
+        assert_eq!(super::extract_command(" \t ! \t some \t command \t ", "some"), "some command");
         assert_eq!(super::extract_command("!command", "command"), "command");
-        assert_eq!(
-            super::extract_command("<@!1234> some command", "some"),
-            "some command"
-        );
+        assert_eq!(super::extract_command("<@!1234> some command", "some"), "some command");
     }
 }

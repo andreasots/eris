@@ -46,10 +46,7 @@ impl<'a> fmt::Display for EventDisplay<'a> {
         write!(
             f,
             " on {}.",
-            self.event
-                .start
-                .with_timezone(&self.tz)
-                .format("%a %e %b at %I:%M %p %Z")
+            self.event.start.with_timezone(&self.tz).format("%a %e %b at %I:%M %p %Z")
         )?;
 
         Ok(())
@@ -75,10 +72,7 @@ impl Autotopic {
     async fn update_topic(self, ctx: &ErisContext) -> Result<(), Error> {
         let header = {
             let lrrbot = ctx.data.read().extract::<LRRbot>()?.clone();
-            lrrbot
-                .get_header_info()
-                .await
-                .context("failed to fetch header info")?
+            lrrbot.get_header_info().await.context("failed to fetch header info")?
         };
 
         let mut messages = vec![];
@@ -118,18 +112,14 @@ impl Autotopic {
                 (Some(game), Some(show)) => {
                     messages.push(format!(
                         "Now live: {} on {}.",
-                        game_entry
-                            .and_then(|entry| entry.display_name)
-                            .unwrap_or(game.name),
+                        game_entry.and_then(|entry| entry.display_name).unwrap_or(game.name),
                         show.name
                     ));
                 }
                 (Some(game), None) => {
                     messages.push(format!(
                         "Now live: {}.",
-                        game_entry
-                            .and_then(|entry| entry.display_name)
-                            .unwrap_or(game.name)
+                        game_entry.and_then(|entry| entry.display_name).unwrap_or(game.name)
                     ));
                 }
                 (None, Some(show)) => {
@@ -154,11 +144,8 @@ impl Autotopic {
                 messages.extend(desertbus);
             } else {
                 let tz = ctx.data.read().extract::<Config>()?.timezone;
-                messages.extend(
-                    events
-                        .iter()
-                        .map(|event| EventDisplay { event, now, tz }.to_string()),
-                );
+                messages
+                    .extend(events.iter().map(|event| EventDisplay { event, now, tz }.to_string()));
             }
         }
 
@@ -268,10 +255,6 @@ impl Autotopic {
     async fn is_desertbus_live(self, ctx: &ErisContext) -> bool {
         let helix = ctx.data.read().extract::<Helix>().unwrap().clone();
 
-        helix
-            .get_stream(User::Login("desertbus"))
-            .await
-            .unwrap_or(None)
-            .is_some()
+        helix.get_stream(User::Login("desertbus")).await.unwrap_or(None).is_some()
     }
 }

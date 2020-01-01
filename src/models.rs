@@ -24,9 +24,7 @@ impl GameEntry {
         show_id: i32,
         conn: &C,
     ) -> QueryResult<GameEntry> {
-        game_per_show_data::table
-            .find((game_id, show_id))
-            .first::<GameEntry>(conn)
+        game_per_show_data::table.find((game_id, show_id)).first::<GameEntry>(conn)
     }
 }
 
@@ -103,11 +101,7 @@ impl State {
         key: &str,
         conn: &C,
     ) -> Result<Option<T>, Error> {
-        let value = state::table
-            .find(key)
-            .select(state::value)
-            .first::<Value>(conn)
-            .optional()?;
+        let value = state::table.find(key).select(state::value).first::<Value>(conn).optional()?;
 
         match value {
             Some(value) => Ok(Some(serde_json::from_value(value)?)),
@@ -121,10 +115,7 @@ impl State {
         conn: &C,
     ) -> Result<(), Error> {
         diesel::insert_into(state::table)
-            .values(NewState {
-                key,
-                value: serde_json::to_value(value)?,
-            })
+            .values(NewState { key, value: serde_json::to_value(value)? })
             .on_conflict(state::key)
             .do_update()
             .set(state::value.eq(excluded(state::value)))

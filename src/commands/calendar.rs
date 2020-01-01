@@ -55,9 +55,7 @@ impl FromStr for Timezone {
     type Err = Compat<Error>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Timezone(
-            Tz::from_str(s).map_err(|err| failure::err_msg(err).compat())?,
-        ))
+        Ok(Timezone(Tz::from_str(s).map_err(|err| failure::err_msg(err).compat())?))
     }
 }
 
@@ -98,22 +96,14 @@ impl PushEvent for MessageBuilder {
 
         if let Some(ref desc) = event.description {
             // TODO: shorten to 200 characters.
-            self.push(" (")
-                .push_safer(GoogleCalendar::format_description(desc))
-                .push(")");
+            self.push(" (").push_safer(GoogleCalendar::format_description(desc)).push(")");
         }
-        self.push(" on ").push(
-            event
-                .start
-                .with_timezone(&tz)
-                .format("%a %e %b at %I:%M %p %Z"),
-        );
+        self.push(" on ").push(event.start.with_timezone(&tz).format("%a %e %b at %I:%M %p %Z"));
 
         let start = event.start.with_timezone(&Utc);
         self.push(" (");
         if start > now {
-            self.push(HumanReadable::new(start - now))
-                .push(" from now)");
+            self.push(HumanReadable::new(start - now)).push(" from now)");
         } else {
             self.push(HumanReadable::new(now - start)).push(" ago)");
         }
@@ -130,19 +120,11 @@ struct Calendar {
 
 impl Calendar {
     pub const fn lrr() -> Calendar {
-        Calendar {
-            calendar: LRR,
-            tag: "Next scheduled stream",
-            include_current: false,
-        }
+        Calendar { calendar: LRR, tag: "Next scheduled stream", include_current: false }
     }
 
     pub const fn fan() -> Calendar {
-        Calendar {
-            calendar: FANSTREAMS,
-            tag: "Next scheduled fan stream",
-            include_current: true,
-        }
+        Calendar { calendar: FANSTREAMS, tag: "Next scheduled fan stream", include_current: true }
     }
 
     pub fn execute(&self, ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {

@@ -47,11 +47,7 @@ impl DiscordEvents {
                 build_number
             )
         } else {
-            format!(
-                "{}help || v{}",
-                config.command_prefix,
-                env!("CARGO_PKG_VERSION")
-            )
+            format!("{}help || v{}", config.command_prefix, env!("CARGO_PKG_VERSION"))
         };
         ctx.set_activity(Activity::listening(&activity));
     }
@@ -106,9 +102,8 @@ impl EventHandler for DiscordEvents {
 
                         let users = Self::users_for(&guild.read(), channel.id);
 
-                        let mut measurement = self
-                            .create_measurement_for_channel(&channel, "create")
-                            .add_field(
+                        let mut measurement =
+                            self.create_measurement_for_channel(&channel, "create").add_field(
                                 "count",
                                 i64::try_from(users.len()).unwrap_or(std::i64::MAX),
                             );
@@ -182,9 +177,8 @@ impl EventHandler for DiscordEvents {
 
                         let users = Self::users_for(&guild.read(), channel.id);
 
-                        let mut measurement = self
-                            .create_measurement_for_channel(&channel, "update")
-                            .add_field(
+                        let mut measurement =
+                            self.create_measurement_for_channel(&channel, "update").add_field(
                                 "count",
                                 i64::try_from(users.len()).unwrap_or(std::i64::MAX),
                             );

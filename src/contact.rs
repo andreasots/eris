@@ -87,9 +87,7 @@ fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(u64, Vec<Entry>)> {
 
             let values = row.values.as_ref();
 
-            let timestamp = values
-                .and_then(|row| row.get(0))
-                .and_then(extract_timestamp);
+            let timestamp = values.and_then(|row| row.get(0)).and_then(extract_timestamp);
             let message = values.and_then(|row| row.get(1)).and_then(extract_string);
             let username = values.and_then(|row| row.get(2)).and_then(extract_string);
 
@@ -133,20 +131,19 @@ async fn inner(ctx: &ErisContext) -> Result<(), Error> {
     for message in unsent {
         tokio::task::block_in_place(|| {
             mods_channel.send_message(ctx, |m| {
-                m.content("New message from the contact form:")
-                    .embed(|mut embed| {
-                        if message.message.chars().count() > 2000 {
-                            embed = embed
-                                .description(format!("{}[...]", truncate(message.message, 2000).0));
-                        } else {
-                            embed = embed.description(message.message);
-                        }
-                        embed = embed.timestamp(message.timestamp.to_rfc3339());
-                        if let Some(user) = message.username {
-                            embed = embed.author(|e| e.name(user))
-                        }
-                        embed
-                    })
+                m.content("New message from the contact form:").embed(|mut embed| {
+                    if message.message.chars().count() > 2000 {
+                        embed = embed
+                            .description(format!("{}[...]", truncate(message.message, 2000).0));
+                    } else {
+                        embed = embed.description(message.message);
+                    }
+                    embed = embed.timestamp(message.timestamp.to_rfc3339());
+                    if let Some(user) = message.username {
+                        embed = embed.author(|e| e.name(user))
+                    }
+                    embed
+                })
             })
         })
         .context("failed to forward the message")?;

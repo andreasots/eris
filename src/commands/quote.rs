@@ -108,17 +108,9 @@ impl Column {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Expr<'input> {
-    Or {
-        exprs: Vec<Expr<'input>>,
-    },
-    And {
-        exprs: Vec<Expr<'input>>,
-    },
-    Column {
-        column: Column,
-        op: Op,
-        term: Cow<'input, str>,
-    },
+    Or { exprs: Vec<Expr<'input>> },
+    And { exprs: Vec<Expr<'input>> },
+    Column { column: Column, op: Op, term: Cow<'input, str> },
     Bare(Cow<'input, str>),
 }
 
@@ -173,11 +165,7 @@ impl<'a> Expr<'a> {
             }
             (right, Expr::And { mut exprs }) | (Expr::And { mut exprs }, right) => {
                 match right {
-                    Expr::Column {
-                        column,
-                        op: Op::Fuzzy,
-                        term,
-                    } if column.fuzzy_is_fts() => {
+                    Expr::Column { column, op: Op::Fuzzy, term } if column.fuzzy_is_fts() => {
                         let mut merged = false;
                         for expr in &mut exprs {
                             *expr = match *expr {
@@ -206,11 +194,7 @@ impl<'a> Expr<'a> {
                             break;
                         }
                         if !merged {
-                            exprs.push(Expr::Column {
-                                column,
-                                op: Op::Fuzzy,
-                                term,
-                            });
+                            exprs.push(Expr::Column { column, op: Op::Fuzzy, term });
                         }
                     }
                     Expr::Bare(term) => {
@@ -240,16 +224,8 @@ impl<'a> Expr<'a> {
                 Expr::And { exprs }
             }
             (
-                Expr::Column {
-                    column: l_column,
-                    op: Op::Fuzzy,
-                    term: ref l_term,
-                },
-                Expr::Column {
-                    column: r_column,
-                    op: Op::Fuzzy,
-                    term: ref r_term,
-                },
+                Expr::Column { column: l_column, op: Op::Fuzzy, term: ref l_term },
+                Expr::Column { column: r_column, op: Op::Fuzzy, term: ref r_term },
             ) if l_column == r_column && l_column.fuzzy_is_fts() => Expr::Column {
                 column: l_column,
                 op: Op::Fuzzy,
@@ -258,9 +234,7 @@ impl<'a> Expr<'a> {
             (Expr::Bare(left), Expr::Bare(right)) => {
                 Expr::Bare(Cow::Owned(format!("{} {}", left, right)))
             }
-            (left, right) => Expr::And {
-                exprs: vec![left, right],
-            },
+            (left, right) => Expr::And { exprs: vec![left, right] },
         }
     }
 
@@ -276,9 +250,7 @@ impl<'a> Expr<'a> {
                 exprs.push(right);
                 Expr::Or { exprs }
             }
-            (left, right) => Expr::Or {
-                exprs: vec![left, right],
-            },
+            (left, right) => Expr::Or { exprs: vec![left, right] },
         }
     }
 
@@ -288,10 +260,8 @@ impl<'a> Expr<'a> {
         match self {
             Expr::Or { exprs } => {
                 let mut iter = exprs.iter();
-                let mut ast = iter
-                    .next()
-                    .ok_or_else(|| "empty `Or` node".to_string())?
-                    .to_predicate()?;
+                let mut ast =
+                    iter.next().ok_or_else(|| "empty `Or` node".to_string())?.to_predicate()?;
                 for node in iter {
                     ast = Box::new(ast.or(node.to_predicate()?));
                 }
@@ -299,10 +269,8 @@ impl<'a> Expr<'a> {
             }
             Expr::And { exprs } => {
                 let mut iter = exprs.iter();
-                let mut ast = iter
-                    .next()
-                    .ok_or_else(|| "empty `And` node".to_string())?
-                    .to_predicate()?;
+                let mut ast =
+                    iter.next().ok_or_else(|| "empty `And` node".to_string())?.to_predicate()?;
                 for node in iter {
                     ast = Box::new(ast.and(node.to_predicate()?));
                 }
@@ -325,9 +293,7 @@ impl<'a> Expr<'a> {
                 Column::Date => {
                     let term = NaiveDate::parse_from_str(term, "%Y-%m-%d")
                         .map_err(|err| format!("failed to parse {:?} as a date: {}", term, err))?;
-                    Ok(single_predicate(quotes::attrib_date, *op, term, |c, v| {
-                        c.eq(v)
-                    }))
+                    Ok(single_predicate(quotes::attrib_date, *op, term, |c, v| c.eq(v)))
                 }
                 Column::Context => Ok(single_predicate(quotes::context, *op, term, |c, v| {
                     c.is_not_null().and(
@@ -336,30 +302,22 @@ impl<'a> Expr<'a> {
                     )
                 })),
                 Column::Game => {
-                    let subquery =
-                        games::table
-                            .select(games::id.nullable())
-                            .filter(single_predicate(games::name, *op, term, |c, v| {
-                                c.ilike(as_ilike(&v))
-                            }));
+                    let subquery = games::table.select(games::id.nullable()).filter(
+                        single_predicate(games::name, *op, term, |c, v| c.ilike(as_ilike(&v))),
+                    );
                     Ok(Box::new(quotes::game_id.eq_any(subquery)))
                 }
                 Column::Show => {
-                    let subquery =
-                        shows::table
-                            .select(shows::id.nullable())
-                            .filter(single_predicate(shows::name, *op, term, |c, v| {
-                                c.ilike(as_ilike(&v))
-                            }));
+                    let subquery = shows::table.select(shows::id.nullable()).filter(
+                        single_predicate(shows::name, *op, term, |c, v| c.ilike(as_ilike(&v))),
+                    );
                     Ok(Box::new(quotes::show_id.eq_any(subquery)))
                 }
             },
             Expr::Bare(term) => Ok(Box::new(
                 to_tsvector(
                     english(),
-                    quotes::quote
-                        .concat(" ")
-                        .concat(coalesce(quotes::context, "")),
+                    quotes::quote.concat(" ").concat(coalesce(quotes::context, "")),
                 )
                 .matches(plainto_tsquery(english(), term)),
             )),
@@ -404,13 +362,8 @@ fn report_parse_error(
     let (start, end) = match &err {
         ParseError::InvalidToken { location } => (*location, *location),
         ParseError::UnrecognizedEOF { location, .. } => (*location, *location),
-        ParseError::UnrecognizedToken {
-            token: (start, _, end),
-            ..
-        } => (*start, *end),
-        ParseError::ExtraToken {
-            token: (start, _, end),
-        } => (*start, *end),
+        ParseError::UnrecognizedToken { token: (start, _, end), .. } => (*start, *end),
+        ParseError::ExtraToken { token: (start, _, end) } => (*start, *end),
         ParseError::User { error } => match *error {},
     };
 
@@ -469,23 +422,17 @@ fn quote(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
 
     let query = args.rest().trim();
     let quotes = if query.is_empty() {
-        quotes::table
-            .filter(diesel::dsl::not(quotes::deleted))
-            .load::<Quote>(&conn)?
+        quotes::table.filter(diesel::dsl::not(quotes::deleted)).load::<Quote>(&conn)?
     } else if let Ok(id) = query.parse::<i32>() {
-        quotes::table
-            .find(id)
-            .filter(diesel::dsl::not(quotes::deleted))
-            .load(&conn)?
+        quotes::table.find(id).filter(diesel::dsl::not(quotes::deleted)).load(&conn)?
     } else {
         let parser = parser::QueryParser::new();
         let query = match parser.parse(query) {
             Ok(query) => query,
             Err(err) => return report_parse_error(msg, &ctx, query, err),
         };
-        let query = quotes::table
-            .filter(query.to_predicate()?)
-            .filter(diesel::dsl::not(quotes::deleted));
+        let query =
+            quotes::table.filter(query.to_predicate()?).filter(diesel::dsl::not(quotes::deleted));
         query.load(&conn)?
     };
 
@@ -572,9 +519,7 @@ fn details(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
                 .push_safe(&quote)
                 .build();
             m.content(message).embed(|embed| {
-                embed
-                    .field("ID", safe(quote.id), false)
-                    .field("Quote", safe(quote.quote), false);
+                embed.field("ID", safe(quote.id), false).field("Quote", safe(quote.quote), false);
                 if let Some(name) = quote.attrib_name {
                     embed.field("Name", safe(name), false);
                 }
@@ -620,10 +565,7 @@ mod test {
     #[test]
     fn parsing() {
         let parser = QueryParser::new();
-        assert_eq!(
-            parser.parse("butts").unwrap(),
-            Expr::Bare(Cow::Borrowed("butts"))
-        );
+        assert_eq!(parser.parse("butts").unwrap(), Expr::Bare(Cow::Borrowed("butts")));
         assert_eq!(
             parser.parse("bare words get concatenated").unwrap(),
             Expr::Bare(Cow::Borrowed("bare words get concatenated"))

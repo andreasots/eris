@@ -53,10 +53,7 @@ impl ServiceAccount {
             key_path,
             client,
             scopes: scopes.join(" "),
-            token: Mutex::new(Token {
-                token: String::new(),
-                expires: Utc.timestamp(0, 0),
-            }),
+            token: Mutex::new(Token { token: String::new(), expires: Utc.timestamp(0, 0) }),
         }
     }
 

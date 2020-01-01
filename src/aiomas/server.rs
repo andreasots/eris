@@ -56,11 +56,7 @@ impl<C: Clone + Send + 'static> Server<C> {
     pub fn new<P: AsRef<Path>>(path: P, context: C) -> Result<Server<C>, Error> {
         let listener = UnixListener::bind(path).context("failed to create a listening socket")?;
 
-        Ok(Server {
-            listener,
-            methods: HashMap::new(),
-            context,
-        })
+        Ok(Server { listener, methods: HashMap::new(), context })
     }
 
     #[cfg(not(unix))]
@@ -70,11 +66,7 @@ impl<C: Clone + Send + 'static> Server<C> {
         let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port);
         let listener = TcpListener::bind(&addr).context("failed to create a listening socket")?;
 
-        Ok(Server {
-            listener,
-            methods: HashMap::new(),
-            context,
-        })
+        Ok(Server { listener, methods: HashMap::new(), context })
     }
 
     pub fn register(
@@ -86,11 +78,7 @@ impl<C: Clone + Send + 'static> Server<C> {
     }
 
     pub async fn serve(self) {
-        let Server {
-            methods,
-            mut listener,
-            context,
-        } = self;
+        let Server { methods, mut listener, context } = self;
 
         let mut listener = listener.incoming();
         let methods = Arc::new(methods);

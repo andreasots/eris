@@ -30,10 +30,7 @@ fn time(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
     };
 
     let now = Utc::now().with_timezone(&ctx.data.read().extract::<Config>()?.timezone);
-    msg.reply(
-        ctx,
-        &format!("Current moonbase time: {}", now.format(format)),
-    )?;
+    msg.reply(ctx, &format!("Current moonbase time: {}", now.format(format)))?;
 
     Ok(())
 }

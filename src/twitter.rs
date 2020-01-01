@@ -73,9 +73,7 @@ impl Twitter {
         let res = client
             .post("https://api.twitter.com/oauth2/token")
             .basic_auth(key, Some(secret))
-            .form(&OAuth2TokenRequest {
-                grant_type: "client_credentials",
-            })
+            .form(&OAuth2TokenRequest { grant_type: "client_credentials" })
             .send()
             .await
             .context("failed to send the bearer token request")?

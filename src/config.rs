@@ -61,10 +61,7 @@ impl Config {
     pub fn load_from_file<P: AsRef<Path>>(filename: P) -> Result<Config, Error> {
         let ini = Ini::load_from_file(filename)?;
         Ok(Config {
-            username: ini
-                .get_from(Some("lrrbot"), "username")
-                .unwrap_or("lrrbot")
-                .into(),
+            username: ini.get_from(Some("lrrbot"), "username").unwrap_or("lrrbot").into(),
 
             database_url: ini
                 .get_from(Some("lrrbot"), "postgres")
@@ -78,8 +75,7 @@ impl Config {
                 .into(),
 
             site_url: Url::parse(
-                ini.get_from(Some("lrrbot"), "siteurl")
-                    .unwrap_or("https://lrrbot.com/"),
+                ini.get_from(Some("lrrbot"), "siteurl").unwrap_or("https://lrrbot.com/"),
             )
             .context("failed to parse `siteurl`")?,
 
@@ -101,10 +97,7 @@ impl Config {
                 .unwrap_or("/tmp/eventserver.sock")
                 .into(),
             #[cfg(unix)]
-            eris_socket: ini
-                .get_from(Some("lrrbot"), "eris_socket")
-                .unwrap_or("eris.sock")
-                .into(),
+            eris_socket: ini.get_from(Some("lrrbot"), "eris_socket").unwrap_or("eris.sock").into(),
 
             #[cfg(not(unix))]
             lrrbot_port: Config::get_option_parsed(&ini, "socket_port")?.unwrap_or(49601),
@@ -173,10 +166,7 @@ impl Config {
                         String::from("loadingreadyrun"),
                         vec![ChannelId(322643668831961088)],
                     );
-                    twitter.insert(
-                        String::from("desertbus"),
-                        vec![ChannelId(370211226564689921)],
-                    );
+                    twitter.insert(String::from("desertbus"), vec![ChannelId(370211226564689921)]);
                     Ok(twitter)
                 })?,
 

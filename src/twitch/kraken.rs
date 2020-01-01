@@ -56,10 +56,7 @@ impl Kraken {
                 .client
                 .get(url)
                 .header("Client-ID", self.client_id.clone())
-                .header(
-                    ACCEPT,
-                    HeaderValue::from_static("application/vnd.twitchtv.v5+json"),
-                );
+                .header(ACCEPT, HeaderValue::from_static("application/vnd.twitchtv.v5+json"));
             if let Some(ref token) = token {
                 req = req.header(AUTHORIZATION, token.clone());
             }

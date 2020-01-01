@@ -120,10 +120,7 @@ impl Client {
     ) -> Result<oneshot::Receiver<Result<Value, Exception>>, Error> {
         let (tx, rx) = oneshot::channel();
 
-        self.channel
-            .send((req, tx))
-            .await
-            .context("failed to queue the request")?;
+        self.channel.send((req, tx)).await.context("failed to queue the request")?;
 
         Ok(rx)
     }
@@ -148,10 +145,8 @@ mod tests {
 
         let mut client = Client::from_stream(read);
 
-        let first = client
-            .call((String::from("test"), vec![], HashMap::new()))
-            .await
-            .expect("queue first");
+        let first =
+            client.call((String::from("test"), vec![], HashMap::new())).await.expect("queue first");
         let second = client
             .call((String::from("test"), vec![], HashMap::new()))
             .await
@@ -160,15 +155,9 @@ mod tests {
         // FIXME: `REQUEST` has a constant size so an array could be used instead but
         //  this currently requires `#![feature(const_slice_len)]`.
         let mut buf = vec![0; REQUEST.len()];
-        write
-            .read_exact(&mut buf[..])
-            .await
-            .expect("failed to read request");
+        write.read_exact(&mut buf[..]).await.expect("failed to read request");
         assert_eq!(&buf[..], REQUEST);
-        write
-            .write_all(RESPONSE)
-            .await
-            .expect("failed to write response");
+        write.write_all(RESPONSE).await.expect("failed to write response");
 
         assert_eq!(first.await.expect("first"), Ok(Value::Number(0.into())));
         assert_eq!(second.await.expect("second"), Ok(Value::Number(1.into())));

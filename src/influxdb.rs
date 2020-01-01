@@ -148,11 +148,7 @@ impl Measurement<'_, Complete> {
             if i != 0 {
                 buf.push(b',');
             }
-            Self::append_escaped(
-                buf,
-                key,
-                Self::is_special_for_tag_keys_tag_values_and_field_keys,
-            );
+            Self::append_escaped(buf, key, Self::is_special_for_tag_keys_tag_values_and_field_keys);
             buf.push(b'=');
             match value {
                 Value::Float(x) => {
@@ -201,10 +197,7 @@ pub struct InfluxDB {
 
 impl InfluxDB {
     pub fn new(client: Client, url: Url) -> InfluxDB {
-        InfluxDB {
-            client,
-            url: Arc::new(url),
-        }
+        InfluxDB { client, url: Arc::new(url) }
     }
 
     pub async fn write(&self, req: &[Measurement<'_, Complete>]) -> Result<(), Error> {
@@ -224,13 +217,9 @@ impl InfluxDB {
         match status {
             status if status.is_success() => Ok(()),
             status if status.is_client_error() || status.is_server_error() => {
-                let error = res
-                    .json::<InfluxError>()
-                    .await
-                    .context("failed to read the response")?;
-                Err(failure::err_msg(error.error)
-                    .context("server returned an error")
-                    .into())
+                let error =
+                    res.json::<InfluxError>().await.context("failed to read the response")?;
+                Err(failure::err_msg(error.error).context("server returned an error").into())
             }
             status => {
                 let body = res.bytes().await.context("failed to read the response")?;

@@ -39,10 +39,8 @@ mod typemap_keys;
 
 fn main() -> Result<(), failure::Error> {
     let decorator = slog_term::TermDecorator::new().build();
-    let term_drain = slog_term::FullFormat::new(decorator)
-        .build()
-        .filter_level(slog::Level::Info)
-        .fuse();
+    let term_drain =
+        slog_term::FullFormat::new(decorator).build().filter_level(slog::Level::Info).fuse();
 
     let limited_log = std::fs::OpenOptions::new()
         .write(true)
@@ -58,10 +56,8 @@ fn main() -> Result<(), failure::Error> {
         .context("failed to open the debug log file")?;
 
     let decorator = slog_term::PlainDecorator::new(limited_log);
-    let limited_drain = slog_term::FullFormat::new(decorator)
-        .build()
-        .filter_level(slog::Level::Info)
-        .fuse();
+    let limited_drain =
+        slog_term::FullFormat::new(decorator).build().filter_level(slog::Level::Info).fuse();
 
     let decorator = slog_term::PlainDecorator::new(debug_log);
     let full_drain = slog_term::FullFormat::new(decorator).build().fuse();
@@ -200,16 +196,13 @@ fn main() -> Result<(), failure::Error> {
             );
 
             #[cfg(unix)]
-            tokio::fs::remove_file(&config.eris_socket)
-                .await
-                .or_else(|err| {
-                    if err.kind() == std::io::ErrorKind::NotFound {
-                        Ok(())
-                    } else {
-                        Err(err)
+            {
+                if let Err(err) = tokio::fs::remove_file(&config.eris_socket).await {
+                    if err.kind() != std::io::ErrorKind::NotFound {
+                        return Err(err).context("failed to remove the socket file")?;
                     }
-                })
-                .context("failed to remove the socket file")?;
+                }
+            }
 
             {
                 let mut data = client.data.write();

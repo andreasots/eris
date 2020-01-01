@@ -13,10 +13,7 @@ pub struct Reconnect {
 
 impl Reconnect {
     pub fn new(factory: NewClient) -> Reconnect {
-        Reconnect {
-            factory,
-            client: Mutex::new(None),
-        }
+        Reconnect { factory, client: Mutex::new(None) }
     }
 
     async fn call_inner(
@@ -49,11 +46,7 @@ impl Reconnect {
     }
 
     pub async fn call(&self, req: Request) -> Result<Result<Value, Exception>, Error> {
-        let res = self
-            .call_inner(req)
-            .await?
-            .await
-            .context("client disconnected mid-request")?;
+        let res = self.call_inner(req).await?.await.context("client disconnected mid-request")?;
         Ok(res)
     }
 }

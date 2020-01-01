@@ -36,11 +36,7 @@ impl Log for Logger {
 
         let tag = "";
 
-        let s = RecordStatic {
-            location: &location,
-            tag,
-            level,
-        };
+        let s = RecordStatic { location: &location, tag, level };
         slog_scope::logger().log(&SlogRecord::new(&s, r.args(), b!()));
     }
 

@@ -37,10 +37,7 @@ impl<'de> Deserialize<'de> for FrameType {
                     0 => Ok(FrameType::Request),
                     1 => Ok(FrameType::Result),
                     2 => Ok(FrameType::Exception),
-                    n => Err(DeserializationError::custom(format!(
-                        "unknown frame type {}",
-                        n
-                    ))),
+                    n => Err(DeserializationError::custom(format!("unknown frame type {}", n))),
                 }
             }
         }
@@ -102,10 +99,9 @@ impl Decoder for ClientCodec {
             Some((FrameType::Exception, request_id, payload)) => {
                 Ok(Some((request_id, Err(serde_json::from_value(payload)?))))
             }
-            Some((ty, _, _)) => Err(Error::new(
-                ErrorKind::Other,
-                format!("response type {:?} invalid", ty),
-            )),
+            Some((ty, _, _)) => {
+                Err(Error::new(ErrorKind::Other, format!("response type {:?} invalid", ty)))
+            }
             None => Ok(None),
         }
     }
@@ -121,15 +117,8 @@ impl Encoder for ServerCodec {
         (request_id, payload): Self::Item,
         dst: &mut BytesMut,
     ) -> Result<(), Self::Error> {
-        let ty = if payload.is_ok() {
-            FrameType::Result
-        } else {
-            FrameType::Exception
-        };
-        encode_frame(
-            &(ty, request_id, payload.unwrap_or_else(Value::String)),
-            dst,
-        )
+        let ty = if payload.is_ok() { FrameType::Result } else { FrameType::Exception };
+        encode_frame(&(ty, request_id, payload.unwrap_or_else(Value::String)), dst)
     }
 }
 
@@ -139,10 +128,9 @@ impl Decoder for ServerCodec {
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         match decode_frame(src)? {
             Some((FrameType::Request, request_id, payload)) => Ok(Some((request_id, payload))),
-            Some((ty, _, _)) => Err(Error::new(
-                ErrorKind::Other,
-                format!("request type {:?} invalid", ty),
-            )),
+            Some((ty, _, _)) => {
+                Err(Error::new(ErrorKind::Other, format!("request type {:?} invalid", ty)))
+            }
             None => Ok(None),
         }
     }

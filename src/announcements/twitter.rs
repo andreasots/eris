@@ -14,10 +14,7 @@ async fn init(ctx: &ErisContext) -> Result<HashMap<u64, Vec<ChannelId>>, Error> 
     let (twitter, twitter_users) = {
         let data = ctx.data.read();
 
-        (
-            data.extract::<Twitter>()?.clone(),
-            data.extract::<Config>()?.twitter_users.clone(),
-        )
+        (data.extract::<Twitter>()?.clone(), data.extract::<Config>()?.twitter_users.clone())
     };
 
     let usernames = twitter_users.keys().map(|s| &s[..]).collect::<Vec<&str>>();

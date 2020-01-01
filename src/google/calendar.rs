@@ -58,10 +58,7 @@ pub struct Calendar {
 
 impl Calendar {
     pub fn new(client: Client, config: &Config) -> Calendar {
-        Calendar {
-            client,
-            key: config.google_key.clone(),
-        }
+        Calendar { client, key: config.google_key.clone() }
     }
 
     pub async fn get_upcoming_events<'a, Tz: TimeZone + 'a>(

@@ -30,13 +30,7 @@ struct StreamUp {
 
 impl Display for StreamUp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(
-            &self
-                .channel
-                .display_name
-                .as_ref()
-                .unwrap_or(&self.channel.name),
-        )?;
+        f.write_str(&self.channel.display_name.as_ref().unwrap_or(&self.channel.name))?;
         f.write_str(" is live with ")?;
         f.write_str(&self.what)?;
         if let Some(ref status) = self.channel.status {
@@ -55,20 +49,11 @@ async fn stream_up_inner(ctx: &ErisContext, channel: Channel) -> Result<(), Erro
     let (lrrbot, announcements_channel) = {
         let data = ctx.data.read();
 
-        (
-            data.extract::<LRRbot>()?.clone(),
-            data.extract::<Config>()?.announcements,
-        )
+        (data.extract::<LRRbot>()?.clone(), data.extract::<Config>()?.announcements)
     };
 
-    let game_id = lrrbot
-        .get_game_id()
-        .await
-        .context("failed to get the game ID")?;
-    let show_id = lrrbot
-        .get_show_id()
-        .await
-        .context("failed to get the show ID")?;
+    let game_id = lrrbot.get_game_id().await.context("failed to get the game ID")?;
+    let show_id = lrrbot.get_show_id().await.context("failed to get the show ID")?;
 
     let (game, show, game_entry) = {
         let conn = ctx
@@ -97,14 +82,10 @@ async fn stream_up_inner(ctx: &ErisContext, channel: Channel) -> Result<(), Erro
         let game = game.as_ref();
         let game_entry = game_entry.as_ref();
         let game_display_name = game.map(|game| {
-            game_entry
-                .and_then(|entry| entry.display_name.as_ref())
-                .unwrap_or(&game.name)
+            game_entry.and_then(|entry| entry.display_name.as_ref()).unwrap_or(&game.name)
         });
 
-        game_display_name
-            .map(|name| format!("{} on {}", name, show.name))
-            .unwrap_or(show.name)
+        game_display_name.map(|name| format!("{} on {}", name, show.name)).unwrap_or(show.name)
     };
 
     tokio::task::block_in_place(|| {
