@@ -7,7 +7,7 @@ use crate::twitch::{Helix, Kraken};
 use crate::twitter::Twitter;
 use serenity::prelude::TypeMapKey;
 use std::sync::Arc;
-use tokio::runtime::TaskExecutor;
+use tokio::runtime::Handle;
 
 // Local types
 
@@ -52,7 +52,7 @@ impl TypeMapKey for Twitter {
 pub enum Executor {}
 
 impl TypeMapKey for Executor {
-    type Value = TaskExecutor;
+    type Value = Handle;
 }
 
 pub enum PgPool {}

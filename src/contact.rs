@@ -6,11 +6,8 @@ use crate::truncate::truncate;
 use chrono::TimeZone;
 use chrono::{DateTime, Utc};
 use failure::{Error, ResultExt};
-use futures::compat::Stream01CompatExt;
-use futures::TryStreamExt;
 use slog_scope::{error, info};
-use std::time::{Duration, Instant};
-use tokio::timer::Interval;
+use std::time::Duration;
 
 const SENT_KEY: &str = "lrrbot.sent";
 
@@ -26,17 +23,13 @@ pub async fn post_messages(ctx: ErisContext) {
         return;
     };
 
-    let mut timer = Interval::new(Instant::now(), Duration::from_secs(60)).compat();
+    let mut timer = tokio::time::interval(Duration::from_secs(60));
 
     loop {
-        match timer.try_next().await {
-            Ok(Some(_)) => {
-                if let Err(err) = inner(&ctx).await {
-                    error!("Failed to post new messages"; "error" => ?err);
-                }
-            }
-            Ok(None) => break,
-            Err(err) => error!("Timer error"; "error" => ?err),
+        timer.tick().await;
+
+        if let Err(err) = inner(&ctx).await {
+            error!("Failed to post new messages"; "error" => ?err);
         }
     }
 }
@@ -138,7 +131,7 @@ async fn inner(ctx: &ErisContext) -> Result<(), Error> {
         .ok_or_else(|| failure::err_msg("no sheets or required information missing"))?;
 
     for message in unsent {
-        crate::blocking::blocking(|| {
+        tokio::task::block_in_place(|| {
             mods_channel.send_message(ctx, |m| {
                 m.content("New message from the contact form:")
                     .embed(|mut embed| {
@@ -156,8 +149,6 @@ async fn inner(ctx: &ErisContext) -> Result<(), Error> {
                     })
             })
         })
-        .await
-        .context("failed to exit the runtime")?
         .context("failed to forward the message")?;
 
         sheets

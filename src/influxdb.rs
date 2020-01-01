@@ -1,13 +1,11 @@
 use failure::{Error, ResultExt};
-use futures::compat::Future01CompatExt;
-use reqwest::r#async::{Body, Client};
+use reqwest::{Body, Client};
 use serde::Deserialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::Write;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use tokio::prelude::Stream as Stream01;
 use url::Url;
 
 pub enum New {}
@@ -214,12 +212,11 @@ impl InfluxDB {
             return Ok(());
         }
 
-        let mut res = self
+        let res = self
             .client
             .post(self.url.as_str())
             .body(WriteRequest(req))
             .send()
-            .compat()
             .await
             .context("failed to send the request")?;
         // For some reason if you `match` on `res.status()` a `&Response` gets saved in the generator, making it not `Sync`.
@@ -229,7 +226,6 @@ impl InfluxDB {
             status if status.is_client_error() || status.is_server_error() => {
                 let error = res
                     .json::<InfluxError>()
-                    .compat()
                     .await
                     .context("failed to read the response")?;
                 Err(failure::err_msg(error.error)
@@ -237,12 +233,7 @@ impl InfluxDB {
                     .into())
             }
             status => {
-                let body = res
-                    .into_body()
-                    .concat2()
-                    .compat()
-                    .await
-                    .context("failed to read the response")?;
+                let body = res.bytes().await.context("failed to read the response")?;
                 unimplemented!(
                     "status code {} {}, response: {:?}",
                     status.as_str(),

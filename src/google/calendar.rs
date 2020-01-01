@@ -2,8 +2,7 @@ use crate::config::Config;
 use chrono::Duration;
 use chrono::{DateTime, FixedOffset, TimeZone};
 use failure::{Error, ResultExt};
-use futures::compat::Future01CompatExt;
-use reqwest::r#async::Client;
+use reqwest::Client;
 use reqwest::Url;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::cmp;
@@ -95,13 +94,11 @@ impl Calendar {
                 key: &self.key,
             })
             .send()
-            .compat()
             .await
             .context("failed to get calendar events")?
             .error_for_status()
             .context("request failed")?
             .json::<ListEventsResponse>()
-            .compat()
             .await
             .context("failed to parse calendar events")?
             .items)

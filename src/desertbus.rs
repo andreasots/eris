@@ -2,8 +2,7 @@ use chrono::{DateTime, TimeZone};
 use chrono_tz::America::Vancouver as TIMEZONE;
 use chrono_tz::Tz;
 use failure::{Error, ResultExt};
-use futures::compat::Future01CompatExt;
-use reqwest::r#async::Client;
+use reqwest::Client;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -46,11 +45,9 @@ impl DesertBus {
             .client
             .get("https://desertbus.org/wapi/init")
             .send()
-            .compat()
             .await
             .context("failed to get the current Desert Bus total")?
             .json::<Init>()
-            .compat()
             .await
             .context("failed to parse the current Desert Bus total")?
             .total)

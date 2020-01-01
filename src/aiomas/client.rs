@@ -1,21 +1,16 @@
 use super::codec::{ClientCodec, Exception, Request};
 use failure::{Error, Fail, ResultExt};
 use futures::channel::{mpsc, oneshot};
-use futures::compat::{Future01CompatExt, Stream01CompatExt};
 use futures::prelude::*;
 use futures::select;
 use serde_json::Value;
 use slog_scope::error;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use tokio::codec::Framed;
-use tokio::runtime::TaskExecutor;
-
-use tokio::prelude::Sink as Sink01;
-use tokio::prelude::Stream as Stream01;
+use tokio_util::codec::Framed;
 
 #[cfg(unix)]
-use tokio::net::unix::UnixStream;
+use tokio::net::UnixStream;
 
 #[cfg(not(unix))]
 use tokio::net::TcpStream;
@@ -26,41 +21,30 @@ pub struct NewClient {
 
     #[cfg(not(unix))]
     port: u16,
-
-    executor: TaskExecutor,
 }
 
 #[cfg(unix)]
 impl NewClient {
-    pub fn new<P: Into<PathBuf>>(path: P, executor: TaskExecutor) -> NewClient {
-        NewClient {
-            path: path.into(),
-            executor,
-        }
+    pub fn new<P: Into<PathBuf>>(path: P) -> NewClient {
+        NewClient { path: path.into() }
     }
 
     pub async fn new_client(&self) -> Result<Client, Error> {
-        Ok(Client::from_stream(
-            UnixStream::connect(&self.path).compat().await?,
-            self.executor.clone(),
-        ))
+        Ok(Client::from_stream(UnixStream::connect(&self.path).await?))
     }
 }
 
 #[cfg(not(unix))]
 impl NewClient {
-    pub fn new(port: u16, executor: TaskExecutor) -> NewClient {
-        NewClient { port, executor }
+    pub fn new(port: u16) -> NewClient {
+        NewClient { port }
     }
 
     pub async fn new_service(&self) -> Result<Client, Error> {
         use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 
         let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), self.port);
-        Ok(Client::from_stream(
-            TcpStream::connect(&addr).compat().await?,
-            self.executor.clone(),
-        ))
+        Ok(Client::from_stream(TcpStream::connect(&addr).await?))
     }
 }
 
@@ -71,16 +55,10 @@ pub struct Client {
 impl Client {
     fn from_stream<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + 'static>(
         stream: S,
-        executor: TaskExecutor,
     ) -> Client {
         let (tx, rx) = mpsc::channel(16);
 
-        executor.spawn(
-            Client::dispatch(rx, Framed::new(stream, ClientCodec))
-                .unit_error()
-                .boxed()
-                .compat(),
-        );
+        tokio::spawn(Client::dispatch(rx, Framed::new(stream, ClientCodec)));
 
         Client { channel: tx }
     }
@@ -89,12 +67,11 @@ impl Client {
         mut channel: mpsc::Receiver<(Request, oneshot::Sender<Result<Value, Exception>>)>,
         stream: T,
     ) where
-        T: Sink01<SinkItem = (u64, Request), SinkError = E>
-            + Stream01<Item = (u64, Result<Value, Exception>), Error = E>,
+        T: Sink<(u64, Request), Error = E>
+            + Stream<Item = Result<(u64, Result<Value, Exception>), E>>,
         E: Fail,
     {
-        let (mut sink, stream) = stream.split();
-        let mut stream = stream.compat();
+        let (mut sink, mut stream) = stream.split();
 
         let mut pending = HashMap::<u64, oneshot::Sender<Result<Value, Exception>>>::new();
         let mut next_request_id = 0;
@@ -111,12 +88,9 @@ impl Client {
                             //  if the result of `pending.insert()` is not used the compiler ICEs.
                             drop(pending.insert(request_id, channel));
 
-                            sink = match sink.send((request_id, request)).compat().await {
-                                Ok(sink) => sink,
-                                Err(err) => {
-                                    error!("Failed to send the request"; "error" => ?err);
-                                    return;
-                                },
+                            if let Err(err) = sink.send((request_id, request)).await {
+                                error!("Failed to send the request"; "error" => ?err);
+                                return;
                             };
                         },
                         None => return,
@@ -159,61 +133,44 @@ impl Client {
 #[cfg(all(test, unix))]
 mod tests {
     use super::Client;
-    use failure::{Error, ResultExt};
-    use futures::compat::Future01CompatExt;
-    use futures::prelude::*;
     use serde_json::Value;
     use std::collections::HashMap;
-    use tokio::io;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::UnixStream;
-    use tokio::runtime::Runtime;
 
-    #[test]
-    fn smoke_test() {
+    #[tokio::test]
+    async fn smoke_test() {
         const REQUEST: &[u8] =
             b"\x00\x00\x00\x14[0,0,[\"test\",[],{}]]\x00\x00\x00\x14[0,1,[\"test\",[],{}]]";
         const RESPONSE: &[u8] = b"\x00\x00\x00\x09[1, 1, 1]\x00\x00\x00\x09[1, 0, 0]";
 
-        let mut runtime = Runtime::new().unwrap();
-        let executor = runtime.executor();
-        runtime
-            .block_on::<_, (), Error>(
-                async move {
-                    let (read, mut write) =
-                        UnixStream::pair().context("failed to create a socket pair")?;
+        let (read, mut write) = UnixStream::pair().expect("failed to create a socket pair");
 
-                    let mut client = Client::from_stream(read, executor);
+        let mut client = Client::from_stream(read);
 
-                    let first = client
-                        .call((String::from("test"), vec![], HashMap::new()))
-                        .await
-                        .context("queue first")?;
-                    let second = client
-                        .call((String::from("test"), vec![], HashMap::new()))
-                        .await
-                        .context("queue second")?;
+        let first = client
+            .call((String::from("test"), vec![], HashMap::new()))
+            .await
+            .expect("queue first");
+        let second = client
+            .call((String::from("test"), vec![], HashMap::new()))
+            .await
+            .expect("queue second");
 
-                    // FIXME: `REQUEST` has a constant size so an array could be used instead but
-                    //  this currently requires `#![feature(const_slice_len)]`.
-                    let mut buf = vec![0; REQUEST.len()];
-                    io::read_exact(&mut write, &mut buf[..])
-                        .compat()
-                        .await
-                        .context("failed to read request")?;
-                    assert_eq!(&buf[..], REQUEST);
-                    io::write_all(&mut write, RESPONSE)
-                        .compat()
-                        .await
-                        .context("failed to write response")?;
+        // FIXME: `REQUEST` has a constant size so an array could be used instead but
+        //  this currently requires `#![feature(const_slice_len)]`.
+        let mut buf = vec![0; REQUEST.len()];
+        write
+            .read_exact(&mut buf[..])
+            .await
+            .expect("failed to read request");
+        assert_eq!(&buf[..], REQUEST);
+        write
+            .write_all(RESPONSE)
+            .await
+            .expect("failed to write response");
 
-                    assert_eq!(first.await.context("first")?, Ok(Value::Number(0.into())));
-                    assert_eq!(second.await.context("second")?, Ok(Value::Number(1.into())));
-
-                    Ok(())
-                }
-                    .boxed()
-                    .compat(),
-            )
-            .unwrap();
+        assert_eq!(first.await.expect("first"), Ok(Value::Number(0.into())));
+        assert_eq!(second.await.expect("second"), Ok(Value::Number(1.into())));
     }
 }

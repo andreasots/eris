@@ -1,4 +1,4 @@
-use bytes::{BufMut, BytesMut};
+use bytes::{Buf, BufMut, BytesMut};
 use serde::de::{Error as DeserializationError, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{self, Value};
@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fmt::{Formatter, Result as FmtResult};
 use std::io::{Error, ErrorKind};
 use std::u32;
-use tokio::codec::{Decoder, Encoder};
+use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Copy, Clone, Debug)]
 enum FrameType {
@@ -56,7 +56,7 @@ fn encode_frame<T: Serialize>(frame: &Frame<T>, dst: &mut BytesMut) -> Result<()
     if request.len() > u32::MAX as usize {
         return Err(Error::new(ErrorKind::Other, "request larger than u32::MAX"));
     }
-    dst.put_u32_be(request.len() as u32);
+    dst.put_u32(request.len() as u32);
     dst.put_slice(&request);
     Ok(())
 }

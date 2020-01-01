@@ -1,9 +1,8 @@
 use crate::config::Config;
 use chrono::{DateTime, FixedOffset};
 use failure::{Error, ResultExt};
-use futures::compat::Future01CompatExt;
 use reqwest::header::HeaderValue;
-use reqwest::r#async::Client;
+use reqwest::Client;
 use serde::de::{Error as SerdeError, Visitor};
 use serde::{Deserialize, Deserializer};
 use std::fmt;
@@ -104,13 +103,11 @@ impl Helix {
             .header("Client-ID", self.client_id.clone())
             .query(&user.as_query()[..])
             .send()
-            .compat()
             .await
             .context("failed to send the request")?
             .error_for_status()
             .context("request failed")?
             .json::<PaginatedResponse<Stream>>()
-            .compat()
             .await
             .context("failed to read the response")?
             .data

@@ -11,7 +11,7 @@ build = "build.rs"
 lalrpop = { version = "0.17.2", default-features = false }
 
 [dependencies]
-bytes = { version = "0.4.12", default-features = false }
+bytes = { version = "0.5.3", default-features = false }
 chrono = { version = "0.4.10", default-features = false }
 chrono-tz = { version = "0.5.1", default-features = false }
 clap = { version = "2.33.0", default-features = false }
@@ -20,7 +20,7 @@ diesel_full_text_search = { version = "1.0.1", default-features = false }
 egg-mode-text = { version = "1.14.7", default-features = false }
 eris-macros = { path = "eris-macros" }
 failure = { version = "0.1.6", default-features = false }
-futures = { version = "0.3.1", default-features = false, features = ["async-await", "compat"] }
+futures = { version = "0.3.1", default-features = false, features = ["std", "async-await"] }
 inventory = { version = "0.1.5", default-features = false }
 joinery = "2.0.0"
 jsonwebtoken = { version = "7.0.0-alpha.2", default-features = false }
@@ -29,7 +29,7 @@ lazy_static = { version = "1.4.0", default-features = false }
 log = { version = "0.4.10", default-features = false, features = ["max_level_trace", "release_max_level_info", "std"] }
 rand = { version = "0.7.2", default-features = false, features = ["std"] }
 regex = { version = "1.3.1", default-features = false, features = ["perf", "std", "unicode"] }
-reqwest = { version = "0.9.24", default-features = false, features = ["rustls-tls"] }
+reqwest = { version = "0.10.0", default-features = false, features = ["rustls-tls", "json"] }
 rust-ini = { version = "0.13.0", default-features = false }
 separator = { version = "0.4.1", default-features = false }
 serde = { version = "1.0.104", default-features = false, features = ["derive"] }
@@ -40,15 +40,10 @@ slog-async = { version = "2.3.0", default-features = false }
 slog-scope = { version = "4.3.0", default-features = false }
 slog-term = { version = "2.4.2", default-features = false }
 strfmt = { version = "0.1.6", default-features = false }
-tokio-threadpool = { version = "0.1.17", default-features = false }
-unicode-width = "0.1.7"
+tokio = { version = "0.2.6", default-features = false, features = ["uds", "tcp", "fs", "io-util", "rt-threaded", "blocking", "macros", "time", "stream"] }
+tokio-util = { version = "0.2.0", default-features = false, features = ["codec"] }
+unicode-width = { version = "0.1.7", default-features = false }
 url = { version = "2.1.0", default-features = false }
-
-[target.'cfg(unix)'.dependencies]
-tokio = { version = "0.1.22", default-features = false, features = ["codec", "fs", "uds"] }
-
-[target.'cfg(not(unix))'.dependencies]
-tokio = { version = "0.1.22", default-features = false, features = ["codec", "fs", "tcp"] }
 
 [dev-dependencies]
 pin-utils = { version = "0.1.0-alpha.4", default-features = false }

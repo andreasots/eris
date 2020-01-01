@@ -2,13 +2,13 @@
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use failure::{Error, ResultExt};
-use futures::compat::Future01CompatExt;
 use futures::lock::Mutex;
 use jsonwebtoken::{Algorithm, Header};
-use reqwest::r#async::Client;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 
 const TOKEN_URI: &str = "https://www.googleapis.com/oauth2/v4/token";
 
@@ -65,12 +65,11 @@ impl ServiceAccount {
         let now = Utc::now();
 
         if token.expires <= now {
-            let file = File::open(self.key_path.clone())
-                .compat()
+            let mut file = File::open(&self.key_path)
                 .await
                 .context("failed to open the service account key JSON file")?;
-            let (_, content) = tokio::io::read_to_end(file, vec![])
-                .compat()
+            let mut content = vec![];
+            file.read_to_end(&mut content)
                 .await
                 .context("failed to read the service account key JSON file")?;
             let key = serde_json::from_slice::<'_, ServiceAccountKey>(&content)
@@ -97,13 +96,11 @@ impl ServiceAccount {
                     ("assertion", &jwt),
                 ])
                 .send()
-                .compat()
                 .await
                 .context("failed to request a OAuth2 token")?
                 .error_for_status()
                 .context("request failed")?
                 .json::<NewToken>()
-                .compat()
                 .await
                 .context("failed to read the response")?;
             if new_token.token_type != "Bearer" {
