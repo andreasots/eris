@@ -26,9 +26,7 @@ pub struct NewClient {
 #[cfg(unix)]
 impl NewClient {
     pub fn new<P: Into<PathBuf>>(path: P) -> NewClient {
-        NewClient {
-            path: path.into(),
-        }
+        NewClient { path: path.into() }
     }
 
     pub async fn new_client(&self) -> Result<Client, Error> {
@@ -137,8 +135,8 @@ mod tests {
     use super::Client;
     use serde_json::Value;
     use std::collections::HashMap;
-    use tokio::net::UnixStream;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::UnixStream;
 
     #[tokio::test]
     async fn smoke_test() {
@@ -146,8 +144,7 @@ mod tests {
             b"\x00\x00\x00\x14[0,0,[\"test\",[],{}]]\x00\x00\x00\x14[0,1,[\"test\",[],{}]]";
         const RESPONSE: &[u8] = b"\x00\x00\x00\x09[1, 1, 1]\x00\x00\x00\x09[1, 0, 0]";
 
-        let (read, mut write) =
-            UnixStream::pair().expect("failed to create a socket pair");
+        let (read, mut write) = UnixStream::pair().expect("failed to create a socket pair");
 
         let mut client = Client::from_stream(read);
 
@@ -163,11 +160,13 @@ mod tests {
         // FIXME: `REQUEST` has a constant size so an array could be used instead but
         //  this currently requires `#![feature(const_slice_len)]`.
         let mut buf = vec![0; REQUEST.len()];
-        write.read_exact(&mut buf[..])
+        write
+            .read_exact(&mut buf[..])
             .await
             .expect("failed to read request");
         assert_eq!(&buf[..], REQUEST);
-        write.write_all(RESPONSE)
+        write
+            .write_all(RESPONSE)
             .await
             .expect("failed to write response");
 

@@ -233,10 +233,7 @@ impl InfluxDB {
                     .into())
             }
             status => {
-                let body = res
-                    .bytes()
-                    .await
-                    .context("failed to read the response")?;
+                let body = res.bytes().await.context("failed to read the response")?;
                 unimplemented!(
                     "status code {} {}, response: {:?}",
                     status.as_str(),

@@ -1,4 +1,4 @@
-use bytes::{BufMut, BytesMut, Buf};
+use bytes::{Buf, BufMut, BytesMut};
 use serde::de::{Error as DeserializationError, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{self, Value};

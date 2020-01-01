@@ -8,7 +8,7 @@ use failure::{Error, ResultExt};
 use serenity::model::id::ChannelId;
 use slog_scope::{error, info};
 use std::collections::HashMap;
-use std::time::{Duration};
+use std::time::Duration;
 
 async fn init(ctx: &ErisContext) -> Result<HashMap<u64, Vec<ChannelId>>, Error> {
     let (twitter, twitter_users) = {

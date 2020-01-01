@@ -16,7 +16,7 @@ use failure::{Error, ResultExt};
 use separator::FixedPlaceSeparatable;
 use slog_scope::error;
 use std::fmt;
-use std::time::{Duration};
+use std::time::Duration;
 
 struct EventDisplay<'a> {
     event: &'a Event,

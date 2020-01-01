@@ -8,7 +8,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tokio::fs::File;
-use tokio::io::{AsyncReadExt};
+use tokio::io::AsyncReadExt;
 
 const TOKEN_URI: &str = "https://www.googleapis.com/oauth2/v4/token";
 

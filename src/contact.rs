@@ -7,7 +7,7 @@ use chrono::TimeZone;
 use chrono::{DateTime, Utc};
 use failure::{Error, ResultExt};
 use slog_scope::{error, info};
-use std::time::{Duration};
+use std::time::Duration;
 
 const SENT_KEY: &str = "lrrbot.sent";
 

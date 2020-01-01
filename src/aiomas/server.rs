@@ -53,10 +53,7 @@ pub struct Server<C: 'static> {
 
 impl<C: Clone + Send + 'static> Server<C> {
     #[cfg(unix)]
-    pub fn new<P: AsRef<Path>>(
-        path: P,
-        context: C,
-    ) -> Result<Server<C>, Error> {
+    pub fn new<P: AsRef<Path>>(path: P, context: C) -> Result<Server<C>, Error> {
         let listener = UnixListener::bind(path).context("failed to create a listening socket")?;
 
         Ok(Server {
@@ -101,13 +98,11 @@ impl<C: Clone + Send + 'static> Server<C> {
         loop {
             match listener.try_next().await {
                 Ok(Some(socket)) => {
-                    tokio::spawn(
-                        Server::process(
-                            methods.clone(),
-                            Framed::new(socket, ServerCodec),
-                            context.clone(),
-                        )
-                    );
+                    tokio::spawn(Server::process(
+                        methods.clone(),
+                        Framed::new(socket, ServerCodec),
+                        context.clone(),
+                    ));
                 }
                 Ok(None) => return,
                 Err(err) => error!("Failed to accept an incoming connection"; "error" => ?err),
@@ -129,16 +124,14 @@ impl<C: Clone + Send + 'static> Server<C> {
     {
         let (mut sink, mut stream) = transport.split();
         let (tx, mut rx) = mpsc::channel(16);
-        tokio::spawn(
-            async move {
-                while let Some(response) = rx.next().await {
-                    if let Err(err) = sink.send(response).await {
-                        error!("Failed to send a response"; "error" => ?err);
-                        break;
-                    }
+        tokio::spawn(async move {
+            while let Some(response) = rx.next().await {
+                if let Err(err) = sink.send(response).await {
+                    error!("Failed to send a response"; "error" => ?err);
+                    break;
                 }
             }
-        );
+        });
 
         loop {
             match stream.try_next().await {
