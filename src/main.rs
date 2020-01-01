@@ -262,7 +262,7 @@ fn main() -> Result<(), failure::Error> {
 
             tokio::spawn(autotopic::autotopic(ctx.clone()));
 
-            tokio::spawn(contact::post_messages(ctx.clone()));
+            tokio::spawn(contact::post_messages(ctx));
 
             tokio::task::block_in_place(|| client.start())
                 .map_err(failure::SyncFailure::new)
