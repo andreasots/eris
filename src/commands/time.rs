@@ -6,15 +6,10 @@ use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
 
-group!({
-    name: "Time",
-    options: {
-        description: "Time commands",
-    },
-    commands: [
-        time,
-    ],
-});
+#[group("Time")]
+#[description = "Time commands"]
+#[commands(time)]
+struct Time;
 
 #[command]
 #[description = "Post the current moonbase time, optionally in the 24-hour format."]

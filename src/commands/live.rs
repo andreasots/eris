@@ -12,15 +12,10 @@ use serenity::model::prelude::*;
 use serenity::prelude::*;
 use serenity::utils::MessageBuilder;
 
-group!({
-    name: "Fanstreams",
-    options: {
-        description: "Fanstream commands",
-    },
-    commands: [
-        live,
-    ],
-});
+#[group("Fanstreams")]
+#[description = "Fanstream commands"]
+#[commands(live)]
+struct Fanstreams;
 
 fn push_stream(builder: &mut MessageBuilder, stream: &Stream) {
     // FIXME: the MessageBuilder doesn't escape spoilers

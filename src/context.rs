@@ -1,4 +1,4 @@
-use serenity::http::raw::Http;
+use serenity::http::client::Http;
 use serenity::prelude::{RwLock, ShareMap};
 use serenity::{CacheAndHttp, Client};
 use std::sync::Arc;

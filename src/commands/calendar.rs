@@ -16,16 +16,10 @@ use std::fmt::Display;
 use std::str::FromStr;
 use url::Url;
 
-group!({
-    name: "Calendar",
-    options: {
-        description: "Commands to query the streaming calendars.",
-    },
-    commands: [
-        next,
-        nextfan,
-    ],
-});
+#[group("Calendar")]
+#[description("Connands to query the streaming calendars.")]
+#[commands(next, nextfan)]
+struct Calendar;
 
 #[command]
 #[help_available]
@@ -35,7 +29,7 @@ group!({
 #[min_args("0")]
 #[max_args("1")]
 pub fn next(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
-    Calendar::lrr().execute(ctx, msg, args)
+    Next::lrr().execute(ctx, msg, args)
 }
 
 #[command]
@@ -46,7 +40,7 @@ pub fn next(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
 #[min_args("0")]
 #[max_args("1")]
 pub fn nextfan(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
-    Calendar::fan().execute(ctx, msg, args)
+    Next::fan().execute(ctx, msg, args)
 }
 
 struct Timezone(Tz);
@@ -112,19 +106,19 @@ impl PushEvent for MessageBuilder {
     }
 }
 
-struct Calendar {
+struct Next {
     calendar: &'static str,
     tag: &'static str,
     include_current: bool,
 }
 
-impl Calendar {
-    pub const fn lrr() -> Calendar {
-        Calendar { calendar: LRR, tag: "Next scheduled stream", include_current: false }
+impl Next {
+    pub const fn lrr() -> Next {
+        Next { calendar: LRR, tag: "Next scheduled stream", include_current: false }
     }
 
-    pub const fn fan() -> Calendar {
-        Calendar { calendar: FANSTREAMS, tag: "Next scheduled fan stream", include_current: true }
+    pub const fn fan() -> Next {
+        Next { calendar: FANSTREAMS, tag: "Next scheduled fan stream", include_current: true }
     }
 
     pub fn execute(&self, ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {

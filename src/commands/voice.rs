@@ -5,15 +5,10 @@ use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
 
-group!({
-    name: "Voice",
-    options: {
-        description: "Voice channel commands",
-    },
-    commands: [
-        voice,
-    ],
-});
+#[group("Voice")]
+#[description = "Voice channel commands"]
+#[commands(voice)]
+struct Voice;
 
 #[command]
 #[description = "Create a temporary voice channel. Unused temporary voice channels will be automatically deleted if they're older than 15 minutes."]

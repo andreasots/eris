@@ -37,32 +37,22 @@ use unicode_width::UnicodeWidthStr;
 // Subgroups gets us everything we want but parts of this seem very hacky and probably need issues
 // filed against Serenity. The user facing downside of this approach is a visible subgroup in
 // `!help`.
-group!({
-    name: "Quote",
-    options: {
-        description: "Commands for querying the quote database.\n\nPlease keep in mind that many of the following quotes are taken out of context, be it for comedic effect or out of necessity. Take all of them with a grain of salt and bear in mind they don't necessarily reflect their originators' views and opinions. That being said, if you find any quote to be particularly awful, please notify the moderator of your choice to have its removal evaluated.",
-    },
-    commands: [
-        // The subgroup seems to override matching `!quote` so in effect this only registers the
-        // `!findquote` and the help text for `!quote`.
-        quote,
-    ],
-    sub_groups: [
-        {
-            name: "detailed_information",
-            help_name: "Detailed information",
-            options: {
-                prefixes: ["quote"],
-                // Enable matching of the bare `!quote`.
-                default_command: quote,
-            },
-            commands: [
-                details,
-                query_debugger,
-            ]
-        },
-    ],
-});
+#[group("Detailed information")]
+#[prefix = "quote"]
+// Enable matching of the bare `!quote`.
+#[default_command(quote)]
+#[commands(details, query_debugger)]
+struct DetailedInformation;
+
+#[group("Quote")]
+#[description = "Commands for querying the quote database.\n\nPlease keep in mind that many of the following quotes are taken out of context, be it for comedic effect or out of necessity. Take all of them with a grain of salt and bear in mind they don't necessarily reflect their originators' views and opinions. That being said, if you find any quote to be particularly awful, please notify the moderator of your choice to have its removal evaluated."]
+// The subgroup seems to override matching `!quote` so in effect this only registers the `!findquote` and the help text for `!quote`.
+#[commands(quote)]
+#[sub_groups(DetailedInformation)]
+// `Quote` conflicts with the `Quote` model.
+struct QuoteGroup;
+
+pub use self::QUOTEGROUP_GROUP as QUOTE_GROUP;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
 pub enum Op {
@@ -391,31 +381,27 @@ fn report_parse_error(
 }
 
 #[command]
-#[description = "Search for a quote in the quote database.
-
-You can search for a quote by its ID or by using the query language.
-
-The query language is designed such that you can still type words in and get vaguely relevant quotes back.
-
-A query is broken up into terms. A term is either an unquoted word (eg. `butts`), a quoted phrase (eg. `\"my butt\"`), or a column name (`context`, `date`, `from`/`name`, `game`, `id`, `quote`/`text`, `show`) followed by an operator (the fuzzy search operator `:` or a relational operator `<`, `=`, `>`, `>=`, `<=`) followed by an unquoted word or a quoted phrase (eg. `quote:butts`).
-
-Multiple terms can be combined together to form a more complex query. By default when you write two terms one after the other both need to match the quote (boolean AND). If the two terms are separated by a `|` then either of them needs to match the quote (boolean OR). AND has higher precedence than OR but you can use parentheses to override that.
-
-When a query matches multiple quotes a random one is picked. An empty query matches all quotes.
-
-**Examples:**
- * `!quote`
- * `!quote 3849`
- * `!quote findquote butts`
- * `!quote context:pants`
- * `!quote from:Serge robot`
- * `!quote id < 1000`
- * `!quote date >= 2019-01-01`
- * `!quote (show:\"IDDQDerp\" | show:\"Let's NOPE\" | show:\"Watch and Play\") from:Alex \"long pig\"`
-"]
 #[aliases(findquote)]
 #[usage = "[ID | QUERY]"]
+#[example = ""]
+#[example = "3849"]
+#[example = "findquote butts"]
+#[example = "context:pants"]
 #[example = "from:alex butts"]
+#[example = "id < 1000"]
+#[example = "date >= 2019-01-01"]
+#[example = "(show:\"IDDQDerp\" | show:\"Let's NOPE\" | show:\"Watch and Play\") from:Alex \"long pig\""]
+/// Search for a quote in the quote database.
+///
+/// You can search for a quote by its ID or by using the query language.
+///
+/// The query language is designed such that you can still type words in and get vaguely relevant quotes back.
+///
+/// A query is broken up into terms. A term is either an unquoted word (eg. `butts`), a quoted phrase (eg. `\"my butt\"`), or a column name (`context`, `date`, `from`/`name`, `game`, `id`, `quote`/`text`, `show`) followed by an operator (the fuzzy search operator `:` or a relational operator `<`, `=`, `>`, `>=`, `<=`) followed by an unquoted word or a quoted phrase (eg. `quote:butts`).
+///
+/// Multiple terms can be combined together to form a more complex query. By default when you write two terms one after the other both need to match the quote (boolean AND). If the two terms are separated by a `|` then either of them needs to match the quote (boolean OR). AND has higher precedence than OR but you can use parentheses to override that.
+///
+///When a query matches multiple quotes a random one is picked. An empty query matches all quotes.
 fn quote(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
     let data = ctx.data.read();
     let conn = data.extract::<PgPool>()?.get()?;

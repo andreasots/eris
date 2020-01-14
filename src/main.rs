@@ -142,14 +142,15 @@ fn main() -> Result<(), failure::Error> {
             .await
             .context("failed to initialise the Twitter client")?;
 
-            let mut client = serenity::Client::new(&config.discord_botsecret, handler)
-                .map_err(failure::SyncFailure::new)
-                .context("failed to create the Discord client")?;
-            let current_application_info = client
-                .cache_and_http
-                .http
-                .get_current_application_info()
-                .context("failed to fetch the current application information")?;
+            let mut client = tokio::task::block_in_place(|| {
+                serenity::Client::new(&config.discord_botsecret, handler)
+            })
+            .map_err(failure::SyncFailure::new)
+            .context("failed to create the Discord client")?;
+            let current_application_info = tokio::task::block_in_place(|| {
+                client.cache_and_http.http.get_current_application_info()
+            })
+            .context("failed to fetch the current application information")?;
             client.with_framework(
                 serenity::framework::StandardFramework::new()
                     .configure(|c| {
