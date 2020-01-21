@@ -3,7 +3,7 @@
 #[macro_use]
 extern crate diesel;
 
-use failure::ResultExt;
+use anyhow::{Context, Error};
 
 use crate::context::ErisContext;
 use crate::extract::Extract;
@@ -37,7 +37,7 @@ mod twitch;
 mod twitter;
 mod typemap_keys;
 
-fn main() -> Result<(), failure::Error> {
+fn main() -> Result<(), Error> {
     let decorator = slog_term::TermDecorator::new().build();
     let term_drain =
         slog_term::FullFormat::new(decorator).build().filter_level(slog::Level::Info).fuse();
@@ -145,7 +145,6 @@ fn main() -> Result<(), failure::Error> {
             let mut client = tokio::task::block_in_place(|| {
                 serenity::Client::new(&config.discord_botsecret, handler)
             })
-            .map_err(failure::SyncFailure::new)
             .context("failed to create the Discord client")?;
             let current_application_info = tokio::task::block_in_place(|| {
                 client.cache_and_http.http.get_current_application_info()
@@ -259,7 +258,6 @@ fn main() -> Result<(), failure::Error> {
             tokio::spawn(contact::post_messages(ctx));
 
             tokio::task::block_in_place(|| client.start())
-                .map_err(failure::SyncFailure::new)
                 .context("error while running the Discord client")?;
 
             Ok(())

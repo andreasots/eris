@@ -1,6 +1,6 @@
 use crate::aiomas::{Exception, Request};
 use crate::service::Reconnect;
-use failure::{self, Error};
+use anyhow::Error;
 use serde_json::Value;
 
 // FIXME: this should be generic over the service but that requires generic associated types and
@@ -25,6 +25,6 @@ impl Retry {
             }
         }
 
-        Err(error.unwrap_or_else(|| failure::err_msg("max count is 0")))
+        Err(error.unwrap_or_else(|| Error::msg("max count is 0")))
     }
 }

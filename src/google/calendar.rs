@@ -1,7 +1,7 @@
 use crate::config::Config;
+use anyhow::{Context, Error};
 use chrono::Duration;
 use chrono::{DateTime, FixedOffset, TimeZone};
-use failure::{Error, ResultExt};
 use reqwest::Client;
 use reqwest::Url;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -72,7 +72,7 @@ impl Calendar {
             {
                 let mut path_segments = url
                     .path_segments_mut()
-                    .map_err(|()| failure::err_msg("https URL is cannot-be-a-base?"))?;
+                    .map_err(|()| Error::msg("https URL is cannot-be-a-base?"))?;
                 path_segments.push(calendar);
                 path_segments.push("events");
             }

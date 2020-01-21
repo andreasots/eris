@@ -1,10 +1,11 @@
 #![allow(clippy::unreadable_literal)]
 
+use anyhow::{anyhow, Context, Error};
 use chrono_tz::Tz;
-use failure::{self, Error, Fail, ResultExt};
 use ini::Ini;
 use serenity::model::prelude::*;
 use std::collections::HashMap;
+use std::error::Error as StdError;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use url::Url;
@@ -83,7 +84,7 @@ impl Config {
                 .get_from(Some("lrrbot"), "timezone")
                 .unwrap_or("America/Vancouver")
                 .parse::<Tz>()
-                .map_err(failure::err_msg)
+                .map_err(Error::msg)
                 .context("failed to parse the timezone")?,
 
             #[cfg(unix)]
@@ -185,18 +186,20 @@ impl Config {
     fn get_option_required(ini: &Ini, option: &str) -> Result<String, Error> {
         Ok(ini
             .get_from(Some("lrrbot"), option)
-            .ok_or_else(|| failure::err_msg(format!("{:?} is missing", option)))?
+            .ok_or_else(|| anyhow!("{:?} is missing", option))?
             .into())
     }
 
     fn get_option_parsed<T>(ini: &Ini, option: &str) -> Result<Option<T>, Error>
     where
         T: FromStr,
-        T::Err: Fail,
+        T::Err: StdError + Send + Sync + 'static,
     {
         match ini.get_from(Some("lrrbot"), option).map(str::parse) {
             Some(Ok(opt)) => Ok(Some(opt)),
-            Some(Err(err)) => Err(err).with_context(|_| format!("failed to parse {:?}", option))?,
+            Some(Err(err)) => {
+                Err(Error::from(err).context(format!("failed to parse {:?}", option)))
+            }
             None => Ok(None),
         }
     }

@@ -1,6 +1,6 @@
 use crate::config::Config;
+use anyhow::{Context, Error};
 use chrono::{DateTime, FixedOffset};
-use failure::{Error, ResultExt};
 use reqwest::header::HeaderValue;
 use reqwest::Client;
 use serde::de::{Error as SerdeError, Visitor};

@@ -1,7 +1,7 @@
+use anyhow::{Context, Error};
 use chrono::{DateTime, TimeZone};
 use chrono_tz::America::Vancouver as TIMEZONE;
 use chrono_tz::Tz;
-use failure::{Error, ResultExt};
 use reqwest::Client;
 use serde::Deserialize;
 

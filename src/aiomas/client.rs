@@ -1,11 +1,12 @@
 use super::codec::{ClientCodec, Exception, Request};
-use failure::{Error, Fail, ResultExt};
+use anyhow::{Context, Error};
 use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
 use futures::select;
 use serde_json::Value;
 use slog_scope::error;
 use std::collections::HashMap;
+use std::error::Error as StdError;
 use std::path::PathBuf;
 use tokio_util::codec::Framed;
 
@@ -69,7 +70,7 @@ impl Client {
     ) where
         T: Sink<(u64, Request), Error = E>
             + Stream<Item = Result<(u64, Result<Value, Exception>), E>>,
-        E: Fail,
+        E: StdError,
     {
         let (mut sink, mut stream) = stream.split();
 

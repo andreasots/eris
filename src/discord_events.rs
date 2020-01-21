@@ -3,7 +3,7 @@ use crate::executor_ext::ExecutorExt;
 use crate::extract::Extract;
 use crate::influxdb::{InfluxDB, Measurement, New, Timestamp};
 use crate::typemap_keys::Executor;
-use failure::{bail, Error, ResultExt};
+use anyhow::{bail, Context as _, Error};
 use joinery::Joinable;
 use serenity::model::prelude::*;
 use serenity::prelude::*;
@@ -264,7 +264,7 @@ impl EventHandler for DiscordEvents {
                 let guild = match guild {
                     Some(guild) => guild
                         .to_guild_cached(&ctx)
-                        .ok_or_else(|| failure::err_msg("failed to get the guild"))?,
+                        .ok_or_else(|| Error::msg("failed to get the guild"))?,
                     None => return Ok(()),
                 };
 

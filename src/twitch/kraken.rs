@@ -1,9 +1,9 @@
 use crate::config::Config;
-use failure::{self, Error, ResultExt};
+use anyhow::{Context, Error};
 use reqwest::header::{HeaderValue, ACCEPT, AUTHORIZATION};
 use reqwest::Client;
 use serde::Deserialize;
-use serde_json::{self, Value};
+use serde_json::Value;
 
 #[derive(Debug, Deserialize)]
 pub struct Channel {
@@ -83,7 +83,7 @@ impl Kraken {
                 >= value
                     .get("_total")
                     .and_then(Value::as_u64)
-                    .ok_or_else(|| failure::err_msg("'_total' missing or not an integer"))?
+                    .ok_or_else(|| Error::msg("'_total' missing or not an integer"))?
             {
                 break;
             }

@@ -1,4 +1,4 @@
-use failure::{Error, ResultExt};
+use anyhow::{Context, Error};
 use reqwest::{Body, Client};
 use serde::Deserialize;
 use std::borrow::Cow;
@@ -219,7 +219,7 @@ impl InfluxDB {
             status if status.is_client_error() || status.is_server_error() => {
                 let error =
                     res.json::<InfluxError>().await.context("failed to read the response")?;
-                Err(failure::err_msg(error.error).context("server returned an error").into())
+                Err(Error::msg(error.error).context("server returned an error"))
             }
             status => {
                 let body = res.bytes().await.context("failed to read the response")?;

@@ -1,9 +1,9 @@
 use crate::schema::*;
+use anyhow::Error;
 use chrono::NaiveDate;
 use diesel::pg::upsert::excluded;
 use diesel::pg::Pg;
 use diesel::prelude::*;
-use failure::Error;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt::{Display, Formatter};

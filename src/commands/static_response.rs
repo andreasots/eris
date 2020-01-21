@@ -2,7 +2,7 @@ use crate::executor_ext::ExecutorExt;
 use crate::extract::Extract;
 use crate::rpc::LRRbot;
 use crate::typemap_keys::Executor;
-use failure::{Error, ResultExt, SyncFailure};
+use anyhow::{Context as _, Error};
 use rand::seq::SliceRandom;
 use regex::Regex;
 use serde::{Deserialize, Deserializer};
@@ -108,7 +108,7 @@ fn replace_emojis<'a, S: Into<String>, I: Iterator<Item = &'a Emoji>>(
 
     for emoji in emojis {
         let regex = Regex::new(&format!(r"\b{}\b", regex::escape(&emoji.name)))
-            .with_context(|err| format!("invalid regex syntax with {:?}: {:?}", emoji.name, err))?;
+            .with_context(|| format!("invalid regex syntax with {:?}", emoji.name))?;
         if let Cow::Owned(s) = regex.replace_all(&msg, &emoji.mention()[..]) {
             msg = s;
         }
@@ -158,9 +158,7 @@ fn static_response_impl(ctx: &mut Context, msg: &Message, command: &str) -> Resu
                 } else {
                     response
                 };
-                msg.reply(ctx, &response)
-                    .map_err(SyncFailure::new)
-                    .context("failed to send a reply")?;
+                msg.reply(ctx, &response).context("failed to send a reply")?;
             }
         } else {
             info!("Refusing to reply because user lacks access";

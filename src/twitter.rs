@@ -1,4 +1,4 @@
-use failure::{Error, ResultExt};
+use anyhow::{Context, Error, bail};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
@@ -86,10 +86,7 @@ impl Twitter {
         if res.token_type == "bearer" {
             Ok(res.access_token)
         } else {
-            Err(failure::err_msg(format!(
-                "OAuth2 token request returned a non-Bearer token, got {:?}",
-                res.token_type
-            )))
+            bail!("OAuth2 token request returned a non-Bearer token, got {:?}", res.token_type)
         }
     }
 

@@ -1,10 +1,10 @@
 use crate::aiomas::NewClient;
 use crate::config::Config;
 use crate::service::{Reconnect, Retry};
-use failure::{self, Error, ResultExt};
+use anyhow::{Context, Error};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer};
-use serde_json::{self, Value};
+use serde_json::Value;
 use std::collections::HashMap;
 
 #[derive(Copy, Clone, Debug, Deserialize)]
@@ -56,7 +56,7 @@ impl LRRbot {
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
     ) -> Result<Value, Error> {
-        self.service.call((name, args, kwargs)).await?.map_err(failure::err_msg)
+        self.service.call((name, args, kwargs)).await?.map_err(Error::msg)
     }
 
     pub async fn get_header_info(&self) -> Result<HeaderInfo, Error> {

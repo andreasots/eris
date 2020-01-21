@@ -4,7 +4,7 @@ use crate::extract::Extract;
 use crate::models::State;
 use crate::twitter::Twitter;
 use crate::typemap_keys::PgPool;
-use failure::{Error, ResultExt};
+use anyhow::{Context, Error};
 use serenity::model::id::ChannelId;
 use slog_scope::{error, info};
 use std::collections::HashMap;

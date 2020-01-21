@@ -3,9 +3,9 @@ use crate::context::ErisContext;
 use crate::extract::Extract;
 use crate::google::sheets::{CellData, ExtendedValue, Sheets, Spreadsheet};
 use crate::truncate::truncate;
+use anyhow::{Context, Error};
 use chrono::TimeZone;
 use chrono::{DateTime, Utc};
-use failure::{Error, ResultExt};
 use slog_scope::{error, info};
 use std::time::Duration;
 
@@ -114,7 +114,7 @@ async fn inner(ctx: &ErisContext) -> Result<(), Error> {
         let spreadsheet_key = config
             .contact_spreadsheet
             .clone()
-            .ok_or_else(|| failure::err_msg("Contact spreadsheet is not set"))?;
+            .ok_or_else(|| Error::msg("Contact spreadsheet is not set"))?;
 
         let sheets = data.extract::<Sheets>()?.clone();
 
@@ -126,7 +126,7 @@ async fn inner(ctx: &ErisContext) -> Result<(), Error> {
         .context("failed to fetch the spreadsheet")?;
 
     let (sheet_id, unsent) = find_unsent_rows(&spreadsheet)
-        .ok_or_else(|| failure::err_msg("no sheets or required information missing"))?;
+        .ok_or_else(|| Error::msg("no sheets or required information missing"))?;
 
     for message in unsent {
         tokio::task::block_in_place(|| {

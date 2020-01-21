@@ -1,11 +1,12 @@
 use crate::aiomas::codec::{Exception, Request, ServerCodec};
-use failure::{Error, Fail, ResultExt};
+use anyhow::{Context, Error};
 use futures::channel::mpsc;
 use futures::future::BoxFuture;
 use futures::prelude::*;
 use serde_json::Value;
 use slog_scope::error;
 use std::collections::HashMap;
+use std::error::Error as StdError;
 use std::path::Path;
 use std::sync::Arc;
 use tokio_util::codec::Framed;
@@ -108,7 +109,7 @@ impl<C: Clone + Send + 'static> Server<C> {
             + Send
             + Sync
             + 'static,
-        E: Fail,
+        E: StdError,
     {
         let (mut sink, mut stream) = transport.split();
         let (tx, mut rx) = mpsc::channel(16);

@@ -1,7 +1,7 @@
 //! Creating OAuth2 bearer tokens for Google service accounts
 
+use anyhow::{Context, Error, bail};
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use failure::{Error, ResultExt};
 use futures::lock::Mutex;
 use jsonwebtoken::{Algorithm, Header};
 use reqwest::Client;
@@ -101,10 +101,7 @@ impl ServiceAccount {
                 .await
                 .context("failed to read the response")?;
             if new_token.token_type != "Bearer" {
-                return Err(failure::err_msg(format!(
-                    "{:?} token returned, expected Bearer",
-                    new_token.token_type
-                )));
+                bail!("{:?} token returned, expected Bearer", new_token.token_type);
             }
             *token = Token {
                 token: new_token.access_token,

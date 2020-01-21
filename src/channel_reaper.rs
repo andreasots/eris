@@ -1,8 +1,8 @@
 use crate::config::Config;
 use crate::context::ErisContext;
 use crate::extract::Extract;
+use anyhow::Error;
 use chrono::Utc;
-use failure::{self, Error};
 use serenity::model::prelude::*;
 use slog_scope::{error, info};
 use std::collections::HashMap;
@@ -21,7 +21,7 @@ fn reap_channels(ctx: &ErisContext) -> Result<(), Error> {
         .cache
         .read()
         .guild(config.guild)
-        .ok_or_else(|| failure::err_msg("failed to get the guild"))?;
+        .ok_or_else(|| Error::msg("failed to get the guild"))?;
 
     let mut voice_users = HashMap::new();
     for voice_state in guild.read().voice_states.values() {

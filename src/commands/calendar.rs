@@ -4,9 +4,9 @@ use crate::extract::Extract;
 use crate::google::calendar::{Calendar as GoogleCalendar, Event, FANSTREAMS, LRR};
 use crate::time::HumanReadable;
 use crate::typemap_keys::Executor;
+use anyhow::Error;
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
-use failure::{Compat, Error};
 use serenity::framework::standard::macros::{command, group};
 use serenity::framework::standard::{ArgError, Args, CommandResult};
 use serenity::model::prelude::*;
@@ -46,10 +46,10 @@ pub fn nextfan(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
 struct Timezone(Tz);
 
 impl FromStr for Timezone {
-    type Err = Compat<Error>;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Timezone(Tz::from_str(s).map_err(|err| failure::err_msg(err).compat())?))
+        Ok(Timezone(Tz::from_str(s).map_err(Error::msg)?))
     }
 }
 

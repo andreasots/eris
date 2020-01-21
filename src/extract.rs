@@ -1,4 +1,4 @@
-use failure::Error;
+use anyhow::Error;
 use serenity::prelude::*;
 use std::any::type_name;
 
@@ -20,7 +20,7 @@ impl Extract for ShareMap {
         T::Value: Send + Sync,
     {
         self.get::<T>()
-            .ok_or_else(|| failure::err_msg(format!("{} not in the sharemap", type_name::<T>())))
+            .ok_or_else(|| Error::msg(format!("{} not in the sharemap", type_name::<T>())))
     }
 
     fn extract_mut<T>(&mut self) -> Result<&mut T::Value, Error>
@@ -29,6 +29,6 @@ impl Extract for ShareMap {
         T::Value: Send + Sync,
     {
         self.get_mut::<T>()
-            .ok_or_else(|| failure::err_msg(format!("{} not in the sharemap", type_name::<T>())))
+            .ok_or_else(|| Error::msg(format!("{} not in the sharemap", type_name::<T>())))
     }
 }
