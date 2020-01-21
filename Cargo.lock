@@ -435,7 +435,7 @@ dependencies = [
  "futures 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "inventory 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "joinery 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "jsonwebtoken 7.0.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jsonwebtoken 7.0.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lalrpop 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "lalrpop-util 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -822,7 +822,7 @@ dependencies = [
 
 [[package]]
 name = "jsonwebtoken"
-version = "7.0.0-alpha.2"
+version = "7.0.0-beta.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "base64 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2408,7 +2408,7 @@ dependencies = [
 "checksum itoa 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "501266b7edd0174f8530248f87f99c88fbe60ca4ef3dd486835b8d8d53136f7f"
 "checksum joinery 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "85a5c968b1e8336a945da21fab473045df2d5f8c81535e762d52f6b2c49477b9"
 "checksum js-sys 0.3.33 (registry+https://github.com/rust-lang/crates.io-index)" = "367647c532db6f1555d7151e619540ec5f713328235b8c062c6b4f63e84adfe3"
-"checksum jsonwebtoken 7.0.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)" = "a3e1643b14858e5cf385fe43675ffc4d5b5a5abc3342acaab7b08a058d64e31b"
+"checksum jsonwebtoken 7.0.0-beta.1 (registry+https://github.com/rust-lang/crates.io-index)" = "e8c24a5d8627e3dd2982521e858f74b79f48c2f4981fed860cc765230045302a"
 "checksum kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
 "checksum lalrpop 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)" = "64dc3698e75d452867d9bd86f4a723f452ce9d01fe1d55990b79f0c790aa67db"
 "checksum lalrpop-util 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)" = "c277d18683b36349ab5cd030158b54856fca6bb2d5dc5263b06288f486958b7c"
