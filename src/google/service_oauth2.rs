@@ -1,9 +1,9 @@
 //! Creating OAuth2 bearer tokens for Google service accounts
 
-use anyhow::{Context, Error, bail};
+use anyhow::{bail, Context, Error};
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use futures::lock::Mutex;
-use jsonwebtoken::{Algorithm, Header};
+use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -71,6 +71,8 @@ impl ServiceAccount {
                 .context("failed to read the service account key JSON file")?;
             let key = serde_json::from_slice::<'_, ServiceAccountKey>(&content)
                 .context("failed to parse the service account key JSON")?;
+            let private_key = EncodingKey::from_rsa_pem(key.private_key.as_bytes())
+                .context("failed to parse the private key")?;
 
             let jwt = jsonwebtoken::encode(
                 &Header::new(Algorithm::RS256),
@@ -81,7 +83,7 @@ impl ServiceAccount {
                     iat: now.timestamp(),
                     exp: (now + Duration::seconds(3600)).timestamp(),
                 },
-                key.private_key.as_bytes(),
+                &private_key,
             )
             .context("failed to create a JWT token")?;
 
