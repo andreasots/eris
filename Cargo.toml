@@ -12,7 +12,7 @@ lalrpop = { version = "0.17.2", default-features = false }
 
 [dependencies]
 anyhow = { version = "1.0.26", default-features = false, features = ["std"] }
-bytes = { version = "0.5.3", default-features = false }
+bytes = { version = "0.5.4", default-features = false }
 chrono = { version = "0.4.10", default-features = false }
 chrono-tz = { version = "0.5.1", default-features = false }
 clap = { version = "2.33.0", default-features = false }
