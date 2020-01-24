@@ -119,12 +119,12 @@ fn replace_emojis<'a, S: Into<String>, I: Iterator<Item = &'a Emoji>>(
 
 fn static_response_impl(ctx: &mut Context, msg: &Message, command: &str) -> Result<(), Error> {
     info!("Static command received";
-        "command_name" => ?command,
-        "message" => ?&msg.content,
-        "message.id" => ?msg.id.0,
-        "from.id" => ?msg.author.id.0,
-        "from.name" => ?&msg.author.name,
-        "from.discriminator" => ?msg.author.discriminator,
+        "command_name" => command,
+        "message" => &msg.content,
+        "message.id" => msg.id.0,
+        "from.id" => msg.author.id.0,
+        "from.name" => &msg.author.name,
+        "from.discriminator" => msg.author.discriminator,
     );
 
     let response = {
@@ -162,7 +162,7 @@ fn static_response_impl(ctx: &mut Context, msg: &Message, command: &str) -> Resu
             }
         } else {
             info!("Refusing to reply because user lacks access";
-                "message.id" => ?msg.id.0,
+                "message.id" => msg.id.0,
                 "access_required" => ?access,
             );
         }
@@ -176,7 +176,7 @@ pub fn static_response(ctx: &mut Context, msg: &Message, command: &str) {
         Ok(()) => (),
         Err(err) => {
             error!("Static command resulted in an unexpected error";
-                "message.id" => ?msg.id.0,
+                "message.id" => msg.id.0,
                 "error" => ?err,
             );
 

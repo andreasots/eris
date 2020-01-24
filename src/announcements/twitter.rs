@@ -86,7 +86,7 @@ async fn inner<'a>(
                                 if channels.contains(channel) {
                                     info!("Skipping posting a retweet because the target already gets posted to this channel";
                                         "channel" => channel.0,
-                                        "msg" => ?message,
+                                        "msg" => &message,
                                     );
                                     continue;
                                 }

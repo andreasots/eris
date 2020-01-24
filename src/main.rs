@@ -30,40 +30,46 @@ mod pg_fts;
 mod rpc;
 mod schema;
 mod service;
-mod stdlog;
 mod time;
 mod truncate;
 mod twitch;
 mod twitter;
 mod typemap_keys;
 
-fn main() -> Result<(), Error> {
-    let decorator = slog_term::TermDecorator::new().build();
-    let term_drain =
-        slog_term::FullFormat::new(decorator).build().filter_level(slog::Level::Info).fuse();
+struct DualWriter<W1: std::io::Write, W2: std::io::Write>(W1, W2);
 
-    let limited_log = std::fs::OpenOptions::new()
+impl<W1: std::io::Write, W2: std::io::Write> std::io::Write for DualWriter<W1, W2> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.write_all(buf)?;
+        self.1.write_all(buf)?;
+
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.0.flush()?;
+        self.1.flush()
+    }
+}
+
+fn main() -> Result<(), Error> {
+    let log_file = std::fs::OpenOptions::new()
         .write(true)
         .append(true)
         .create(true)
         .open("eris.log")
         .context("failed to open the log file")?;
-    let debug_log = std::fs::OpenOptions::new()
-        .write(true)
-        .append(true)
-        .create(true)
-        .open("eris.debug.log")
-        .context("failed to open the debug log file")?;
 
-    let decorator = slog_term::PlainDecorator::new(limited_log);
-    let limited_drain =
-        slog_term::FullFormat::new(decorator).build().filter_level(slog::Level::Info).fuse();
-
-    let decorator = slog_term::PlainDecorator::new(debug_log);
-    let full_drain = slog_term::FullFormat::new(decorator).build().fuse();
-    let file_drain = slog::Duplicate::new(limited_drain, full_drain);
-
-    let drain = slog::Duplicate::new(term_drain, file_drain).fuse();
+    let drain = slog_json::Json::new(DualWriter(log_file, std::io::stdout()))
+        .set_flush(true)
+        .add_key_value(o! {
+            "ts" => slog::PushFnValue(|_, ser| ser.emit(chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Micros, true))),
+            "level" => slog::FnValue(|record| record.level().as_str()),
+            "msg" => slog::PushFnValue(|record, ser| ser.emit(record.msg())),
+            "module" => slog::FnValue(|record| record.module()),
+        })
+        .build()
+        .fuse();
     let drain = slog_async::Async::new(drain)
         .overflow_strategy(slog_async::OverflowStrategy::Block)
         .build()
@@ -76,8 +82,7 @@ fn main() -> Result<(), Error> {
         ),
     );
     let _handle = slog_scope::set_global_logger(logger);
-    log::set_logger(&stdlog::LOGGER)
-        .context("failed to redirect logs from the standard log crate")?;
+    slog_stdlog::init().context("failed to redirect logs from the standard log crate")?;
     log::set_max_level(log::LevelFilter::max());
 
     let matches = clap::App::new(env!("CARGO_PKG_NAME"))
@@ -160,20 +165,20 @@ fn main() -> Result<(), Error> {
                     })
                     .before(|_, message, command_name| {
                         info!("Command received";
-                            "command_name" => ?command_name,
-                            "message" => ?&message.content,
-                            "message.id" => ?message.id.0,
-                            "from.id" => ?message.author.id.0,
-                            "from.name" => ?&message.author.name,
-                            "from.discriminator" => ?message.author.discriminator,
+                            "command_name" => command_name,
+                            "message" => &message.content,
+                            "message.id" => message.id.0,
+                            "from.id" => message.author.id.0,
+                            "from.name" => &message.author.name,
+                            "from.discriminator" => message.author.discriminator,
                         );
                         true
                     })
                     .after(|ctx, message, _command_name, result| {
                         if let Err(err) = result {
                             error!("Command resulted in an unexpected error";
-                                "message.id" => ?message.id.0,
-                                "error" => ?err,
+                                "message.id" => message.id.0,
+                                "error" => &err.0,
                             );
 
                             let _ = message.reply(
@@ -182,7 +187,7 @@ fn main() -> Result<(), Error> {
                             );
                         } else {
                             info!("Command processed successfully";
-                                "message.id" => ?message.id.0,
+                                "message.id" => message.id.0,
                             );
                         }
                     })
