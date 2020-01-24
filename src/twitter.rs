@@ -1,4 +1,4 @@
-use anyhow::{Context, Error, bail};
+use anyhow::{bail, Context, Error};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;

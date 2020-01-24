@@ -47,14 +47,14 @@ fn reap_channels(ctx: &ErisContext) -> Result<(), Error> {
         if (now - created_at).to_std()? > MIN_CHANNEL_AGE
             && voice_users.get(&channel.id).cloned().unwrap_or(0) == 0
         {
-            info!("Scheduling a temporary channel for deletion"; "channel.id" => ?channel.id, "channel.name" => ?channel.name);
+            info!("Scheduling a temporary channel for deletion"; "channel.id" => channel.id.0, "channel.name" => &channel.name);
             unused_channels.push(channel.id);
         }
     }
 
     for channel_id in unused_channels {
         if let Err(err) = channel_id.delete(&ctx) {
-            error!("Failed to delete a temporary channel"; "error" => ?err, "channel.id" => ?channel_id);
+            error!("Failed to delete a temporary channel"; "error" => ?err, "channel.id" => channel_id.0);
         }
     }
 
