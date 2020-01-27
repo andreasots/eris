@@ -41,7 +41,7 @@ slog-scope = { version = "4.3.0", default-features = false }
 slog-json = { version = "2.3.0", default-features = false }
 slog-stdlog = "4.0.0"
 strfmt = { version = "0.1.6", default-features = false }
-tokio = { version = "0.2.9", default-features = false, features = ["uds", "tcp", "fs", "io-util", "rt-threaded", "blocking", "macros", "time", "stream"] }
+tokio = { version = "0.2.11", default-features = false, features = ["uds", "tcp", "fs", "io-util", "rt-threaded", "blocking", "macros", "time", "stream"] }
 tokio-util = { version = "0.2.0", default-features = false, features = ["codec"] }
 unicode-width = { version = "0.1.7", default-features = false }
 url = { version = "2.1.1", default-features = false }
