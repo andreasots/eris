@@ -465,7 +465,7 @@ dependencies = [
  "futures 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "inventory 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "joinery 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "jsonwebtoken 7.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jsonwebtoken 7.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lalrpop 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "lalrpop-util 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -833,7 +833,7 @@ dependencies = [
 
 [[package]]
 name = "jsonwebtoken"
-version = "7.0.0"
+version = "7.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "base64 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2407,7 +2407,7 @@ dependencies = [
 "checksum itoa 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)" = "b8b7a7c0c47db5545ed3fef7468ee7bb5b74691498139e4b3f6a20685dc6dd8e"
 "checksum joinery 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "85a5c968b1e8336a945da21fab473045df2d5f8c81535e762d52f6b2c49477b9"
 "checksum js-sys 0.3.35 (registry+https://github.com/rust-lang/crates.io-index)" = "7889c7c36282151f6bf465be4700359318aef36baa951462382eae49e9577cf9"
-"checksum jsonwebtoken 7.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "59d4b9c3cd9f2ff3f624767f77b5bc3fdf687c5cf81866a824d09549bd089b10"
+"checksum jsonwebtoken 7.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7577c6272114f9a75da574d2497509d7a73c25cd005a2df35e4a1845a6522ea4"
 "checksum kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
 "checksum lalrpop 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)" = "64dc3698e75d452867d9bd86f4a723f452ce9d01fe1d55990b79f0c790aa67db"
 "checksum lalrpop-util 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)" = "c277d18683b36349ab5cd030158b54856fca6bb2d5dc5263b06288f486958b7c"
