@@ -368,7 +368,7 @@ dependencies = [
 
 [[package]]
 name = "ctor"
-version = "0.1.12"
+version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -827,7 +827,7 @@ name = "inventory"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "ctor 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ctor 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "ghost 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "inventory-impl 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -2407,7 +2407,7 @@ dependencies = [
 "checksum crossbeam-utils 0.6.6 (registry+https://github.com/rust-lang/crates.io-index)" = "04973fa96e96579258a5091af6003abde64af786b860f18622b82e026cca60e6"
 "checksum crossbeam-utils 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ce446db02cdc3165b94ae73111e570793400d0794e46125cc4056c81cbb039f4"
 "checksum ct-logs 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "4d3686f5fa27dbc1d76c751300376e167c5a43387f44bb451fd1c24776e49113"
-"checksum ctor 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)" = "cd8ce37ad4184ab2ce004c33bf6379185d3b1c95801cab51026bd271bf68eedc"
+"checksum ctor 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)" = "47c5e5ac752e18207b12e16b10631ae5f7f68f8805f335f9b817ead83d9ffce1"
 "checksum diesel 1.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "9d7cc03b910de9935007861dce440881f69102aaaedfd4bc5a6f40340ca5840c"
 "checksum diesel_derives 1.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "45f5098f628d02a7a0f68ddba586fb61e80edec3bdc1be3b921f4ceec60858d3"
 "checksum diesel_full_text_search 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7ad3168d9d2008c58b8c9fabb79ddc38d1f9d511fa15e0dcbd6b987912b05783"
