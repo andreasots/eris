@@ -78,12 +78,11 @@ pub type Exception = String;
 
 pub struct ClientCodec;
 
-impl Encoder for ClientCodec {
-    type Item = (u64, Request);
+impl Encoder<(u64, Request)> for ClientCodec {
     type Error = Error;
     fn encode(
         &mut self,
-        (request_id, payload): Self::Item,
+        (request_id, payload): (u64, Request),
         dst: &mut BytesMut,
     ) -> Result<(), Self::Error> {
         encode_frame(&(FrameType::Request, request_id, payload), dst)
@@ -109,12 +108,11 @@ impl Decoder for ClientCodec {
 
 pub struct ServerCodec;
 
-impl Encoder for ServerCodec {
-    type Item = (u64, Result<Value, Exception>);
+impl Encoder<(u64, Result<Value, Exception>)> for ServerCodec {
     type Error = Error;
     fn encode(
         &mut self,
-        (request_id, payload): Self::Item,
+        (request_id, payload): (u64, Result<Value, Exception>),
         dst: &mut BytesMut,
     ) -> Result<(), Self::Error> {
         let ty = if payload.is_ok() { FrameType::Result } else { FrameType::Exception };
