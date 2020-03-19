@@ -292,14 +292,6 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-channel"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "crossbeam-utils 0.6.6 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "crossbeam-channel"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
@@ -337,15 +329,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cfg-if 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "crossbeam-utils 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "crossbeam-utils"
-version = "0.6.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "cfg-if 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -515,7 +498,7 @@ dependencies = [
  "serde_json 1.0.48 (registry+https://github.com/rust-lang/crates.io-index)",
  "serenity 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog 2.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "slog-async 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog-async 2.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-json 2.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-scope 4.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-stdlog 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1809,10 +1792,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "slog-async"
-version = "2.4.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "crossbeam-channel 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "crossbeam-channel 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog 2.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "take_mut 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "thread_local 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2415,12 +2398,10 @@ dependencies = [
 "checksum core-foundation-sys 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b3a71ab494c0b5b860bdc8407ae08978052417070c2ced38573a9157ad75b8ac"
 "checksum crc32fast 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ba125de2af0df55319f41944744ad91c71113bf74a4646efff39afe1f6842db1"
 "checksum crossbeam 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)" = "69323bff1fb41c635347b8ead484a5ca6c3f11914d784170b158d8449ab07f8e"
-"checksum crossbeam-channel 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "c8ec7fcd21571dc78f96cc96243cab8d8f035247c3efd16c687be154c3fa9efa"
 "checksum crossbeam-channel 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "acec9a3b0b3559f15aee4f90746c4e5e293b701c0f7d3925d24e01645267b68c"
 "checksum crossbeam-deque 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)" = "9f02af974daeee82218205558e51ec8768b48cf524bd01d550abe5573a608285"
 "checksum crossbeam-epoch 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)" = "058ed274caafc1f60c4997b5fc07bf7dc7cca454af7c6e81edffe5f33f70dace"
 "checksum crossbeam-queue 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "c695eeca1e7173472a32221542ae469b3e9aac3a4fc81f7696bcad82029493db"
-"checksum crossbeam-utils 0.6.6 (registry+https://github.com/rust-lang/crates.io-index)" = "04973fa96e96579258a5091af6003abde64af786b860f18622b82e026cca60e6"
 "checksum crossbeam-utils 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ce446db02cdc3165b94ae73111e570793400d0794e46125cc4056c81cbb039f4"
 "checksum ct-logs 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "4d3686f5fa27dbc1d76c751300376e167c5a43387f44bb451fd1c24776e49113"
 "checksum ctor 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)" = "47c5e5ac752e18207b12e16b10631ae5f7f68f8805f335f9b817ead83d9ffce1"
@@ -2578,7 +2559,7 @@ dependencies = [
 "checksum siphasher 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "0b8de496cf83d4ed58b6be86c3a275b8602f6ffe98d3024a869e124147a9a3ac"
 "checksum slab 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 "checksum slog 2.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1cc9c640a4adbfbcc11ffb95efe5aa7af7309e002adab54b185507dbf2377b99"
-"checksum slog-async 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "78ca925b180da88ccc595cbe4a3d378d79cb49fe5906c2cbc2488eaf700913ee"
+"checksum slog-async 2.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "51b3336ce47ce2f96673499fc07eb85e3472727b9a7a2959964b002c2ce8fbbb"
 "checksum slog-json 2.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ddc0d2aff1f8f325ef660d9a0eb6e6dcd20b30b3f581a5897f58bf42d061c37a"
 "checksum slog-scope 4.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7c44c89dd8b0ae4537d1ae318353eaf7840b4869c536e31c41e963d1ea523ee6"
 "checksum slog-stdlog 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "be4d87903baf655da2d82bc3ac3f7ef43868c58bf712b3a661fda72009304c23"
