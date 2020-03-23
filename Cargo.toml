@@ -16,7 +16,7 @@ bytes = { version = "0.5.4", default-features = false }
 chrono = { version = "0.4.11", default-features = false }
 chrono-tz = { version = "0.5.1", default-features = false }
 clap = { version = "2.33.0", default-features = false }
-diesel = { version = "1.4.3", default-features = false, features = ["chrono", "postgres", "r2d2", "serde_json"] }
+diesel = { version = "1.4.4", default-features = false, features = ["chrono", "postgres", "r2d2", "serde_json"] }
 diesel_full_text_search = { version = "1.0.1", default-features = false }
 egg-mode-text = { version = "1.14.7", default-features = false }
 eris-macros = { path = "eris-macros" }
