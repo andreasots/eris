@@ -9,6 +9,7 @@ use serenity::prelude::*;
 use slog_scope::error;
 use std::convert::TryFrom;
 use std::sync::Arc;
+use serenity::http::client::Http;
 
 pub struct DiscordEvents;
 
@@ -71,6 +72,13 @@ impl DiscordEvents {
         }
 
         measurement
+    }
+
+    fn kick_from_voice(&self, http: &Http, guild: GuildId, user: UserId) -> Result<(), Error> {
+        // FIXME: (or rather Serenity) `guild.move_member()` doesn't take `None`
+        let mut map = serde_json::Map::new();
+        map.insert("channel_id".to_string(), serde_json::Value::Null);
+        Ok(http.edit_member(guild.0, user.0, &map)?)
     }
 }
 
@@ -203,6 +211,16 @@ impl EventHandler for DiscordEvents {
     }
 
     fn guild_create(&self, ctx: Context, guild: Guild, _is_new: bool) {
+        if let Some(afk_channel) = guild.afk_channel_id {
+            for (&user, voice_state) in &guild.voice_states {
+                if voice_state.channel_id == Some(afk_channel) {
+                    if let Err(err) = self.kick_from_voice(&ctx.http, guild.id, user) {
+                        error!("failed to kick user from the AFK channel"; "error" => ?err);
+                    }
+                }
+            }
+        }
+
         Self::log_error(|| {
             let data = ctx.data.read();
             if let Some(influxdb) = data.get::<InfluxDB>() {
@@ -262,10 +280,7 @@ impl EventHandler for DiscordEvents {
                     let guild = guild.read();
                     if let Some(afk_channel) = guild.afk_channel_id {
                         if new.channel_id == Some(afk_channel) {
-                            // FIXME: (or rather Serenity) `guild.move_member()` doesn't take `None`
-                            let mut map = serde_json::Map::new();
-                            map.insert("channel_id".to_string(), serde_json::Value::Null);
-                            if let Err(err) = ctx.http.edit_member(guild.id.0, new.user_id.0, &map)
+                            if let Err(err) = self.kick_from_voice(&ctx.http, guild.id, new.user_id)
                             {
                                 error!("failed to kick user from the AFK channel"; "error" => ?err);
                             }
