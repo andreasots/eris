@@ -1,5 +1,4 @@
 use crate::config::Config;
-use crate::executor_ext::ExecutorExt;
 use crate::extract::Extract;
 use crate::models::User;
 use crate::twitch::kraken::Stream;

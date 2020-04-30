@@ -1,5 +1,4 @@
 use crate::config::Config;
-use crate::executor_ext::ExecutorExt;
 use crate::extract::Extract;
 use crate::influxdb::{InfluxDB, Measurement, New, Timestamp};
 use crate::typemap_keys::Executor;
@@ -257,6 +256,23 @@ impl EventHandler for DiscordEvents {
     ) {
         Self::log_error(|| {
             let data = ctx.data.read();
+
+            if let Some(guild) = guild {
+                if let Some(guild) = guild.to_guild_cached(&ctx) {
+                    let guild = guild.read();
+                    if let Some(afk_channel) = guild.afk_channel_id {
+                        if new.channel_id == Some(afk_channel) {
+                            // FIXME: (or rather Serenity) `guild.move_member()` doesn't take `None`
+                            let mut map = serde_json::Map::new();
+                            map.insert("channel_id".to_string(), serde_json::Value::Null);
+                            if let Err(err) = ctx.http.edit_member(guild.id.0, new.user_id.0, &map)
+                            {
+                                error!("failed to kick user from the AFK channel"; "error" => ?err);
+                            }
+                        }
+                    }
+                }
+            }
 
             if let Some(influxdb) = data.get::<InfluxDB>() {
                 let executor = data.extract::<Executor>()?;

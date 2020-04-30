@@ -1,4 +1,3 @@
-use crate::executor_ext::ExecutorExt;
 use crate::extract::Extract;
 use crate::rpc::LRRbot;
 use crate::typemap_keys::Executor;

@@ -1,5 +1,4 @@
 use crate::config::Config;
-use crate::executor_ext::ExecutorExt;
 use crate::extract::Extract;
 use crate::google::calendar::{Calendar as GoogleCalendar, Event, FANSTREAMS, LRR};
 use crate::time::HumanReadable;

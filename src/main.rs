@@ -20,7 +20,6 @@ mod contact;
 mod context;
 mod desertbus;
 mod discord_events;
-mod executor_ext;
 mod extract;
 mod google;
 mod influxdb;
