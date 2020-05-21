@@ -128,7 +128,10 @@ impl Autotopic {
                 (None, None) => messages.push(String::from("Now live: something?")),
             }
 
-            messages.push(self.uptime_msg(ctx, &header.channel).await?);
+            match self.uptime_msg(ctx, &header.channel).await {
+                Ok(msg) => messages.push(msg),
+                Err(err) => error!("failed to generate the uptime message"; "error" => ?err),
+            }
         } else {
             let now = Utc::now();
 
