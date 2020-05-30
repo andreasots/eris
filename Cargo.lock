@@ -815,7 +815,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "base64 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pem 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ring 0.16.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ring 0.16.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.111 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.53 (registry+https://github.com/rust-lang/crates.io-index)",
  "simple_asn1 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1463,7 +1463,7 @@ dependencies = [
 
 [[package]]
 name = "ring"
-version = "0.16.13"
+version = "0.16.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cc 1.0.54 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1510,7 +1510,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "ring 0.16.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ring 0.16.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "sct 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "webpki 0.21.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1522,7 +1522,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "base64 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "ring 0.16.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ring 0.16.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "sct 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "webpki 0.21.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1550,7 +1550,7 @@ name = "sct"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "ring 0.16.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ring 0.16.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "untrusted 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -2149,7 +2149,7 @@ name = "webpki"
 version = "0.21.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "ring 0.16.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ring 0.16.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "untrusted 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -2382,7 +2382,7 @@ dependencies = [
 "checksum regex-syntax 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "f9ec002c35e86791825ed294b50008eea9ddfc8def4420124fbc6b08db834957"
 "checksum regex-syntax 0.6.18 (registry+https://github.com/rust-lang/crates.io-index)" = "26412eb97c6b088a6997e05f69403a802a92d520de2f8e63c2b65f9e0f47c4e8"
 "checksum reqwest 0.10.6 (registry+https://github.com/rust-lang/crates.io-index)" = "3b82c9238b305f26f53443e3a4bc8528d64b8d0bee408ec949eb7bf5635ec680"
-"checksum ring 0.16.13 (registry+https://github.com/rust-lang/crates.io-index)" = "703516ae74571f24b465b4a1431e81e2ad51336cb0ded733a55a1aa3eccac196"
+"checksum ring 0.16.14 (registry+https://github.com/rust-lang/crates.io-index)" = "06b3fefa4f12272808f809a0af618501fdaba41a58963c5fb72238ab0be09603"
 "checksum rust-argon2 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2bc8af4bda8e1ff4932523b94d3dd20ee30a87232323eda55903ffd71d2fb017"
 "checksum rust-ini 0.15.2 (registry+https://github.com/rust-lang/crates.io-index)" = "9c609fa8151080b18c38d39e09d1e55d6301d5610428ff804d0d59c4bac15cf7"
 "checksum rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"
