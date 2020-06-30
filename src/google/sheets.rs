@@ -155,19 +155,16 @@ impl Sheets {
         }
     }
 
-    async fn get_token(&self) -> Result<String, Error> {
-        let mut token = self.oauth2.get_token().await?;
-        token.insert_str(0, "Bearer ");
-        Ok(token)
-    }
-
     pub async fn get_spreadsheet<'a>(
         &'a self,
         spreadsheet: &'a str,
         fields: &'a str,
     ) -> Result<Spreadsheet, Error> {
-        let token =
-            self.get_token().await.context("failed to get a service account OAuth2 token")?;
+        let token = self
+            .oauth2
+            .get_token()
+            .await
+            .context("failed to get a service account OAuth2 token")?;
 
         let url = {
             let mut url = Url::parse("https://sheets.googleapis.com/v4/spreadsheets")
@@ -204,8 +201,11 @@ impl Sheets {
         key: &'a str,
         value: &'a str,
     ) -> Result<(), Error> {
-        let token =
-            self.get_token().await.context("failed to get a service account OAuth2 token")?;
+        let token = self
+            .oauth2
+            .get_token()
+            .await
+            .context("failed to get a service account OAuth2 token")?;
 
         let url = {
             let mut url = Url::parse("https://sheets.googleapis.com/v4/spreadsheets")

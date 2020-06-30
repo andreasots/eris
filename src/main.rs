@@ -128,11 +128,10 @@ fn main() -> Result<(), Error> {
             let helix = twitch::Helix::new(http_client.clone(), &config)
                 .context("failed to create the New Twitch API client")?;
 
-            let calendar = google::Calendar::new(http_client.clone(), &config);
-            let spreadsheets = google::Sheets::new(
-                http_client.clone(),
-                matches.value_of_os("google-service-account").unwrap(),
-            );
+            let google_keys_json_path = matches.value_of_os("google-service-account").unwrap();
+
+            let calendar = google::Calendar::new(http_client.clone(), &google_keys_json_path);
+            let spreadsheets = google::Sheets::new(http_client.clone(), &google_keys_json_path);
 
             let desertbus = desertbus::DesertBus::new(http_client.clone());
 

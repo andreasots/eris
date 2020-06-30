@@ -1,14 +1,18 @@
-use crate::config::Config;
+use crate::google::ServiceAccount;
 use anyhow::{Context, Error};
 use chrono::Duration;
 use chrono::{DateTime, FixedOffset, TimeZone};
+use reqwest::header::AUTHORIZATION;
 use reqwest::Client;
 use reqwest::Url;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::cmp;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 pub const LRR: &str = "loadingreadyrun.com_72jmf1fn564cbbr84l048pv1go@group.calendar.google.com";
 pub const FANSTREAMS: &str = "caffeinatedlemur@gmail.com";
+const SCOPES: &[&str] = &["https://www.googleapis.com/auth/calendar.events.readonly"];
 
 #[derive(Debug, Deserialize)]
 pub struct Event {
@@ -29,7 +33,6 @@ struct ListEventsRequest<'a, Tz: TimeZone> {
     orderBy: &'a str,
     singleEvents: bool,
     timeMin: DateTime<Tz>,
-    key: &'a str,
 }
 
 #[derive(Deserialize)]
@@ -53,12 +56,15 @@ where
 #[derive(Clone)]
 pub struct Calendar {
     client: Client,
-    key: String,
+    oauth2: Arc<ServiceAccount>,
 }
 
 impl Calendar {
-    pub fn new(client: Client, config: &Config) -> Calendar {
-        Calendar { client, key: config.google_key.clone() }
+    pub fn new<P: Into<PathBuf>>(client: Client, key_file_path: P) -> Calendar {
+        Calendar {
+            oauth2: Arc::new(ServiceAccount::new(key_file_path.into(), client.clone(), SCOPES)),
+            client,
+        }
     }
 
     pub async fn get_upcoming_events<'a, Tz: TimeZone + 'a>(
@@ -80,15 +86,21 @@ impl Calendar {
             url
         };
 
+        let token = self
+            .oauth2
+            .get_token()
+            .await
+            .context("failed to get a service account OAuth2 token")?;
+
         Ok(self
             .client
             .get(url)
+            .header(AUTHORIZATION, token)
             .query(&ListEventsRequest {
                 maxResults: 10,
                 orderBy: "startTime",
                 singleEvents: true,
                 timeMin: after,
-                key: &self.key,
             })
             .send()
             .await

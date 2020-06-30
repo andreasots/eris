@@ -111,6 +111,6 @@ impl ServiceAccount {
             }
         }
 
-        Ok(token.token.clone())
+        Ok(format!("Bearer {}", token.token))
     }
 }
