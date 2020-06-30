@@ -4,12 +4,12 @@ use crate::influxdb::{InfluxDB, Measurement, New, Timestamp};
 use crate::typemap_keys::Executor;
 use anyhow::{bail, Context as _, Error};
 use joinery::Joinable;
+use serenity::http::client::Http;
 use serenity::model::prelude::*;
 use serenity::prelude::*;
 use slog_scope::error;
 use std::convert::TryFrom;
 use std::sync::Arc;
-use serenity::http::client::Http;
 
 pub struct DiscordEvents;
 
