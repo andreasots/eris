@@ -191,8 +191,9 @@ fn main() -> Result<(), Error> {
                     })
                     .unrecognised_command(commands::static_response::static_response)
                     .help(&crate::commands::help::HELP)
-                    .group(&crate::commands::live::FANSTREAMS_GROUP)
                     .group(&crate::commands::calendar::CALENDAR_GROUP)
+                    .group(&crate::commands::date::DATE_GROUP)
+                    .group(&crate::commands::live::FANSTREAMS_GROUP)
                     .group(&crate::commands::quote::QUOTE_GROUP)
                     .group(&crate::commands::time::TIME_GROUP)
                     .group(&crate::commands::voice::VOICE_GROUP),

@@ -506,6 +506,7 @@ dependencies = [
  "lalrpop-util",
  "lazy_static 1.4.0",
  "log",
+ "ordinal",
  "rand",
  "regex 1.3.9",
  "reqwest",
@@ -1214,6 +1215,15 @@ checksum = "e88f947c6799d5eff50e6cf8a2365c17ac4aa8f8f43aceeedc29b616d872a358"
 dependencies = [
  "dlv-list",
  "hashbrown",
+]
+
+[[package]]
+name = "ordinal"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7743451938a8eda7454b48c8a3997bbd66ad9cd495d566e654feafeafba64c0b"
+dependencies = [
+ "num-integer",
 ]
 
 [[package]]
