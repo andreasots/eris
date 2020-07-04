@@ -3,10 +3,10 @@ use crate::context::ErisContext;
 use crate::desertbus::DesertBus;
 use crate::extract::Extract;
 use crate::google::calendar::{Calendar, Event, LRR};
-use crate::models::{Game, GameEntry, Show};
+use crate::models::{Game, GameEntry, Show, User};
 use crate::rpc::LRRbot;
 use crate::time::HumanReadable;
-use crate::twitch::helix::User;
+use crate::twitch::helix::User as TwitchUser;
 use crate::twitch::Helix;
 use crate::typemap_keys::PgPool;
 use anyhow::{Context, Error};
@@ -77,26 +77,33 @@ impl Autotopic {
 
         let mut messages = vec![];
 
-        if header.is_live {
-            let (game, show, game_entry) = {
-                let conn = ctx
-                    .data
-                    .read()
-                    .extract::<PgPool>()?
-                    .get()
-                    .context("failed to get a database connection from the pool")?;
+        let user;
+        let game;
+        let show;
+        let game_entry;
 
-                let game = header
+        {
+            let data = ctx.data.read();
+            let conn = data
+                .extract::<PgPool>()?
+                .get()
+                .context("failed to get a database connection from the pool")?;
+
+            user = User::by_name(&data.extract::<Config>()?.username, &conn)
+                .context("failed to load the bot user")?;
+
+            if header.is_live {
+                game = header
                     .current_game
                     .map(|game| Game::find(game.id, &conn))
                     .transpose()
                     .context("failed to load the game")?;
-                let show = header
+                show = header
                     .current_show
                     .map(|show| Show::find(show.id, &conn))
                     .transpose()
                     .context("failed to load the show")?;
-                let game_entry =
+                game_entry =
                     if let (Some(game), Some(show)) = (header.current_game, header.current_show) {
                         GameEntry::find(game.id, show.id, &conn)
                             .optional()
@@ -104,10 +111,14 @@ impl Autotopic {
                     } else {
                         None
                     };
+            } else {
+                game = None;
+                show = None;
+                game_entry = None;
+            }
+        }
 
-                (game, show, game_entry)
-            };
-
+        if header.is_live {
             match (game, show) {
                 (Some(game), Some(show)) => {
                     messages.push(format!(
@@ -128,7 +139,7 @@ impl Autotopic {
                 (None, None) => messages.push(String::from("Now live: something?")),
             }
 
-            match self.uptime_msg(ctx, &header.channel).await {
+            match self.uptime_msg(ctx, &user, &header.channel).await {
                 Ok(msg) => messages.push(msg),
                 Err(err) => error!("failed to generate the uptime message"; "error" => ?err),
             }
@@ -142,7 +153,7 @@ impl Autotopic {
                 .context("failed to get the next scheduled stream")?;
             let events = Calendar::get_next_event(&events, now, false);
 
-            let desertbus = self.desertbus(ctx, now, &events).await?;
+            let desertbus = self.desertbus(ctx, &user, now, &events).await?;
             if !desertbus.is_empty() {
                 messages.extend(desertbus);
             } else {
@@ -165,12 +176,21 @@ impl Autotopic {
         Ok(())
     }
 
-    async fn uptime_msg<'a>(self, ctx: &'a ErisContext, channel: &'a str) -> Result<String, Error> {
+    async fn uptime_msg<'a>(
+        self,
+        ctx: &'a ErisContext,
+        user: &User,
+        channel: &'a str,
+    ) -> Result<String, Error> {
         let helix = ctx.data.read().extract::<Helix>()?.clone();
         Ok(helix
-            .get_stream(User::Login(channel))
+            .get_streams(
+                &user.twitch_oauth.as_ref().context("token missing")?,
+                &[TwitchUser::Login(channel)],
+            )
             .await
             .context("failed to get the stream")?
+            .first()
             .map(|stream| {
                 format!(
                     "The stream has been live for {}.",
@@ -180,11 +200,12 @@ impl Autotopic {
             .unwrap_or_else(|| String::from("The stream is not live.")))
     }
 
-    async fn desertbus<'a>(
+    async fn desertbus(
         self,
-        ctx: &'a ErisContext,
+        ctx: &ErisContext,
+        user: &User,
         now: DateTime<Utc>,
-        events: &'a [Event],
+        events: &[Event],
     ) -> Result<Vec<String>, Error> {
         let start = DesertBus::start_time().with_timezone(&Utc);
         let announce_start = start - chrono::Duration::days(2);
@@ -233,7 +254,7 @@ impl Autotopic {
                     money_raised.separated_string_with_fixed_place(2)
                 ));
             } else if now <= start + chrono::Duration::hours(total_hours)
-                || self.is_desertbus_live(ctx).await
+                || self.is_desertbus_live(ctx, user).await
             {
                 messages.push(String::from(
                     "DESERT BUS! (https://desertbus.org/ or https://twitch.tv/desertbus)",
@@ -255,9 +276,18 @@ impl Autotopic {
         Ok(messages)
     }
 
-    async fn is_desertbus_live(self, ctx: &ErisContext) -> bool {
+    async fn is_desertbus_live(self, ctx: &ErisContext, user: &User) -> bool {
         let helix = ctx.data.read().extract::<Helix>().unwrap().clone();
 
-        helix.get_stream(User::Login("desertbus")).await.unwrap_or(None).is_some()
+        if let Some(token) = user.twitch_oauth.as_ref() {
+            !helix
+                .get_streams(&token, &[TwitchUser::Login("desertbus")])
+                .await
+                .ok()
+                .unwrap_or_else(Vec::new)
+                .is_empty()
+        } else {
+            false
+        }
     }
 }

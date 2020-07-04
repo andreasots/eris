@@ -139,3 +139,9 @@ pub struct User {
     pub chat_timestamps_24hr: bool,
     pub chat_timestamps_secs: bool,
 }
+
+impl User {
+    pub fn by_name<C: Connection<Backend = Pg>>(name: &str, conn: &C) -> QueryResult<Self> {
+        users::table.filter(users::name.eq(name)).first(conn)
+    }
+}

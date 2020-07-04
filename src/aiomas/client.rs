@@ -85,9 +85,7 @@ impl Client {
                             let request_id = next_request_id;
                             next_request_id += 1;
 
-                            // FIXME(rust-lang/rust#61579): this manual `drop()` is needed because
-                            //  if the result of `pending.insert()` is not used the compiler ICEs.
-                            drop(pending.insert(request_id, channel));
+                            pending.insert(request_id, channel);
 
                             if let Err(err) = sink.send((request_id, request)).await {
                                 error!("Failed to send the request"; "error" => ?err);
@@ -153,9 +151,7 @@ mod tests {
             .await
             .expect("queue second");
 
-        // FIXME: `REQUEST` has a constant size so an array could be used instead but
-        //  this currently requires `#![feature(const_slice_len)]`.
-        let mut buf = vec![0; REQUEST.len()];
+        let mut buf = [0; REQUEST.len()];
         write.read_exact(&mut buf[..]).await.expect("failed to read request");
         assert_eq!(&buf[..], REQUEST);
         write.write_all(RESPONSE).await.expect("failed to write response");
