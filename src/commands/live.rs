@@ -19,9 +19,9 @@ struct Fanstreams;
 
 fn push_stream(builder: &mut MessageBuilder, games: &HashMap<&str, &Game>, stream: &Stream) {
     // FIXME: the MessageBuilder doesn't escape spoilers
-    builder.push_safe(&stream.user_name.replace('|', "\\|"));
+    builder.push(&stream.user_name);
     builder.push(" (<https://twitch.tv/");
-    builder.push_safe(&stream.user_name.replace('|', "\\|"));
+    builder.push(&stream.user_name);
     builder.push(">)");
     builder.push(" is playing ");
     builder.push_safe(&games[stream.game_id.as_str()].name.replace('|', "\\|"));

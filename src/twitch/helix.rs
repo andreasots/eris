@@ -100,7 +100,7 @@ struct Pagination {
 #[derive(Deserialize)]
 struct PaginatedResponse<T> {
     data: Vec<T>,
-    pagination: Pagination,
+    pagination: Option<Pagination>,
 }
 
 /// The New Twitch API
@@ -157,7 +157,7 @@ impl Helix {
 
                 streams.extend(response.data.drain(..));
 
-                if let Some(cursor) = response.pagination.cursor {
+                if let Some(cursor) = response.pagination.and_then(|p| p.cursor) {
                     after = Some(cursor);
                 } else {
                     break;
@@ -200,7 +200,7 @@ impl Helix {
 
             follows.extend(response.data.drain(..));
 
-            if let Some(cursor) = response.pagination.cursor {
+            if let Some(cursor) = response.pagination.and_then(|p| p.cursor) {
                 after = Some(cursor);
             } else {
                 break;
@@ -251,7 +251,7 @@ impl Helix {
 
                 games.extend(response.data.drain(..));
 
-                if let Some(cursor) = response.pagination.cursor {
+                if let Some(cursor) = response.pagination.and_then(|p| p.cursor) {
                     after = Some(cursor);
                 } else {
                     break;
