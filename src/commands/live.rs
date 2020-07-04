@@ -63,7 +63,8 @@ fn live(ctx: &mut Context, msg: &Message, _: Args) -> CommandResult {
             let streams =
                 helix.get_streams(token, &users).await.context("failed to get the streams")?;
 
-            let users = streams.iter().map(|stream| UserId::Id(&stream.id)).collect::<Vec<_>>();
+            let users =
+                streams.iter().map(|stream| UserId::Id(&stream.user_id)).collect::<Vec<_>>();
 
             let users =
                 helix.get_users(token, &users).await.context("failed to get the streamers")?;

@@ -3,7 +3,7 @@ use anyhow::{Context, Error};
 use chrono::{DateTime, FixedOffset};
 use reqwest::header::HeaderValue;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 #[derive(Copy, Clone, Debug)]
 pub enum UserId<'a> {
@@ -49,14 +49,6 @@ pub struct User {
     pub display_name: String,
 }
 
-#[derive(Serialize)]
-struct GetUsersFollowsQueryParams<'a> {
-    after: Option<&'a str>,
-    first: u64,
-    from_id: Option<&'a str>,
-    to_id: Option<&'a str>,
-}
-
 #[derive(Deserialize)]
 struct Pagination {
     cursor: Option<String>,
@@ -66,6 +58,53 @@ struct Pagination {
 struct PaginatedResponse<T> {
     data: Vec<T>,
     pagination: Option<Pagination>,
+}
+
+trait FillParams {
+    fn fill_params<'a>(&'a self, params: &mut Vec<(&'a str, &'a str)>);
+}
+
+impl FillParams for UserId<'_> {
+    fn fill_params<'a>(&'a self, params: &mut Vec<(&'a str, &'a str)>) {
+        match *self {
+            UserId::Id(id) => params.push(("id", id)),
+            UserId::Login(login) => params.push(("login", login)),
+        }
+    }
+}
+
+struct Prefixed<T>(T);
+
+impl FillParams for Prefixed<UserId<'_>> {
+    fn fill_params<'a>(&'a self, params: &mut Vec<(&'a str, &'a str)>) {
+        match self.0 {
+            UserId::Id(id) => params.push(("user_id", id)),
+            UserId::Login(login) => params.push(("user_login", login)),
+        }
+    }
+}
+
+impl FillParams for GameId<'_> {
+    fn fill_params<'a>(&'a self, params: &mut Vec<(&'a str, &'a str)>) {
+        match *self {
+            GameId::Id(id) => params.push(("id", id)),
+            // GameId::Name(name) => params.push(("name", name)),
+        }
+    }
+}
+
+impl<T: FillParams + ?Sized> FillParams for &T {
+    fn fill_params<'a>(&'a self, params: &mut Vec<(&'a str, &'a str)>) {
+        (*self).fill_params(params)
+    }
+}
+
+impl<T: FillParams> FillParams for [T] {
+    fn fill_params<'a>(&'a self, params: &mut Vec<(&'a str, &'a str)>) {
+        for elem in self {
+            elem.fill_params(params);
+        }
+    }
 }
 
 /// The New Twitch API
@@ -84,78 +123,27 @@ impl Helix {
         })
     }
 
-    pub async fn get_streams(
+    async fn paginated<F: FillParams, T: for<'de> Deserialize<'de>>(
         &self,
+        url: &str,
         token: &str,
-        user_ids: &[UserId<'_>],
-    ) -> Result<Vec<Stream>, Error> {
-        let mut streams = vec![];
-
-        for chunk in user_ids.chunks(100) {
-            let mut after = None::<String>;
-
-            loop {
-                let mut response = {
-                    let mut params = vec![];
-
-                    for user in chunk {
-                        match *user {
-                            UserId::Id(id) => params.push(("user_id", id)),
-                            UserId::Login(login) => params.push(("user_login", login)),
-                        }
-                    }
-                    params.push(("first", "100"));
-                    if let Some(after) = after.as_ref() {
-                        params.push(("after", after));
-                    }
-
-                    self.client
-                        .get("https://api.twitch.tv/helix/streams")
-                        .query(&params)
-                        .header("Client-ID", self.client_id.clone())
-                        .bearer_auth(token)
-                        .send()
-                        .await
-                        .context("failed to send the request")?
-                        .error_for_status()
-                        .context("request failed")?
-                        .json::<PaginatedResponse<Stream>>()
-                        .await
-                        .context("failed to read the response")?
-                };
-
-                streams.extend(response.data.drain(..));
-
-                if let Some(cursor) = response.pagination.and_then(|p| p.cursor) {
-                    after = Some(cursor);
-                } else {
-                    break;
-                }
-            }
-        }
-
-        Ok(streams)
-    }
-
-    pub async fn get_user_follows(
-        &self,
-        token: &str,
-        from_id: Option<&str>,
-        to_id: Option<&str>,
-    ) -> Result<Vec<Follow>, Error> {
-        let mut follows = vec![];
+        params: F,
+    ) -> Result<Vec<T>, Error> {
+        let mut result = vec![];
         let mut after = None::<String>;
 
         loop {
+            let mut req_params = vec![];
+            params.fill_params(&mut req_params);
+            req_params.push(("first", "100"));
+            if let Some(after) = after.as_ref() {
+                req_params.push(("after", after));
+            }
+
             let mut response = self
                 .client
-                .get("https://api.twitch.tv/helix/users/follows")
-                .query(&GetUsersFollowsQueryParams {
-                    from_id,
-                    to_id,
-                    after: after.as_ref().map(String::as_str),
-                    first: 100,
-                })
+                .get(url)
+                .query(&req_params)
                 .header("Client-ID", self.client_id.clone())
                 .bearer_auth(token)
                 .send()
@@ -163,11 +151,11 @@ impl Helix {
                 .context("failed to send the request")?
                 .error_for_status()
                 .context("request failed")?
-                .json::<PaginatedResponse<Follow>>()
+                .json::<PaginatedResponse<T>>()
                 .await
                 .context("failed to read the response")?;
 
-            follows.extend(response.data.drain(..));
+            result.extend(response.data.drain(..));
 
             if let Some(cursor) = response.pagination.and_then(|p| p.cursor) {
                 after = Some(cursor);
@@ -176,111 +164,68 @@ impl Helix {
             }
         }
 
-        Ok(follows)
+        Ok(result)
     }
 
-    pub async fn get_games(
+    async fn lookup<I: FillParams, T: for<'de> Deserialize<'de>>(
+        &self,
+        url: &str,
+        token: &str,
+        ids: &[I],
+    ) -> Result<Vec<T>, Error> {
+        let mut result = vec![];
+
+        for chunk in ids.chunks(100) {
+            result.extend(self.paginated(url, token, chunk).await?);
+        }
+
+        Ok(result)
+    }
+
+    pub async fn get_streams(
         &self,
         token: &str,
-        game_ids: &[GameId<'_>],
-    ) -> Result<Vec<Game>, Error> {
-        let mut games = vec![];
+        users: &[UserId<'_>],
+    ) -> Result<Vec<Stream>, Error> {
+        let users = users.iter().copied().map(Prefixed).collect::<Vec<_>>();
+        self.lookup("https://api.twitch.tv/helix/streams", token, &users[..]).await
+    }
 
-        for chunk in game_ids.chunks(100) {
-            let mut after = None::<String>;
+    pub async fn get_user_follows(
+        &self,
+        token: &str,
+        from_id: Option<&str>,
+        to_id: Option<&str>,
+    ) -> Result<Vec<Follow>, Error> {
+        struct Params<'a> {
+            from_id: Option<&'a str>,
+            to_id: Option<&'a str>,
+        }
 
-            loop {
-                let mut response = {
-                    let mut params = vec![];
-
-                    for game in chunk {
-                        match *game {
-                            GameId::Id(id) => params.push(("id", id)),
-                            // GameId::Name(name) => params.push(("name", name)),
-                        }
-                    }
-                    if let Some(after) = after.as_ref() {
-                        params.push(("after", after));
-                    }
-
-                    self.client
-                        .get("https://api.twitch.tv/helix/games")
-                        .query(&params)
-                        .header("Client-ID", self.client_id.clone())
-                        .bearer_auth(token)
-                        .send()
-                        .await
-                        .context("failed to send the request")?
-                        .error_for_status()
-                        .context("request failed")?
-                        .json::<PaginatedResponse<Game>>()
-                        .await
-                        .context("failed to read the response")?
-                };
-
-                games.extend(response.data.drain(..));
-
-                if let Some(cursor) = response.pagination.and_then(|p| p.cursor) {
-                    after = Some(cursor);
-                } else {
-                    break;
+        impl FillParams for Params<'_> {
+            fn fill_params<'a>(&'a self, params: &mut Vec<(&'a str, &'a str)>) {
+                if let Some(from_id) = self.from_id {
+                    params.push(("from_id", from_id));
+                }
+                if let Some(to_id) = self.to_id {
+                    params.push(("to_id", to_id));
                 }
             }
         }
 
-        Ok(games)
+        self.paginated(
+            "https://api.twitch.tv/helix/users/follows",
+            token,
+            Params { from_id, to_id },
+        )
+        .await
     }
 
-    pub async fn get_users(
-        &self,
-        token: &str,
-        user_ids: &[UserId<'_>],
-    ) -> Result<Vec<User>, Error> {
-        let mut users = vec![];
+    pub async fn get_games(&self, token: &str, games: &[GameId<'_>]) -> Result<Vec<Game>, Error> {
+        self.lookup("https://api.twitch.tv/helix/games", token, games).await
+    }
 
-        for chunk in user_ids.chunks(100) {
-            let mut after = None::<String>;
-
-            loop {
-                let mut response = {
-                    let mut params = vec![];
-
-                    for user in chunk {
-                        match *user {
-                            UserId::Id(id) => params.push(("user_id", id)),
-                            UserId::Login(login) => params.push(("user_login", login)),
-                        }
-                    }
-                    params.push(("first", "100"));
-                    if let Some(after) = after.as_ref() {
-                        params.push(("after", after));
-                    }
-
-                    self.client
-                        .get("https://api.twitch.tv/helix/users")
-                        .query(&params)
-                        .header("Client-ID", self.client_id.clone())
-                        .bearer_auth(token)
-                        .send()
-                        .await
-                        .context("failed to send the request")?
-                        .error_for_status()
-                        .context("request failed")?
-                        .json::<PaginatedResponse<User>>()
-                        .await
-                        .context("failed to read the response")?
-                };
-
-                users.extend(response.data.drain(..));
-
-                if let Some(cursor) = response.pagination.and_then(|p| p.cursor) {
-                    after = Some(cursor);
-                } else {
-                    break;
-                }
-            }
-        }
-
-        Ok(users)
+    pub async fn get_users(&self, token: &str, users: &[UserId<'_>]) -> Result<Vec<User>, Error> {
+        self.lookup("https://api.twitch.tv/helix/users", token, users).await
     }
 }
