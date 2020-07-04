@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::extract::Extract;
 use crate::models::User;
-use crate::twitch::helix::{Game, GameDescriptor, Stream, User as TwitchUser};
+use crate::twitch::helix::{Game, GameId, Stream, User as TwitchUser, UserId};
 use crate::twitch::Helix;
 use crate::typemap_keys::{Executor, PgPool};
 use anyhow::{Context as _, Error};
@@ -17,11 +17,16 @@ use std::collections::HashMap;
 #[commands(live)]
 struct Fanstreams;
 
-fn push_stream(builder: &mut MessageBuilder, games: &HashMap<&str, &Game>, stream: &Stream) {
+fn push_stream(
+    builder: &mut MessageBuilder,
+    users: &HashMap<&str, &TwitchUser>,
+    games: &HashMap<&str, &Game>,
+    stream: &Stream,
+) {
     // FIXME: the MessageBuilder doesn't escape spoilers
-    builder.push(&stream.user_name);
+    builder.push_safe(&stream.user_name.replace('|', "\\|"));
     builder.push(" (<https://twitch.tv/");
-    builder.push(&stream.user_name);
+    builder.push(&users[stream.user_id.as_str()].login);
     builder.push(">)");
     builder.push(" is playing ");
     builder.push_safe(&games[stream.game_id.as_str()].name.replace('|', "\\|"));
@@ -43,7 +48,7 @@ fn live(ctx: &mut Context, msg: &Message, _: Args) -> CommandResult {
             .context("failed to load the bot user")?
     };
 
-    let (mut streams, games) = {
+    let (users, mut streams, games) = {
         let helix = data.extract::<Helix>()?.clone();
         data.extract::<Executor>()?.block_on(async move {
             let token = user.twitch_oauth.as_ref().map(String::as_str).context("token missing")?;
@@ -53,24 +58,27 @@ fn live(ctx: &mut Context, msg: &Message, _: Args) -> CommandResult {
                 .await
                 .context("failed to get the follows")?;
 
-            let users =
-                follows.iter().map(|follow| TwitchUser::Id(&follow.to_id)).collect::<Vec<_>>();
+            let users = follows.iter().map(|follow| UserId::Id(&follow.to_id)).collect::<Vec<_>>();
 
             let streams =
                 helix.get_streams(token, &users).await.context("failed to get the streams")?;
 
-            let games = streams
-                .iter()
-                .map(|stream| GameDescriptor::Id(&stream.game_id))
-                .collect::<Vec<_>>();
+            let users = streams.iter().map(|stream| UserId::Id(&stream.id)).collect::<Vec<_>>();
+
+            let users =
+                helix.get_users(token, &users).await.context("failed to get the streamers")?;
+
+            let games =
+                streams.iter().map(|stream| GameId::Id(&stream.game_id)).collect::<Vec<_>>();
 
             let games = helix.get_games(token, &games).await.context("failed to get the games")?;
 
-            Ok::<_, Error>((streams, games))
+            Ok::<_, Error>((users, streams, games))
         })?
     };
 
-    let games = games.iter().map(|game| (game.id.as_str(), game)).collect::<HashMap<&str, &Game>>();
+    let games = games.iter().map(|game| (game.id.as_str(), game)).collect::<HashMap<_, _>>();
+    let users = users.iter().map(|user| (user.id.as_str(), user)).collect::<HashMap<_, _>>();
 
     if streams.is_empty() {
         msg.reply(&ctx, "No fanstreamers currently live.")?;
@@ -83,7 +91,7 @@ fn live(ctx: &mut Context, msg: &Message, _: Args) -> CommandResult {
             if i != 0 {
                 builder.push(", ");
             }
-            push_stream(&mut builder, &games, &stream);
+            push_stream(&mut builder, &users, &games, &stream);
         }
         msg.reply(&ctx, builder.build())?;
     }
@@ -94,13 +102,22 @@ fn live(ctx: &mut Context, msg: &Message, _: Args) -> CommandResult {
 #[cfg(test)]
 mod test {
     use super::push_stream;
-    use crate::twitch::helix::{Game, Stream, StreamType};
+    use crate::twitch::helix::{Game, Stream, User};
     use chrono::DateTime;
     use serenity::utils::MessageBuilder;
     use std::collections::HashMap;
 
     #[test]
     fn formatting() {
+        let qrpth = User {
+            id: "29801300".to_string(),
+            login: "qrpth".to_string(),
+            display_name: "qrpth".to_string(),
+        };
+
+        let mut users = HashMap::new();
+        users.insert(qrpth.id.as_str(), &qrpth);
+
         let minesweeper = Game {
             id: "3681".to_string(),
             name: "Minesweeper".to_string(),
@@ -113,19 +130,14 @@ mod test {
         let mut builder = MessageBuilder::new();
         push_stream(
             &mut builder,
+            &users,
             &games,
             &Stream {
                 game_id: "3681".to_string(),
-                id: "123456789".to_string(),
-                language: "en".to_string(),
                 started_at: DateTime::parse_from_rfc3339("2020-04-07T11:45:20Z").unwrap(),
-                tag_ids: vec![],
-                thumbnail_url: "https://".to_string(),
                 title: "Let's explode || Minesweeper".to_string(),
-                stream_type: StreamType::Live,
                 user_id: "29801300".to_string(),
                 user_name: "qrpth".to_string(),
-                viewer_count: 1,
             },
         );
         assert_eq!(builder.build(), "qrpth (<https://twitch.tv/qrpth>) is playing Minesweeper (Let\'s explode \\|\\| Minesweeper)");

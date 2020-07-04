@@ -6,7 +6,7 @@ use crate::google::calendar::{Calendar, Event, LRR};
 use crate::models::{Game, GameEntry, Show, User};
 use crate::rpc::LRRbot;
 use crate::time::HumanReadable;
-use crate::twitch::helix::User as TwitchUser;
+use crate::twitch::helix::UserId;
 use crate::twitch::Helix;
 use crate::typemap_keys::PgPool;
 use anyhow::{Context, Error};
@@ -186,7 +186,7 @@ impl Autotopic {
         Ok(helix
             .get_streams(
                 &user.twitch_oauth.as_ref().context("token missing")?,
-                &[TwitchUser::Login(channel)],
+                &[UserId::Login(channel)],
             )
             .await
             .context("failed to get the stream")?
@@ -281,7 +281,7 @@ impl Autotopic {
 
         if let Some(token) = user.twitch_oauth.as_ref() {
             !helix
-                .get_streams(&token, &[TwitchUser::Login("desertbus")])
+                .get_streams(&token, &[UserId::Login("desertbus")])
                 .await
                 .ok()
                 .unwrap_or_else(Vec::new)
