@@ -9,7 +9,7 @@ use serenity::prelude::*;
 
 #[group("Date")]
 #[description = "Date commands"]
-#[commands(march, september)]
+#[commands(march, september, november)]
 struct Date;
 
 #[command]
@@ -24,6 +24,13 @@ fn march(ctx: &mut Context, msg: &Message, _args: Args) -> CommandResult {
 #[num_args(0)]
 fn september(ctx: &mut Context, msg: &Message, _args: Args) -> CommandResult {
     eternal(ctx, msg, NaiveDate::from_ymd(1993, 9, 1))
+}
+
+#[command]
+#[description = "Post the current date.\n\n(https://desertbus.org/)"]
+#[num_args(0)]
+fn november(ctx: &mut Context, msg: &Message, _args: Args) -> CommandResult {
+    eternal(ctx, msg, NaiveDate::from_ymd(2007, 11, 1))
 }
 
 fn eternal(ctx: &mut Context, msg: &Message, epoch: NaiveDate) -> CommandResult {

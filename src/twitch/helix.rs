@@ -175,6 +175,7 @@ impl Helix {
     ) -> Result<Vec<T>, Error> {
         let mut result = vec![];
 
+        // FIXME: do it in parallel. Blocked by rust-lang/rust#64552.
         for chunk in ids.chunks(100) {
             result.extend(self.paginated(url, token, chunk).await?);
         }
