@@ -1783,9 +1783,9 @@ checksum = "fbee7696b84bbf3d89a1c2eccff0850e3047ed46bfcd2e92c29a2d074d57e252"
 
 [[package]]
 name = "socket2"
-version = "0.3.12"
+version = "0.3.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03088793f677dce356f3ccc2edb1b314ad191ab702a5de3faf49304f7e104918"
+checksum = "4f44574f7ce55445b522153d04ecc3f996db298b70702e6a5a93161dd6c76261"
 dependencies = [
  "cfg-if",
  "libc",
