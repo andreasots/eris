@@ -149,10 +149,7 @@ impl Autotopic {
         } else {
             let now = Utc::now();
 
-            let events = ctx
-                .data
-                .read()
-                .await
+            let events = data
                 .extract::<Calendar>()?
                 .get_upcoming_events(LRR, now)
                 .await
