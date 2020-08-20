@@ -13,7 +13,7 @@ pub trait Extract {
         T::Value: Send + Sync;
 }
 
-impl Extract for ShareMap {
+impl Extract for TypeMap {
     fn extract<T>(&self) -> Result<&T::Value, Error>
     where
         T: TypeMapKey,

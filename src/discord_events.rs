@@ -1,15 +1,15 @@
 use crate::config::Config;
 use crate::extract::Extract;
 use crate::influxdb::{InfluxDB, Measurement, New, Timestamp};
-use crate::typemap_keys::Executor;
 use anyhow::{bail, Context as _, Error};
 use joinery::Joinable;
+use serenity::async_trait;
 use serenity::http::client::Http;
 use serenity::model::prelude::*;
 use serenity::prelude::*;
 use slog_scope::error;
 use std::convert::TryFrom;
-use std::sync::Arc;
+use std::future::Future;
 
 pub struct DiscordEvents;
 
@@ -29,15 +29,15 @@ impl DiscordEvents {
             .collect()
     }
 
-    fn log_error<F: FnOnce() -> Result<(), Error>>(f: F) {
-        match f() {
+    async fn log_error<F: FnOnce() -> T, T: Future<Output = Result<(), Error>>>(f: F) {
+        match f().await {
             Ok(()) => (),
             Err(err) => error!("Error in event handler"; "error" => ?err),
         }
     }
 
-    fn set_activity(&self, ctx: Context) {
-        let data = ctx.data.read();
+    async fn set_activity(&self, ctx: Context) {
+        let data = ctx.data.read().await;
         let config = data.extract::<Config>().unwrap();
         let activity = if let Some(build_number) = option_env!("TRAVIS_BUILD_NUMBER") {
             format!(
@@ -49,14 +49,14 @@ impl DiscordEvents {
         } else {
             format!("{}help || v{}", config.command_prefix, env!("CARGO_PKG_VERSION"))
         };
-        ctx.set_activity(Activity::listening(&activity));
+        ctx.set_activity(Activity::listening(&activity)).await;
     }
 
-    fn create_measurement_for_channel(
+    fn create_measurement_for_channel<'a>(
         &self,
-        channel: &GuildChannel,
-        event: &'static str,
-    ) -> Measurement<'static, New> {
+        channel: &'a GuildChannel,
+        event: &'a str,
+    ) -> Measurement<'a, New> {
         let kind = match channel.kind {
             ChannelType::Voice => "voice_channels",
             ChannelType::Text => "text_channels",
@@ -65,7 +65,7 @@ impl DiscordEvents {
 
         let mut measurement = Measurement::new(kind, Timestamp::Now)
             .add_tag("channel_id", channel.id.to_string())
-            .add_tag("channel_name", channel.name.clone())
+            .add_tag("channel_name", channel.name.as_str())
             .add_tag("event", event);
         if let Some(category_id) = channel.category_id {
             measurement = measurement.add_tag("category_id", category_id.to_string());
@@ -74,40 +74,41 @@ impl DiscordEvents {
         measurement
     }
 
-    fn kick_from_voice(&self, http: &Http, guild: GuildId, user: UserId) -> Result<(), Error> {
-        // FIXME: (or rather Serenity) `guild.move_member()` doesn't take `None`
-        let mut map = serde_json::Map::new();
-        map.insert("channel_id".to_string(), serde_json::Value::Null);
-        Ok(http.edit_member(guild.0, user.0, &map)?)
+    async fn kick_from_voice(
+        &self,
+        http: &Http,
+        guild: GuildId,
+        user: UserId,
+    ) -> Result<(), Error> {
+        guild.disconnect_member(http, user).await?;
+        Ok(())
     }
 }
 
+#[async_trait]
 impl EventHandler for DiscordEvents {
-    fn ready(&self, ctx: Context, _data_about_bot: Ready) {
-        self.set_activity(ctx);
+    async fn ready(&self, ctx: Context, _data_about_bot: Ready) {
+        self.set_activity(ctx).await
     }
 
-    fn resume(&self, ctx: Context, _event: ResumedEvent) {
-        self.set_activity(ctx);
+    async fn resume(&self, ctx: Context, _event: ResumedEvent) {
+        self.set_activity(ctx).await
     }
 
-    fn channel_create(&self, ctx: Context, channel: Arc<RwLock<GuildChannel>>) {
-        Self::log_error(|| {
-            let data = ctx.data.read();
+    async fn channel_create(&self, ctx: Context, channel: &GuildChannel) {
+        Self::log_error(|| async {
+            let data = ctx.data.read().await;
             if let Some(influxdb) = data.get::<InfluxDB>() {
-                let executor = data.extract::<Executor>()?;
-
-                let channel = channel.read();
                 let measurement = match channel.kind {
                     ChannelType::Voice => {
-                        let guild = match channel.guild(&ctx) {
+                        let guild = match channel.guild(&ctx).await {
                             Some(guild) => guild,
                             None => {
                                 bail!("failed to get the guild for the channel {:?}", channel.name)
                             }
                         };
 
-                        let users = Self::users_for(&guild.read(), channel.id);
+                        let users = Self::users_for(&guild, channel.id);
 
                         let mut measurement =
                             self.create_measurement_for_channel(&channel, "create").add_field(
@@ -126,22 +127,20 @@ impl EventHandler for DiscordEvents {
                     _ => return Ok(()),
                 };
 
-                let influxdb = influxdb.clone();
-                executor
-                    .block_on(async move { influxdb.write(&[measurement]).await })
+                influxdb
+                    .write(&[measurement])
+                    .await
                     .context("failed to write the user count to InfluxDB")?;
             }
             Ok(())
         })
+        .await
     }
 
-    fn channel_delete(&self, ctx: Context, channel: Arc<RwLock<GuildChannel>>) {
-        Self::log_error(|| {
-            let data = ctx.data.read();
+    async fn channel_delete(&self, ctx: Context, channel: &GuildChannel) {
+        Self::log_error(|| async {
+            let data = ctx.data.read().await;
             if let Some(influxdb) = data.get::<InfluxDB>() {
-                let executor = data.extract::<Executor>()?;
-
-                let channel = channel.read();
                 let measurement = match channel.kind {
                     ChannelType::Voice => self
                         .create_measurement_for_channel(&channel, "delete")
@@ -152,37 +151,35 @@ impl EventHandler for DiscordEvents {
                     _ => return Ok(()),
                 };
 
-                let influxdb = influxdb.clone();
-                executor
-                    .block_on(async move { influxdb.write(&[measurement]).await })
+                influxdb
+                    .write(&[measurement])
+                    .await
                     .context("failed to write the user count to InfluxDB")?;
             }
             Ok(())
         })
+        .await
     }
 
-    fn channel_update(&self, ctx: Context, _old: Option<Channel>, new: Channel) {
-        Self::log_error(|| {
-            let data = ctx.data.read();
+    async fn channel_update(&self, ctx: Context, _old: Option<Channel>, new: Channel) {
+        Self::log_error(|| async {
+            let data = ctx.data.read().await;
             if let Some(influxdb) = data.get::<InfluxDB>() {
-                let executor = data.extract::<Executor>()?;
-
                 let channel = if let Some(channel) = new.guild() {
                     channel
                 } else {
                     return Ok(());
                 };
-                let channel = channel.read();
                 let measurement = match channel.kind {
                     ChannelType::Voice => {
-                        let guild = match channel.guild(&ctx) {
+                        let guild = match channel.guild(&ctx).await {
                             Some(guild) => guild,
                             None => {
                                 bail!("failed to get the guild for the channel {:?}", channel.name)
                             }
                         };
 
-                        let users = Self::users_for(&guild.read(), channel.id);
+                        let users = Self::users_for(&guild, channel.id);
 
                         let mut measurement =
                             self.create_measurement_for_channel(&channel, "update").add_field(
@@ -201,35 +198,33 @@ impl EventHandler for DiscordEvents {
                     _ => return Ok(()),
                 };
 
-                let influxdb = influxdb.clone();
-                executor
-                    .block_on(async move { influxdb.write(&[measurement]).await })
+                influxdb
+                    .write(&[measurement])
+                    .await
                     .context("failed to write the user count to InfluxDB")?;
             }
             Ok(())
         })
+        .await
     }
 
-    fn guild_create(&self, ctx: Context, guild: Guild, _is_new: bool) {
+    async fn guild_create(&self, ctx: Context, guild: Guild, _is_new: bool) {
         if let Some(afk_channel) = guild.afk_channel_id {
             for (&user, voice_state) in &guild.voice_states {
                 if voice_state.channel_id == Some(afk_channel) {
-                    if let Err(err) = self.kick_from_voice(&ctx.http, guild.id, user) {
+                    if let Err(err) = self.kick_from_voice(&ctx.http, guild.id, user).await {
                         error!("failed to kick user from the AFK channel"; "error" => ?err);
                     }
                 }
             }
         }
 
-        Self::log_error(|| {
-            let data = ctx.data.read();
+        Self::log_error(|| async {
+            let data = ctx.data.read().await;
             if let Some(influxdb) = data.get::<InfluxDB>() {
-                let executor = data.extract::<Executor>()?;
-
                 let measurements = guild
                     .channels
                     .values()
-                    .map(|channel| channel.read())
                     .filter_map(|channel| match channel.kind {
                         ChannelType::Text => {
                             let measurement = self
@@ -256,31 +251,32 @@ impl EventHandler for DiscordEvents {
                     })
                     .collect::<Vec<_>>();
 
-                let influxdb = influxdb.clone();
-                executor
-                    .block_on(async move { influxdb.write(&measurements).await })
+                influxdb
+                    .write(&measurements)
+                    .await
                     .context("failed to write the user count to InfluxDB")?;
             }
             Ok(())
         })
+        .await
     }
 
-    fn voice_state_update(
+    async fn voice_state_update(
         &self,
         ctx: Context,
         guild: Option<GuildId>,
         old: Option<VoiceState>,
         new: VoiceState,
     ) {
-        Self::log_error(|| {
-            let data = ctx.data.read();
+        Self::log_error(|| async {
+            let data = ctx.data.read().await;
 
             if let Some(guild) = guild {
-                if let Some(guild) = guild.to_guild_cached(&ctx) {
-                    let guild = guild.read();
+                if let Some(guild) = guild.to_guild_cached(&ctx).await {
                     if let Some(afk_channel) = guild.afk_channel_id {
                         if new.channel_id == Some(afk_channel) {
-                            if let Err(err) = self.kick_from_voice(&ctx.http, guild.id, new.user_id)
+                            if let Err(err) =
+                                self.kick_from_voice(&ctx.http, guild.id, new.user_id).await
                             {
                                 error!("failed to kick user from the AFK channel"; "error" => ?err);
                             }
@@ -290,11 +286,10 @@ impl EventHandler for DiscordEvents {
             }
 
             if let Some(influxdb) = data.get::<InfluxDB>() {
-                let executor = data.extract::<Executor>()?;
-
                 let guild = match guild {
                     Some(guild) => guild
                         .to_guild_cached(&ctx)
+                        .await
                         .ok_or_else(|| Error::msg("failed to get the guild"))?,
                     None => return Ok(()),
                 };
@@ -307,13 +302,10 @@ impl EventHandler for DiscordEvents {
 
                 let mut measurements = Vec::with_capacity(2);
                 for channel_id in channels {
-                    let guild = guild.read();
-
-                    let channel = match guild.channels.get(&channel_id).cloned() {
+                    let channel = match guild.channels.get(&channel_id) {
                         Some(channel) => channel,
                         None => continue,
                     };
-                    let channel = channel.read();
 
                     let users = Self::users_for(&guild, channel.id);
 
@@ -327,37 +319,35 @@ impl EventHandler for DiscordEvents {
                     measurements.push(measurement);
                 }
 
-                let influxdb = influxdb.clone();
-                executor
-                    .block_on(async move { influxdb.write(&measurements).await })
+                influxdb
+                    .write(&measurements)
+                    .await
                     .context("failed to write the user count to InfluxDB")?;
             }
 
             Ok(())
         })
+        .await
     }
 
-    fn message(&self, ctx: Context, new_message: Message) {
-        Self::log_error(|| {
-            let data = ctx.data.read();
+    async fn message(&self, ctx: Context, new_message: Message) {
+        Self::log_error(|| async {
+            let data = ctx.data.read().await;
             if let Some(influxdb) = data.get::<InfluxDB>() {
-                let executor = data.extract::<Executor>()?;
-
-                if let Some(channel) = new_message.channel(&ctx).and_then(Channel::guild) {
-                    let channel = channel.read();
-
+                if let Some(channel) = new_message.channel(&ctx).await.and_then(Channel::guild) {
                     let measurement = self
                         .create_measurement_for_channel(&channel, "message")
                         .add_tag("user_id", new_message.author.id.to_string())
                         .add_field("count", 1);
 
-                    let influxdb = influxdb.clone();
-                    executor
-                        .block_on(async move { influxdb.write(&[measurement]).await })
+                    influxdb
+                        .write(&[measurement])
+                        .await
                         .context("failed to write the user count to InfluxDB")?;
                 }
             }
             Ok(())
         })
+        .await
     }
 }

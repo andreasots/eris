@@ -2,7 +2,6 @@ use crate::config::Config;
 use crate::extract::Extract;
 use crate::google::calendar::{Calendar as GoogleCalendar, Event, FANSTREAMS, LRR};
 use crate::time::HumanReadable;
-use crate::typemap_keys::Executor;
 use anyhow::Error;
 use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
@@ -27,8 +26,8 @@ struct Calendar;
 #[example = "America/New_York"]
 #[min_args("0")]
 #[max_args("1")]
-pub fn next(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
-    Next::lrr().execute(ctx, msg, args)
+pub async fn next(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    Next::lrr().execute(ctx, msg, args).await
 }
 
 #[command]
@@ -38,8 +37,8 @@ pub fn next(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
 #[example = "America/New_York"]
 #[min_args("0")]
 #[max_args("1")]
-pub fn nextfan(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
-    Next::fan().execute(ctx, msg, args)
+pub async fn nextfan(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    Next::fan().execute(ctx, msg, args).await
 }
 
 struct Timezone(Tz);
@@ -120,16 +119,15 @@ impl Next {
         Next { calendar: FANSTREAMS, tag: "Next scheduled fan stream", include_current: true }
     }
 
-    pub fn execute(&self, ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
-        let data = ctx.data.read();
+    pub async fn execute(&self, ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+        let data = ctx.data.read().await;
         let config = data.extract::<Config>()?;
         let google_calendar = data.extract::<GoogleCalendar>()?;
-        let executor = data.extract::<Executor>()?;
         let tz = match args.single::<Timezone>() {
             Ok(tz) => tz.0,
             Err(ArgError::Eos) => config.timezone,
             Err(ArgError::Parse(err)) => {
-                msg.reply(&ctx, &format!("Failed to parse the timezone: {}", err))?;
+                msg.reply(&ctx, &format!("Failed to parse the timezone: {}", err)).await?;
                 return Ok(());
             }
             Err(err) => return Err(err.into()),
@@ -137,13 +135,7 @@ impl Next {
 
         let now = Utc::now();
 
-        let events = {
-            let google_calendar = google_calendar.clone();
-            let calendar = self.calendar;
-            executor
-                .block_on(async move { google_calendar.get_upcoming_events(calendar, now).await })?
-        };
-
+        let events = google_calendar.get_upcoming_events(self.calendar, now).await?;
         let events = GoogleCalendar::get_next_event(&events, now, self.include_current);
 
         let mut builder = MessageBuilder::new();
@@ -156,7 +148,7 @@ impl Next {
             builder.push_event(event, now, tz);
         }
 
-        msg.reply(&ctx, &builder.build())?;
+        msg.reply(&ctx, &builder.build()).await?;
 
         Ok(())
     }

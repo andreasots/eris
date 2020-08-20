@@ -17,15 +17,15 @@ struct Time;
 #[example = "24"]
 #[min_args(0)]
 #[max_args(1)]
-fn time(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
+async fn time(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     let format = match args.current() {
         Some("24") => "%H:%M",
         None => "%l:%M %p",
         _ => return Ok(()),
     };
 
-    let now = Utc::now().with_timezone(&ctx.data.read().extract::<Config>()?.timezone);
-    msg.reply(ctx, &format!("Current moonbase time: {}", now.format(format)))?;
+    let now = Utc::now().with_timezone(&ctx.data.read().await.extract::<Config>()?.timezone);
+    msg.reply(ctx, &format!("Current moonbase time: {}", now.format(format))).await?;
 
     Ok(())
 }

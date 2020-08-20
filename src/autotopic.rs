@@ -8,12 +8,13 @@ use crate::rpc::LRRbot;
 use crate::time::HumanReadable;
 use crate::twitch::helix::UserId;
 use crate::twitch::Helix;
-use crate::typemap_keys::PgPool;
+use crate::{truncate::truncate, typemap_keys::PgPool};
 use anyhow::{Context, Error};
 use chrono::{DateTime, FixedOffset, Utc};
 use chrono_tz::Tz;
 use diesel::OptionalExtension;
 use separator::FixedPlaceSeparatable;
+use serenity::prelude::TypeMap;
 use slog_scope::error;
 use std::fmt;
 use std::time::Duration;
@@ -70,10 +71,13 @@ struct Autotopic;
 
 impl Autotopic {
     async fn update_topic(self, ctx: &ErisContext) -> Result<(), Error> {
-        let header = {
-            let lrrbot = ctx.data.read().extract::<LRRbot>()?.clone();
-            lrrbot.get_header_info().await.context("failed to fetch header info")?
-        };
+        let data = ctx.data.read().await;
+
+        let header = data
+            .extract::<LRRbot>()?
+            .get_header_info()
+            .await
+            .context("failed to fetch header info")?;
 
         let mut messages = vec![];
 
@@ -83,7 +87,6 @@ impl Autotopic {
         let game_entry;
 
         {
-            let data = ctx.data.read();
             let conn = data
                 .extract::<PgPool>()?
                 .get()
@@ -139,25 +142,28 @@ impl Autotopic {
                 (None, None) => messages.push(String::from("Now live: something?")),
             }
 
-            match self.uptime_msg(ctx, &user, &header.channel).await {
+            match self.uptime_msg(&data, &user, &header.channel).await {
                 Ok(msg) => messages.push(msg),
                 Err(err) => error!("failed to generate the uptime message"; "error" => ?err),
             }
         } else {
             let now = Utc::now();
 
-            let calendar = ctx.data.read().extract::<Calendar>()?.clone();
-            let events = calendar
+            let events = ctx
+                .data
+                .read()
+                .await
+                .extract::<Calendar>()?
                 .get_upcoming_events(LRR, now)
                 .await
                 .context("failed to get the next scheduled stream")?;
             let events = Calendar::get_next_event(&events, now, false);
 
-            let desertbus = self.desertbus(ctx, &user, now, &events).await?;
+            let desertbus = self.desertbus(&data, &user, now, &events).await?;
             if !desertbus.is_empty() {
                 messages.extend(desertbus);
             } else {
-                let tz = ctx.data.read().extract::<Config>()?.timezone;
+                let tz = data.extract::<Config>()?.timezone;
                 messages
                     .extend(events.iter().map(|event| EventDisplay { event, now, tz }.to_string()));
             }
@@ -167,23 +173,18 @@ impl Autotopic {
             messages.push(advice);
         }
 
-        let general_channel = ctx.data.read().extract::<Config>()?.general_channel;
-
-        // TODO: shorten to a max of 1024 characters, whatever that means.
-        tokio::task::block_in_place(|| general_channel.edit(ctx, |c| c.topic(&messages.join(" "))))
+        data.extract::<Config>()?
+            .general_channel
+            .edit(ctx, |c| c.topic(truncate(&messages.join(" "), 1024).0))
+            .await
             .context("failed to update the topic")?;
 
         Ok(())
     }
 
-    async fn uptime_msg<'a>(
-        self,
-        ctx: &'a ErisContext,
-        user: &User,
-        channel: &'a str,
-    ) -> Result<String, Error> {
-        let helix = ctx.data.read().extract::<Helix>()?.clone();
-        Ok(helix
+    async fn uptime_msg(self, data: &TypeMap, user: &User, channel: &str) -> Result<String, Error> {
+        Ok(data
+            .extract::<Helix>()?
             .get_streams(
                 &user.twitch_oauth.as_ref().context("token missing")?,
                 &[UserId::Login(channel)],
@@ -202,7 +203,7 @@ impl Autotopic {
 
     async fn desertbus(
         self,
-        ctx: &ErisContext,
+        data: &TypeMap,
         user: &User,
         now: DateTime<Utc>,
         events: &[Event],
@@ -218,8 +219,7 @@ impl Autotopic {
                     return Ok(messages);
                 }
             }
-
-            let desertbus = ctx.data.read().extract::<DesertBus>()?.clone();
+            let desertbus = data.extract::<DesertBus>()?;
 
             let money_raised = match desertbus.money_raised().await {
                 Ok(money_raised) => money_raised,
@@ -244,8 +244,7 @@ impl Autotopic {
                             description: None,
                         },
                         now,
-                        // FIXME: .unwrap()
-                        tz: ctx.data.read().extract::<Config>()?.timezone,
+                        tz: data.extract::<Config>()?.timezone,
                     }
                     .to_string(),
                 );
@@ -254,7 +253,7 @@ impl Autotopic {
                     money_raised.separated_string_with_fixed_place(2)
                 ));
             } else if now <= start + chrono::Duration::hours(total_hours)
-                || self.is_desertbus_live(ctx, user).await
+                || self.is_desertbus_live(data, user).await?
             {
                 messages.push(String::from(
                     "DESERT BUS! (https://desertbus.org/ or https://twitch.tv/desertbus)",
@@ -276,18 +275,17 @@ impl Autotopic {
         Ok(messages)
     }
 
-    async fn is_desertbus_live(self, ctx: &ErisContext, user: &User) -> bool {
-        let helix = ctx.data.read().extract::<Helix>().unwrap().clone();
-
+    async fn is_desertbus_live(self, data: &TypeMap, user: &User) -> Result<bool, Error> {
         if let Some(token) = user.twitch_oauth.as_ref() {
-            !helix
+            Ok(!data
+                .extract::<Helix>()?
                 .get_streams(&token, &[UserId::Login("desertbus")])
                 .await
                 .ok()
                 .unwrap_or_else(Vec::new)
-                .is_empty()
+                .is_empty())
         } else {
-            false
+            Ok(false)
         }
     }
 }

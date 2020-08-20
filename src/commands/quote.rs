@@ -343,11 +343,11 @@ fn safe<T: Display>(val: T) -> String {
     MessageBuilder::new().push_safe(val).build()
 }
 
-fn report_parse_error(
-    msg: &Message,
+async fn report_parse_error<'a>(
+    msg: &'a Message,
     ctx: &Context,
     query: &str,
-    err: ParseError<usize, parser::Token, Infallible>,
+    err: ParseError<usize, parser::Token<'a>, Infallible>,
 ) -> CommandResult {
     let (start, end) = match &err {
         ParseError::InvalidToken { location } => (*location, *location),
@@ -376,7 +376,7 @@ fn report_parse_error(
         .push_codeblock_safe(format_args!("{}\n{}", query, caret_line), None)
         .build();
 
-    msg.reply(ctx, message)?;
+    msg.reply(ctx, message).await?;
     Ok(())
 }
 
@@ -402,8 +402,8 @@ fn report_parse_error(
 /// Multiple terms can be combined together to form a more complex query. By default when you write two terms one after the other both need to match the quote (boolean AND). If the two terms are separated by a `|` then either of them needs to match the quote (boolean OR). AND has higher precedence than OR but you can use parentheses to override that.
 ///
 ///When a query matches multiple quotes a random one is picked. An empty query matches all quotes.
-fn quote(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
-    let data = ctx.data.read();
+async fn quote(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    let data = ctx.data.read().await;
     let conn = data.extract::<PgPool>()?.get()?;
 
     let query = args.rest().trim();
@@ -415,22 +415,23 @@ fn quote(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
         let parser = parser::QueryParser::new();
         let query = match parser.parse(query) {
             Ok(query) => query,
-            Err(err) => return report_parse_error(msg, &ctx, query, err),
+            Err(err) => return report_parse_error(msg, &ctx, query, err).await,
         };
         let query =
             quotes::table.filter(query.to_predicate()?).filter(diesel::dsl::not(quotes::deleted));
         query.load(&conn)?
     };
 
-    match quotes.choose(&mut rand::thread_rng()) {
+    let quote = quotes.choose(&mut rand::thread_rng());
+    match quote {
         Some(quote) => {
             let mut builder = MessageBuilder::new();
             builder.push("Quote ");
             builder.push_safe(quote);
-            msg.reply(&ctx, builder.build())?;
+            msg.reply(&ctx, builder.build()).await?;
         }
         None => {
-            msg.reply(&ctx, "Could not find any matching quotes.")?;
+            msg.reply(&ctx, "Could not find any matching quotes.").await?;
         }
     }
 
@@ -440,27 +441,30 @@ fn quote(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
 #[command]
 #[required_permissions("ADMINISTRATOR")]
 #[help_available(false)]
-fn query_debugger(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
+async fn query_debugger(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     let query = args.rest().trim();
 
     if query.is_empty() {
-        msg.reply(&ctx, "Query: pick a random quote")?;
+        msg.reply(&ctx, "Query: pick a random quote").await?;
     } else if let Ok(id) = query.parse::<i32>() {
-        msg.reply(&ctx, format!("Query: fetch quote #{}", id))?;
+        msg.reply(&ctx, format!("Query: fetch quote #{}", id)).await?;
     } else {
         let parser = parser::QueryParser::new();
         let query = match parser.parse(query) {
             Ok(query) => query,
-            Err(err) => return report_parse_error(msg, &ctx, query, err),
+            Err(err) => return report_parse_error(msg, &ctx, query, err).await,
         };
-        let predicate = query.to_predicate()?;
-        let message = MessageBuilder::new()
-            .push("AST: ")
-            .push_codeblock_safe(format!("{:#?}", query), None)
-            .push("SQL: ")
-            .push_mono_safe(diesel::debug_query(&predicate))
-            .build();
-        msg.reply(&ctx, message)?;
+
+        let message = {
+            let predicate = query.to_predicate()?;
+            MessageBuilder::new()
+                .push("AST: ")
+                .push_codeblock_safe(format!("{:#?}", query), None)
+                .push("SQL: ")
+                .push_mono_safe(diesel::debug_query(&predicate))
+                .build()
+        };
+        msg.reply(&ctx, message).await?;
     }
 
     Ok(())
@@ -471,12 +475,12 @@ fn query_debugger(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult
 #[usage = "ID"]
 #[example = "110"]
 #[num_args(1)]
-fn details(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
-    let data = ctx.data.read();
+async fn details(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    let data = ctx.data.read().await;
     let quote_id = match args.parse::<i32>() {
         Ok(id) => id,
         Err(err) => {
-            msg.reply(&ctx, format!("Failed to parse the quote ID: {}", err))?;
+            msg.reply(&ctx, format!("Failed to parse the quote ID: {}", err)).await?;
             return Ok(());
         }
     };
@@ -498,47 +502,53 @@ fn details(ctx: &mut Context, msg: &Message, args: Args) -> CommandResult {
             .optional()?
     };
     if let Some((quote, game, show, game_entry)) = quote {
-        msg.channel_id.send_message(&ctx, |m| {
-            let message = MessageBuilder::new()
-                .mention(&msg.author)
-                .push(": Quote ")
-                .push_safe(&quote)
-                .build();
-            m.content(message).embed(|embed| {
-                embed.field("ID", safe(quote.id), false).field("Quote", safe(quote.quote), false);
-                if let Some(name) = quote.attrib_name {
-                    embed.field("Name", safe(name), false);
-                }
-                if let Some(date) = quote.attrib_date {
-                    embed.field("Date", safe(date), false);
-                }
-                if let Some(context) = quote.context {
-                    embed.field("Context", safe(context), false);
-                }
-                if let Some(game) = game {
-                    embed.field("Game ID", safe(game.id), false).field(
-                        "Game name",
-                        safe(game.name),
+        msg.channel_id
+            .send_message(&ctx, |m| {
+                let message = MessageBuilder::new()
+                    .mention(&msg.author)
+                    .push(": Quote ")
+                    .push_safe(&quote)
+                    .build();
+                m.content(message).embed(|embed| {
+                    embed.field("ID", safe(quote.id), false).field(
+                        "Quote",
+                        safe(quote.quote),
                         false,
                     );
-                }
-                if let Some(game_entry) = game_entry {
-                    if let Some(display_name) = game_entry.display_name {
-                        embed.field("Game display name", safe(display_name), false);
+                    if let Some(name) = quote.attrib_name {
+                        embed.field("Name", safe(name), false);
                     }
-                }
-                if let Some(show) = show {
-                    embed.field("Show ID", safe(show.id), false).field(
-                        "Show name",
-                        safe(show.name),
-                        false,
-                    );
-                }
-                embed
+                    if let Some(date) = quote.attrib_date {
+                        embed.field("Date", safe(date), false);
+                    }
+                    if let Some(context) = quote.context {
+                        embed.field("Context", safe(context), false);
+                    }
+                    if let Some(game) = game {
+                        embed.field("Game ID", safe(game.id), false).field(
+                            "Game name",
+                            safe(game.name),
+                            false,
+                        );
+                    }
+                    if let Some(game_entry) = game_entry {
+                        if let Some(display_name) = game_entry.display_name {
+                            embed.field("Game display name", safe(display_name), false);
+                        }
+                    }
+                    if let Some(show) = show {
+                        embed.field("Show ID", safe(show.id), false).field(
+                            "Show name",
+                            safe(show.name),
+                            false,
+                        );
+                    }
+                    embed
+                })
             })
-        })?;
+            .await?;
     } else {
-        msg.reply(&ctx, format!("Could not find quote #{}", quote_id))?;
+        msg.reply(&ctx, format!("Could not find quote #{}", quote_id)).await?;
     }
     Ok(())
 }

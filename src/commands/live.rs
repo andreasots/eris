@@ -3,8 +3,8 @@ use crate::extract::Extract;
 use crate::models::User;
 use crate::twitch::helix::{Game, GameId, Stream, User as TwitchUser, UserId};
 use crate::twitch::Helix;
-use crate::typemap_keys::{Executor, PgPool};
-use anyhow::{Context as _, Error};
+use crate::typemap_keys::PgPool;
+use anyhow::Context as _;
 use serenity::framework::standard::macros::{command, group};
 use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::*;
@@ -39,8 +39,8 @@ fn push_stream(
 #[help_available]
 #[description = "Post the currently live fanstreamers."]
 #[num_args(0)]
-fn live(ctx: &mut Context, msg: &Message, _: Args) -> CommandResult {
-    let data = ctx.data.read();
+async fn live(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
+    let data = ctx.data.read().await;
     let user = {
         let conn = data.extract::<PgPool>()?.get()?;
 
@@ -48,41 +48,33 @@ fn live(ctx: &mut Context, msg: &Message, _: Args) -> CommandResult {
             .context("failed to load the bot user")?
     };
 
-    let (users, mut streams, games) = {
-        let helix = data.extract::<Helix>()?.clone();
-        data.extract::<Executor>()?.block_on(async move {
-            let token = user.twitch_oauth.as_ref().map(String::as_str).context("token missing")?;
+    let helix = data.extract::<Helix>()?;
 
-            let follows = helix
-                .get_user_follows(token, Some(&user.id.to_string()), None)
-                .await
-                .context("failed to get the follows")?;
+    let token = user.twitch_oauth.as_ref().map(String::as_str).context("token missing")?;
 
-            let users = follows.iter().map(|follow| UserId::Id(&follow.to_id)).collect::<Vec<_>>();
+    let follows = helix
+        .get_user_follows(token, Some(&user.id.to_string()), None)
+        .await
+        .context("failed to get the follows")?;
 
-            let streams =
-                helix.get_streams(token, &users).await.context("failed to get the streams")?;
+    let users = follows.iter().map(|follow| UserId::Id(&follow.to_id)).collect::<Vec<_>>();
 
-            let users =
-                streams.iter().map(|stream| UserId::Id(&stream.user_id)).collect::<Vec<_>>();
+    let mut streams =
+        helix.get_streams(token, &users).await.context("failed to get the streams")?;
 
-            let users =
-                helix.get_users(token, &users).await.context("failed to get the streamers")?;
+    let users = streams.iter().map(|stream| UserId::Id(&stream.user_id)).collect::<Vec<_>>();
 
-            let games =
-                streams.iter().map(|stream| GameId::Id(&stream.game_id)).collect::<Vec<_>>();
+    let users = helix.get_users(token, &users).await.context("failed to get the streamers")?;
 
-            let games = helix.get_games(token, &games).await.context("failed to get the games")?;
+    let games = streams.iter().map(|stream| GameId::Id(&stream.game_id)).collect::<Vec<_>>();
 
-            Ok::<_, Error>((users, streams, games))
-        })?
-    };
+    let games = helix.get_games(token, &games).await.context("failed to get the games")?;
 
     let games = games.iter().map(|game| (game.id.as_str(), game)).collect::<HashMap<_, _>>();
     let users = users.iter().map(|user| (user.id.as_str(), user)).collect::<HashMap<_, _>>();
 
     if streams.is_empty() {
-        msg.reply(&ctx, "No fanstreamers currently live.")?;
+        msg.reply(&ctx, "No fanstreamers currently live.").await?;
     } else {
         streams.sort_by(|a, b| a.user_name.cmp(&b.user_name));
         let mut builder = MessageBuilder::new();
@@ -94,7 +86,7 @@ fn live(ctx: &mut Context, msg: &Message, _: Args) -> CommandResult {
             }
             push_stream(&mut builder, &users, &games, &stream);
         }
-        msg.reply(&ctx, builder.build())?;
+        msg.reply(&ctx, builder.build()).await?;
     }
 
     Ok(())

@@ -51,7 +51,26 @@ impl<W1: std::io::Write, W2: std::io::Write> std::io::Write for DualWriter<W1, W
     }
 }
 
-fn main() -> Result<(), Error> {
+trait ClientBuilderExt {
+    fn maybe_type_map_insert<T: serenity::prelude::TypeMapKey>(self, val: Option<T::Value>)
+        -> Self;
+}
+
+impl ClientBuilderExt for serenity::client::ClientBuilder<'_> {
+    fn maybe_type_map_insert<T: serenity::prelude::TypeMapKey>(
+        self,
+        opt: Option<T::Value>,
+    ) -> Self {
+        if let Some(val) = opt {
+            self.type_map_insert::<T>(val)
+        } else {
+            self
+        }
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Error> {
     let log_file = std::fs::OpenOptions::new()
         .write(true)
         .append(true)
@@ -112,50 +131,53 @@ fn main() -> Result<(), Error> {
     >::new(&config.database_url[..]))
     .context("failed to create the database pool")?;
 
-    let mut runtime = tokio::runtime::Runtime::new().context("failed to create a Tokio runtime")?;
-    let handle = runtime.handle().clone();
+    let http_client = reqwest::ClientBuilder::new()
+        .user_agent(concat!(
+            "LRRbot/2.0 ",
+            env!("CARGO_PKG_NAME"),
+            "/",
+            env!("CARGO_PKG_VERSION"),
+            " (https://lrrbot.com)"
+        ))
+        .build()
+        .context("failed to create the HTTP client")?;
 
-    runtime.block_on(async move {
-        let http_client = reqwest::ClientBuilder::new()
-            .user_agent(concat!(
-                "LRRbot/2.0 ",
-                env!("CARGO_PKG_NAME"),
-                "/",
-                env!("CARGO_PKG_VERSION"),
-                " (https://lrrbot.com)"
-            ))
-            .build()
-            .context("failed to create the HTTP client")?;
+    let helix = twitch::Helix::new(http_client.clone(), &config)
+        .context("failed to create the New Twitch API client")?;
 
-        let helix = twitch::Helix::new(http_client.clone(), &config)
-            .context("failed to create the New Twitch API client")?;
+    let google_keys_json_path = matches.value_of_os("google-service-account").unwrap();
 
-        let google_keys_json_path = matches.value_of_os("google-service-account").unwrap();
+    let calendar = google::Calendar::new(http_client.clone(), &google_keys_json_path);
+    let spreadsheets = google::Sheets::new(http_client.clone(), &google_keys_json_path);
 
-        let calendar = google::Calendar::new(http_client.clone(), &google_keys_json_path);
-        let spreadsheets = google::Sheets::new(http_client.clone(), &google_keys_json_path);
+    let desertbus = desertbus::DesertBus::new(http_client.clone());
 
-        let desertbus = desertbus::DesertBus::new(http_client.clone());
+    let twitter = crate::twitter::Twitter::new(
+        http_client.clone(),
+        config.twitter_api_key.clone(),
+        config.twitter_api_secret.clone(),
+    )
+    .await
+    .context("failed to initialise the Twitter client")?;
 
-        let handler = crate::discord_events::DiscordEvents::new();
+    #[cfg(unix)]
+    {
+        if let Err(err) = tokio::fs::remove_file(&config.eris_socket).await {
+            if err.kind() != std::io::ErrorKind::NotFound {
+                return Err(err).context("failed to remove the socket file")?;
+            }
+        }
+    }
 
-        let twitter = crate::twitter::Twitter::new(
-            http_client.clone(),
-            config.twitter_api_key.clone(),
-            config.twitter_api_secret.clone(),
-        )
+    let http = serenity::http::Http::new_with_token(&config.discord_botsecret);
+    let current_application_info = http
+        .get_current_application_info()
         .await
-        .context("failed to initialise the Twitter client")?;
+        .context("failed to get the current application info")?;
 
-        let mut client = tokio::task::block_in_place(|| {
-            serenity::Client::new(&config.discord_botsecret, handler)
-        })
-        .context("failed to create the Discord client")?;
-        let current_application_info = tokio::task::block_in_place(|| {
-            client.cache_and_http.http.get_current_application_info()
-        })
-        .context("failed to fetch the current application information")?;
-        client.with_framework(
+    let mut client = serenity::Client::new(&config.discord_botsecret)
+        .event_handler(crate::discord_events::DiscordEvents::new())
+        .framework(
             serenity::framework::StandardFramework::new()
                 .configure(|c| {
                     c.prefix(&config.command_prefix)
@@ -164,32 +186,36 @@ fn main() -> Result<(), Error> {
                         .case_insensitivity(true)
                 })
                 .before(|_, message, command_name| {
-                    info!("Command received";
-                        "command_name" => command_name,
-                        "message" => &message.content,
-                        "message.id" => message.id.0,
-                        "from.id" => message.author.id.0,
-                        "from.name" => &message.author.name,
-                        "from.discriminator" => message.author.discriminator,
-                    );
-                    true
+                    Box::pin(async move {
+                        info!("Command received";
+                            "command_name" => command_name,
+                            "message" => &message.content,
+                            "message.id" => message.id.0,
+                            "from.id" => message.author.id.0,
+                            "from.name" => &message.author.name,
+                            "from.discriminator" => message.author.discriminator,
+                        );
+                        true
+                    })
                 })
                 .after(|ctx, message, _command_name, result| {
-                    if let Err(err) = result {
-                        error!("Command resulted in an unexpected error";
-                            "message.id" => message.id.0,
-                            "error" => &err.0,
-                        );
+                    Box::pin(async move {
+                        if let Err(err) = result {
+                            error!("Command resulted in an unexpected error";
+                                "message.id" => message.id.0,
+                                "error" => ?err,
+                            );
 
-                        let _ = message.reply(
-                            ctx,
-                            &format!("Command resulted in an unexpected error: {}.", err.0),
-                        );
-                    } else {
-                        info!("Command processed successfully";
-                            "message.id" => message.id.0,
-                        );
-                    }
+                            let _ = message.reply(
+                                ctx,
+                                &format!("Command resulted in an unexpected error: {}.", err),
+                            );
+                        } else {
+                            info!("Command processed successfully";
+                                "message.id" => message.id.0,
+                            );
+                        }
+                    })
                 })
                 .unrecognised_command(commands::static_response::static_response)
                 .help(&crate::commands::help::HELP)
@@ -199,72 +225,50 @@ fn main() -> Result<(), Error> {
                 .group(&crate::commands::quote::QUOTE_GROUP)
                 .group(&crate::commands::time::TIME_GROUP)
                 .group(&crate::commands::voice::VOICE_GROUP),
-        );
+        )
+        .type_map_insert::<crate::rpc::LRRbot>(std::sync::Arc::new(crate::rpc::LRRbot::new(
+            &config,
+        )))
+        .maybe_type_map_insert::<crate::influxdb::InfluxDB>(
+            config
+                .influxdb
+                .as_ref()
+                .map(|url| crate::influxdb::InfluxDB::new(http_client.clone(), url.clone())),
+        )
+        .type_map_insert::<crate::config::Config>(config)
+        .type_map_insert::<crate::typemap_keys::PgPool>(pg_pool)
+        .type_map_insert::<crate::twitch::Helix>(helix)
+        .type_map_insert::<crate::google::Calendar>(calendar)
+        .type_map_insert::<crate::google::Sheets>(spreadsheets)
+        .type_map_insert::<crate::desertbus::DesertBus>(desertbus)
+        .type_map_insert::<crate::twitter::Twitter>(twitter)
+        .await
+        .context("failed to create the Discord client")?;
+
+    let ctx = ErisContext::from_client(&client);
+
+    let mut rpc_server = {
+        let data = ctx.data.read().await;
+        let config = data.extract::<crate::config::Config>()?;
 
         #[cfg(unix)]
-        {
-            if let Err(err) = tokio::fs::remove_file(&config.eris_socket).await {
-                if err.kind() != std::io::ErrorKind::NotFound {
-                    return Err(err).context("failed to remove the socket file")?;
-                }
-            }
-        }
+        let server = crate::aiomas::Server::new(&config.eris_socket, ctx.clone());
 
-        {
-            let mut data = client.data.write();
+        #[cfg(not(unix))]
+        let server = crate::aiomas::Server::new(config.eris_port, ctx.clone());
 
-            data.insert::<crate::rpc::LRRbot>(std::sync::Arc::new(crate::rpc::LRRbot::new(
-                &config,
-            )));
+        server
+    }
+    .context("failed to create the RPC server")?;
+    for handler in ::inventory::iter::<crate::inventory::AiomasHandler> {
+        rpc_server.register(handler.method, handler.handler);
+    }
 
-            if let Some(url) = config.influxdb.as_ref() {
-                data.insert::<crate::influxdb::InfluxDB>(crate::influxdb::InfluxDB::new(
-                    http_client.clone(),
-                    url.clone(),
-                ));
-            }
+    tokio::spawn(rpc_server.serve());
+    tokio::spawn(channel_reaper::channel_reaper(ctx.clone()));
+    tokio::spawn(announcements::post_tweets(ctx.clone()));
+    tokio::spawn(autotopic::autotopic(ctx.clone()));
+    tokio::spawn(contact::post_messages(ctx));
 
-            data.insert::<crate::config::Config>(config);
-            data.insert::<crate::typemap_keys::Executor>(handle);
-            data.insert::<crate::typemap_keys::PgPool>(pg_pool);
-            data.insert::<crate::twitch::Helix>(helix);
-            data.insert::<crate::google::Calendar>(calendar);
-            data.insert::<crate::google::Sheets>(spreadsheets);
-            data.insert::<crate::desertbus::DesertBus>(desertbus);
-            data.insert::<crate::twitter::Twitter>(twitter);
-        }
-
-        let ctx = ErisContext::from_client(&client);
-
-        let mut rpc_server = {
-            let data = ctx.data.read();
-            let config = data.extract::<crate::config::Config>()?;
-
-            #[cfg(unix)]
-            let server = crate::aiomas::Server::new(&config.eris_socket, ctx.clone());
-
-            #[cfg(not(unix))]
-            let server = crate::aiomas::Server::new(config.eris_port, ctx.clone());
-
-            server
-        }
-        .context("failed to create the RPC server")?;
-        for handler in ::inventory::iter::<crate::inventory::AiomasHandler> {
-            rpc_server.register(handler.method, handler.handler);
-        }
-        tokio::spawn(rpc_server.serve());
-
-        let _handle = std::thread::spawn(channel_reaper::channel_reaper(ctx.clone()));
-
-        tokio::spawn(announcements::post_tweets(ctx.clone()));
-
-        tokio::spawn(autotopic::autotopic(ctx.clone()));
-
-        tokio::spawn(contact::post_messages(ctx));
-
-        tokio::task::block_in_place(|| client.start())
-            .context("error while running the Discord client")?;
-
-        Ok(())
-    })
+    client.start().await.context("error while running the Discord client")
 }

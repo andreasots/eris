@@ -46,11 +46,9 @@ impl Display for StreamUp {
 }
 
 async fn stream_up_inner(ctx: &ErisContext, channel: Channel) -> Result<(), Error> {
-    let (lrrbot, announcements_channel) = {
-        let data = ctx.data.read();
-
-        (data.extract::<LRRbot>()?.clone(), data.extract::<Config>()?.announcements)
-    };
+    let data = ctx.data.read().await;
+    let lrrbot = data.extract::<LRRbot>()?;
+    let announcements_channel = data.extract::<Config>()?.announcements;
 
     let game_id = lrrbot.get_game_id().await.context("failed to get the game ID")?;
     let show_id = lrrbot.get_show_id().await.context("failed to get the show ID")?;
@@ -59,6 +57,7 @@ async fn stream_up_inner(ctx: &ErisContext, channel: Channel) -> Result<(), Erro
         let conn = ctx
             .data
             .read()
+            .await
             .extract::<PgPool>()?
             .get()
             .context("failed to get a database connection from the pool")?;
@@ -88,10 +87,10 @@ async fn stream_up_inner(ctx: &ErisContext, channel: Channel) -> Result<(), Erro
         game_display_name.map(|name| format!("{} on {}", name, show.name)).unwrap_or(show.name)
     };
 
-    tokio::task::block_in_place(|| {
-        announcements_channel.say(ctx, format_args!("{}", StreamUp { channel, what }))
-    })
-    .context("failed to send the announcement message")?;
+    announcements_channel
+        .say(ctx, format!("{}", StreamUp { channel, what }))
+        .await
+        .context("failed to send the announcement message")?;
 
     Ok(())
 }
