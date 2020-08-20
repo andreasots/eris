@@ -7,7 +7,6 @@ use crate::twitch::Helix;
 use crate::twitter::Twitter;
 use serenity::prelude::TypeMapKey;
 use std::sync::Arc;
-use tokio::runtime::Handle;
 
 // Local types
 
@@ -44,12 +43,6 @@ impl TypeMapKey for Twitter {
 }
 
 // Foreign types
-
-pub enum Executor {}
-
-impl TypeMapKey for Executor {
-    type Value = Handle;
-}
 
 pub enum PgPool {}
 

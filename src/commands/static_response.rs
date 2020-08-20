@@ -1,10 +1,10 @@
 use crate::extract::Extract;
 use crate::rpc::LRRbot;
-use crate::typemap_keys::Executor;
 use anyhow::{Context as _, Error};
 use rand::seq::SliceRandom;
 use regex::Regex;
 use serde::{Deserialize, Deserializer};
+use serenity::framework::standard::macros::hook;
 use serenity::framework::standard::{Args, Delimiter};
 use serenity::model::channel::Message;
 use serenity::model::guild::Emoji;
@@ -23,15 +23,14 @@ enum Access {
 }
 
 impl Access {
-    fn user_has_access(self, ctx: &Context, msg: &Message) -> bool {
+    async fn user_has_access(self, ctx: &Context, msg: &Message) -> bool {
         match self {
             Access::Any => true,
             Access::Sub => {
                 // A user is a "subscriber" if they have a coloured role
                 msg.guild(ctx)
+                    .await
                     .and_then(|guild| {
-                        let guild = guild.read();
-
                         guild.members.get(&msg.author.id).map(|member| {
                             member.roles.iter().any(|role_id| {
                                 guild
@@ -45,14 +44,17 @@ impl Access {
                     })
                     .unwrap_or(false)
             }
-            Access::Mod => msg
-                .guild(ctx)
-                .and_then(|guild| {
-                    guild.read().members.get(&msg.author.id).map(|member| {
-                        member.permissions(ctx).map(|p| p.administrator()).unwrap_or(false)
-                    })
-                })
-                .unwrap_or(false),
+            Access::Mod => {
+                if let Some(guild) = msg.guild(ctx).await {
+                    if let Some(member) = guild.members.get(&msg.author.id) {
+                        member.permissions(ctx).await.map(|p| p.administrator()).unwrap_or(false)
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
         }
     }
 }
@@ -116,7 +118,7 @@ fn replace_emojis<'a, S: Into<String>, I: Iterator<Item = &'a Emoji>>(
     Ok(msg)
 }
 
-fn static_response_impl(ctx: &mut Context, msg: &Message, command: &str) -> Result<(), Error> {
+async fn static_response_impl(ctx: &Context, msg: &Message, command: &str) -> Result<(), Error> {
     info!("Static command received";
         "command_name" => command,
         "message" => &msg.content,
@@ -126,38 +128,41 @@ fn static_response_impl(ctx: &mut Context, msg: &Message, command: &str) -> Resu
         "from.discriminator" => msg.author.discriminator,
     );
 
-    let response = {
-        let data = ctx.data.read();
-        let lrrbot = data.extract::<LRRbot>()?.clone();
-        let command = String::from(command);
-
-        data.extract::<Executor>()?
-            .block_on(async move {
-                lrrbot.get_data::<Response>(vec![String::from("responses"), command]).await
-            })
-            .context("failed to fetch the command")?
-    };
+    let response = ctx
+        .data
+        .read()
+        .await
+        .extract::<LRRbot>()?
+        .get_data::<Response>(vec![String::from("responses"), String::from(command)])
+        .await
+        .context("failed to fetch the command")?;
 
     if let Response::Some { access, response } = response {
-        if access.user_has_access(ctx, msg) {
+        if access.user_has_access(ctx, msg).await {
             let response = response.choose(&mut rand::thread_rng());
             if let Some(response) = response {
-                let mut vars = HashMap::new();
+                let mut vars = HashMap::<String, Cow<str>>::new();
                 vars.insert(
                     "user".into(),
-                    msg.guild_id
-                        .and_then(|guild| msg.author.nick_in(&ctx, guild))
-                        .unwrap_or_else(|| msg.author.name.clone()),
+                    if let Some(guild_id) = msg.guild_id {
+                        msg.author
+                            .nick_in(&ctx, guild_id)
+                            .await
+                            .map(Cow::Owned)
+                            .unwrap_or_else(|| msg.author.name.as_str().into())
+                    } else {
+                        msg.author.name.as_str().into()
+                    },
                 );
                 let response =
                     strfmt::strfmt(response, &vars).context("failed to format the reply")?;
-                let response = if let Some(guild) = msg.guild(&ctx) {
-                    replace_emojis(response, guild.read().emojis.values())
+                let response = if let Some(guild) = msg.guild(&ctx).await {
+                    replace_emojis(response, guild.emojis.values())
                         .context("failed to replace emojis")?
                 } else {
                     response
                 };
-                msg.reply(ctx, &response).context("failed to send a reply")?;
+                msg.reply(ctx, &response).await.context("failed to send a reply")?;
             }
         } else {
             info!("Refusing to reply because user lacks access";
@@ -170,8 +175,9 @@ fn static_response_impl(ctx: &mut Context, msg: &Message, command: &str) -> Resu
     Ok(())
 }
 
-pub fn static_response(ctx: &mut Context, msg: &Message, command: &str) {
-    match static_response_impl(ctx, msg, &extract_command(&msg.content, command)) {
+#[hook]
+pub async fn static_response(ctx: &Context, msg: &Message, command: &str) {
+    match static_response_impl(ctx, msg, &extract_command(&msg.content, command)).await {
         Ok(()) => (),
         Err(err) => {
             error!("Static command resulted in an unexpected error";
@@ -179,10 +185,15 @@ pub fn static_response(ctx: &mut Context, msg: &Message, command: &str) {
                 "error" => ?err,
             );
 
-            let _ = msg.reply(
-                ctx,
-                &format!("Simple text response command resulted in an unexpected error: {}.", err),
-            );
+            let _ = msg
+                .reply(
+                    ctx,
+                    &format!(
+                        "Simple text response command resulted in an unexpected error: {}.",
+                        err
+                    ),
+                )
+                .await;
         }
     }
 }

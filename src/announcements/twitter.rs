@@ -11,11 +11,9 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 async fn init(ctx: &ErisContext) -> Result<HashMap<u64, Vec<ChannelId>>, Error> {
-    let (twitter, twitter_users) = {
-        let data = ctx.data.read();
-
-        (data.extract::<Twitter>()?.clone(), data.extract::<Config>()?.twitter_users.clone())
-    };
+    let data = ctx.data.read().await;
+    let twitter = data.extract::<Twitter>()?;
+    let twitter_users = &data.extract::<Config>()?.twitter_users;
 
     let usernames = twitter_users.keys().map(|s| &s[..]).collect::<Vec<&str>>();
     let user_ids = twitter
@@ -29,7 +27,7 @@ async fn init(ctx: &ErisContext) -> Result<HashMap<u64, Vec<ChannelId>>, Error> 
     let mut users = HashMap::new();
 
     for (user, channels) in twitter_users {
-        users.insert(user_ids[&user], channels);
+        users.insert(user_ids[user], channels.clone());
     }
 
     Ok(users)
@@ -39,10 +37,11 @@ async fn inner<'a>(
     ctx: &'a ErisContext,
     users: &'a HashMap<u64, Vec<ChannelId>>,
 ) -> Result<(), Error> {
+    let data = ctx.data.read().await;
+
     for (&user_id, channels) in users {
         let state_key = &format!("eris.announcements.twitter.{}.last_tweet_id", user_id);
         let last_tweet_id = {
-            let data = ctx.data.read();
             let conn = data
                 .extract::<PgPool>()?
                 .get()
@@ -51,7 +50,7 @@ async fn inner<'a>(
             State::get::<u64, _>(&state_key, &conn).context("failed to get the last tweet ID")?
         };
 
-        let twitter = ctx.data.read().extract::<Twitter>()?.clone();
+        let twitter = data.extract::<Twitter>()?;
 
         let mut tweets = twitter
             .user_timeline(user_id, true, true, 200, last_tweet_id)
@@ -92,12 +91,13 @@ async fn inner<'a>(
                                 }
                             }
                         }
-                        tokio::task::block_in_place(|| channel.say(ctx, &message))
+                        channel
+                            .say(ctx, &message)
+                            .await
                             .context("failed to send the announcement message")?;
                     }
 
                     {
-                        let data = ctx.data.read();
                         let conn = data
                             .extract::<PgPool>()?
                             .get()
@@ -108,7 +108,6 @@ async fn inner<'a>(
                 }
             }
         } else {
-            let data = ctx.data.read();
             let conn = data
                 .extract::<PgPool>()?
                 .get()

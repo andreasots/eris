@@ -35,14 +35,14 @@ rust-ini = { version = "0.15.3", default-features = false }
 separator = { version = "0.4.1", default-features = false }
 serde = { version = "1.0.115", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.57", default-features = false }
-serenity = { version = "0.8.7", default-features = false, features = ["cache", "rustls_backend", "standard_framework"] }
+serenity = { version = "0.9.0-rc.0", default-features = false, features = ["gateway", "cache", "rustls_backend", "standard_framework"] }
 slog = { version = "2.5.2", default-features = false, features = ["max_level_trace", "release_max_level_debug"] }
 slog-async = { version = "2.5.0", default-features = false }
 slog-scope = { version = "4.3.0", default-features = false }
 slog-json = { version = "2.3.0", default-features = false }
 slog-stdlog = "4.0.0"
 strfmt = { version = "0.1.6", default-features = false }
-tokio = { version = "0.2.22", default-features = false, features = ["uds", "tcp", "fs", "io-util", "rt-threaded", "blocking", "macros", "time", "stream"] }
+tokio = { version = "0.2.22", default-features = false, features = ["uds", "tcp", "fs", "io-util", "rt-threaded", "macros", "time", "stream"] }
 tokio-util = { version = "0.3.1", default-features = false, features = ["codec"] }
 unicode-width = { version = "0.1.8", default-features = false }
 url = { version = "2.1.1", default-features = false }

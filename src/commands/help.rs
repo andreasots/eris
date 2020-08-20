@@ -8,13 +8,14 @@ use std::collections::HashSet;
 
 #[help]
 #[individual_command_tip = "To get help with an individual command, pass its name as an argument to this command. Simple text response commands (like `!advice`) are  not listed here, for those see <https://lrrbot.com/help#help-section-text>."]
-fn help(
-    ctx: &mut Context,
+async fn help(
+    ctx: &Context,
     msg: &Message,
     args: Args,
     help_options: &'static HelpOptions,
     groups: &[&'static CommandGroup],
     owners: HashSet<UserId>,
 ) -> CommandResult {
-    help_commands::with_embeds(ctx, msg, args, help_options, groups, owners)
+    help_commands::with_embeds(ctx, msg, args, help_options, groups, owners).await;
+    Ok(())
 }

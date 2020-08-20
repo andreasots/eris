@@ -15,6 +15,7 @@ pub async fn post_messages(ctx: ErisContext) {
     let spreadsheet_set = ctx
         .data
         .read()
+        .await
         .extract::<Config>()
         .map(|config| config.contact_spreadsheet.is_some())
         .unwrap_or(false);
@@ -106,20 +107,14 @@ fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(u64, Vec<Entry>)> {
 }
 
 async fn inner(ctx: &ErisContext) -> Result<(), Error> {
-    let (spreadsheet_key, sheets, mods_channel) = {
-        let data = ctx.data.read();
-
-        let config = data.extract::<Config>()?;
-
-        let spreadsheet_key = config
-            .contact_spreadsheet
-            .clone()
-            .ok_or_else(|| Error::msg("Contact spreadsheet is not set"))?;
-
-        let sheets = data.extract::<Sheets>()?.clone();
-
-        (spreadsheet_key, sheets, config.mods_channel)
-    };
+    let data = ctx.data.read().await;
+    let config = data.extract::<Config>()?;
+    let spreadsheet_key = config
+        .contact_spreadsheet
+        .as_deref()
+        .ok_or_else(|| Error::msg("Contact spreadsheet is not set"))?;
+    let sheets = data.extract::<Sheets>()?;
+    let mods_channel = config.mods_channel;
 
     let spreadsheet = sheets.get_spreadsheet(&spreadsheet_key, "properties.timeZone,sheets(properties.sheetId,data(startRow,startColumn,rowData.values.effectiveValue,rowMetadata.developerMetadata))")
         .await
@@ -129,8 +124,8 @@ async fn inner(ctx: &ErisContext) -> Result<(), Error> {
         .ok_or_else(|| Error::msg("no sheets or required information missing"))?;
 
     for message in unsent {
-        tokio::task::block_in_place(|| {
-            mods_channel.send_message(ctx, |m| {
+        mods_channel
+            .send_message(ctx, |m| {
                 m.content("New message from the contact form:").embed(|mut embed| {
                     if message.message.chars().count() > 2000 {
                         embed = embed
@@ -145,8 +140,8 @@ async fn inner(ctx: &ErisContext) -> Result<(), Error> {
                     embed
                 })
             })
-        })
-        .context("failed to forward the message")?;
+            .await
+            .context("failed to forward the message")?;
 
         sheets
             .create_developer_metadata_for_row(
