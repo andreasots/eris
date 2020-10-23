@@ -274,9 +274,9 @@ dependencies = [
 
 [[package]]
 name = "command_attr"
-version = "0.3.0-rc.2"
+version = "0.3.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6745770e89e5e4583424362f15f91c8bb0ef54387d209af30e0446d08909ae7d"
+checksum = "cceb84158562408b452df094d230be2b6a8d82c390acb7372323fc9dd128d4dc"
 dependencies = [
  "proc-macro2",
  "quote",
