@@ -416,7 +416,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f525a586d310c87df72ebcd98009e57f1cc030c8c268305287a476beb653969"
 dependencies = [
  "lazy_static 1.4.0",
- "regex 1.4.1",
+ "regex 1.4.2",
  "serde",
  "strsim",
 ]
@@ -485,7 +485,7 @@ dependencies = [
  "log",
  "ordinal",
  "rand",
- "regex 1.4.1",
+ "regex 1.4.2",
  "reqwest",
  "rust-ini",
  "separator",
@@ -939,8 +939,8 @@ dependencies = [
  "itertools",
  "lalrpop-util",
  "petgraph",
- "regex 1.4.1",
- "regex-syntax 0.6.20",
+ "regex 1.4.2",
+ "regex-syntax 0.6.21",
  "serde",
  "serde_derive",
  "sha2",
@@ -955,7 +955,7 @@ version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6771161eff561647fad8bb7e745e002c304864fb8f436b52b30acda51fca4408"
 dependencies = [
- "regex 1.4.1",
+ "regex 1.4.2",
 ]
 
 [[package]]
@@ -1215,7 +1215,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c705f256449c60da65e11ff6626e0c16a0a0b96aaa348de61376b249bc340f41"
 dependencies = [
- "regex 1.4.1",
+ "regex 1.4.2",
 ]
 
 [[package]]
@@ -1226,7 +1226,7 @@ checksum = "59698ea79df9bf77104aefd39cc3ec990cb9693fb59c3b0a70ddf2646fdffb4b"
 dependencies = [
  "base64 0.12.3",
  "once_cell",
- "regex 1.4.1",
+ "regex 1.4.2",
 ]
 
 [[package]]
@@ -1441,13 +1441,13 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.4.1"
+version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8963b85b8ce3074fecffde43b4b0dded83ce2f367dc8d363afc56679f3ee820b"
+checksum = "38cf2c13ed4745de91a5eb834e11c00bcc3709e773173b2ce4c56c9fbde04b9c"
 dependencies = [
  "aho-corasick 0.7.13",
  "memchr 2.3.3",
- "regex-syntax 0.6.20",
+ "regex-syntax 0.6.21",
  "thread_local 1.0.1",
 ]
 
@@ -1459,9 +1459,9 @@ checksum = "f9ec002c35e86791825ed294b50008eea9ddfc8def4420124fbc6b08db834957"
 
 [[package]]
 name = "regex-syntax"
-version = "0.6.20"
+version = "0.6.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cab7a364d15cde1e505267766a2d3c4e22a843e1a601f0fa7564c0f82ced11c"
+checksum = "3b181ba2dcf07aaccad5448e8ead58db5b742cf85dfe035e2227f137a539a189"
 
 [[package]]
 name = "reqwest"
