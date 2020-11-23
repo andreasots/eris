@@ -7,8 +7,7 @@ use anyhow::{Context, Error};
 
 use crate::context::ErisContext;
 use crate::extract::Extract;
-use slog::{o, Drain};
-use slog_scope::{error, info};
+use tracing::{error, info};
 
 mod aiomas;
 mod announcements;
@@ -35,22 +34,6 @@ mod twitch;
 mod twitter;
 mod typemap_keys;
 
-struct DualWriter<W1: std::io::Write, W2: std::io::Write>(W1, W2);
-
-impl<W1: std::io::Write, W2: std::io::Write> std::io::Write for DualWriter<W1, W2> {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.write_all(buf)?;
-        self.1.write_all(buf)?;
-
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.0.flush()?;
-        self.1.flush()
-    }
-}
-
 trait ClientBuilderExt {
     fn maybe_type_map_insert<T: serenity::prelude::TypeMapKey>(self, val: Option<T::Value>)
         -> Self;
@@ -71,37 +54,17 @@ impl ClientBuilderExt for serenity::client::ClientBuilder<'_> {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let log_file = std::fs::OpenOptions::new()
-        .write(true)
-        .append(true)
-        .create(true)
-        .open("eris.log")
-        .context("failed to open the log file")?;
-
-    let drain = slog_json::Json::new(DualWriter(log_file, std::io::stdout()))
-        .set_flush(true)
-        .add_key_value(o! {
-            "ts" => slog::PushFnValue(|_, ser| ser.emit(chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Micros, true))),
-            "level" => slog::FnValue(|record| record.level().as_str()),
-            "msg" => slog::PushFnValue(|record, ser| ser.emit(record.msg())),
-            "module" => slog::FnValue(|record| record.module()),
-        })
-        .build()
-        .fuse();
-    let drain = slog_async::Async::new(drain)
-        .overflow_strategy(slog_async::OverflowStrategy::Block)
-        .build()
-        .fuse();
-    let logger = slog::Logger::root(
-        drain,
-        o!(
-            "version" => env!("CARGO_PKG_VERSION"),
-            "build" => option_env!("TRAVIS_BUILD_NUMBER").unwrap_or("local build")
-        ),
-    );
-    let _handle = slog_scope::set_global_logger(logger);
-    slog_stdlog::init().context("failed to redirect logs from the standard log crate")?;
-    log::set_max_level(log::LevelFilter::max());
+    let builder = tracing_subscriber::fmt::fmt()
+        .json()
+        .flatten_event(true)
+        .with_current_span(true)
+        .with_span_list(true)
+        .with_timer(tracing_subscriber::fmt::time::ChronoUtc::rfc3339());
+    let reload_handle = builder.reload_handle();
+    builder
+        .try_init()
+        .map_err(|err| anyhow::anyhow!(err))
+        .context("failed to initialize tracing")?;
 
     let matches = clap::App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
@@ -187,32 +150,36 @@ async fn main() -> Result<(), Error> {
                 })
                 .before(|_, message, command_name| {
                     Box::pin(async move {
-                        info!("Command received";
-                            "command_name" => command_name,
-                            "message" => &message.content,
-                            "message.id" => message.id.0,
-                            "from.id" => message.author.id.0,
-                            "from.name" => &message.author.name,
-                            "from.discriminator" => message.author.discriminator,
+                        info!(
+                            command_name = command_name,
+                            message = message.content.as_str(),
+                            message.id = message.id.0,
+                            from.id = message.author.id.0,
+                            from.name = message.author.name.as_str(),
+                            from.discriminator = message.author.discriminator,
+
+                            "Command received",
                         );
                         true
                     })
                 })
                 .after(|ctx, message, _command_name, result| {
                     Box::pin(async move {
-                        if let Err(err) = result {
-                            error!("Command resulted in an unexpected error";
-                                "message.id" => message.id.0,
-                                "error" => ?err,
+                        if let Err(error) = result {
+                            error!(
+                                message.id = message.id.0,
+                                ?error,
+                                "Command resulted in an unexpected error"
                             );
 
                             let _ = message.reply(
                                 ctx,
-                                &format!("Command resulted in an unexpected error: {}.", err),
+                                &format!("Command resulted in an unexpected error: {}.", error),
                             );
                         } else {
-                            info!("Command processed successfully";
-                                "message.id" => message.id.0,
+                            info!(
+                                message.id = message.id.0,
+                                "Command processed successfully",
                             );
                         }
                     })

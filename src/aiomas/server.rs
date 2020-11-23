@@ -4,7 +4,7 @@ use futures::channel::mpsc;
 use futures::future::BoxFuture;
 use futures::prelude::*;
 use serde_json::Value;
-use slog_scope::error;
+use tracing::error;
 use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::path::Path;
@@ -94,7 +94,7 @@ impl<C: Clone + Send + 'static> Server<C> {
                     ));
                 }
                 Ok(None) => return,
-                Err(err) => error!("Failed to accept an incoming connection"; "error" => ?err),
+                Err(error) => error!(?error, "Failed to accept an incoming connection"),
             }
         }
     }
@@ -115,8 +115,8 @@ impl<C: Clone + Send + 'static> Server<C> {
         let (tx, mut rx) = mpsc::channel(16);
         tokio::spawn(async move {
             while let Some(response) = rx.next().await {
-                if let Err(err) = sink.send(response).await {
-                    error!("Failed to send a response"; "error" => ?err);
+                if let Err(error) = sink.send(response).await {
+                    error!(?error, "Failed to send a response");
                     break;
                 }
             }
@@ -136,8 +136,8 @@ impl<C: Clone + Send + 'static> Server<C> {
                     });
                 }
                 Ok(None) => break,
-                Err(err) => {
-                    error!("Failed to read a request"; "error" => ?err);
+                Err(error) => {
+                    error!(?error, "Failed to read a request");
                     break;
                 }
             }

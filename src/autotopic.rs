@@ -5,6 +5,7 @@ use crate::extract::Extract;
 use crate::google::calendar::{Calendar, Event, LRR};
 use crate::models::{Game, GameEntry, Show, User};
 use crate::rpc::LRRbot;
+use crate::rpc::client::HeaderInfo;
 use crate::time::HumanReadable;
 use crate::twitch::helix::UserId;
 use crate::twitch::Helix;
@@ -15,7 +16,7 @@ use chrono_tz::Tz;
 use diesel::OptionalExtension;
 use separator::FixedPlaceSeparatable;
 use serenity::prelude::TypeMap;
-use slog_scope::error;
+use tracing::error;
 use std::fmt;
 use std::time::Duration;
 
@@ -60,8 +61,8 @@ pub async fn autotopic(ctx: ErisContext) {
     loop {
         timer.tick().await;
 
-        if let Err(err) = Autotopic.update_topic(&ctx).await {
-            error!("Failed to update the topic"; "error" => ?err);
+        if let Err(error) = Autotopic.update_topic(&ctx).await {
+            error!(?error, "Failed to update the topic");
         }
     }
 }
@@ -73,11 +74,20 @@ impl Autotopic {
     async fn update_topic(self, ctx: &ErisContext) -> Result<(), Error> {
         let data = ctx.data.read().await;
 
-        let header = data
-            .extract::<LRRbot>()?
-            .get_header_info()
-            .await
-            .context("failed to fetch header info")?;
+        let header = match data.extract::<LRRbot>()?.get_header_info().await {
+            Ok(header) => header,
+            Err(error) => {
+                error!(?error, "failed to fetch header info");
+
+                HeaderInfo {
+                    is_live: false,
+                    channel: data.extract::<Config>()?.channel.clone(),
+                    current_game: None,
+                    current_show: None,
+                    advice: None,
+                }
+            }
+        };
 
         let mut messages = vec![];
 
@@ -144,7 +154,7 @@ impl Autotopic {
 
             match self.uptime_msg(&data, &user, &header.channel).await {
                 Ok(msg) => messages.push(msg),
-                Err(err) => error!("failed to generate the uptime message"; "error" => ?err),
+                Err(error) => error!(?error, "failed to generate the uptime message"),
             }
         } else {
             let now = Utc::now();
@@ -220,8 +230,8 @@ impl Autotopic {
 
             let money_raised = match desertbus.money_raised().await {
                 Ok(money_raised) => money_raised,
-                Err(err) => {
-                    error!("Failed to fetch the current Desert Bus total"; "error" => ?err);
+                Err(error) => {
+                    error!(?error, "Failed to fetch the current Desert Bus total");
                     messages.push(String::from("DESERT BUS?"));
                     return Ok(messages);
                 }

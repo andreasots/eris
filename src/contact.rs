@@ -6,7 +6,7 @@ use crate::truncate::truncate;
 use anyhow::{Context, Error};
 use chrono::TimeZone;
 use chrono::{DateTime, Utc};
-use slog_scope::{error, info};
+use tracing::{error, info};
 use std::time::Duration;
 
 const SENT_KEY: &str = "lrrbot.sent";
@@ -29,8 +29,8 @@ pub async fn post_messages(ctx: ErisContext) {
     loop {
         timer.tick().await;
 
-        if let Err(err) = inner(&ctx).await {
-            error!("Failed to post new messages"; "error" => ?err);
+        if let Err(error) = inner(&ctx).await {
+            error!(?error, "Failed to post new messages");
         }
     }
 }

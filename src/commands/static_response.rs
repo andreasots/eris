@@ -10,7 +10,7 @@ use serenity::model::channel::Message;
 use serenity::model::guild::Emoji;
 use serenity::prelude::*;
 use serenity::utils::Colour;
-use slog_scope::{error, info};
+use tracing::{error, info};
 use std::borrow::Cow;
 use std::collections::HashMap;
 
@@ -119,13 +119,15 @@ fn replace_emojis<'a, S: Into<String>, I: Iterator<Item = &'a Emoji>>(
 }
 
 async fn static_response_impl(ctx: &Context, msg: &Message, command: &str) -> Result<(), Error> {
-    info!("Static command received";
-        "command_name" => command,
-        "message" => &msg.content,
-        "message.id" => msg.id.0,
-        "from.id" => msg.author.id.0,
-        "from.name" => &msg.author.name,
-        "from.discriminator" => msg.author.discriminator,
+    info!(
+        command_name = command,
+        message = msg.content.as_str(),
+        message.id = msg.id.0,
+        from.id = msg.author.id.0,
+        from.name = msg.author.name.as_str(),
+        from.discriminator = msg.author.discriminator,
+
+        "Static command received"
     );
 
     let response = ctx
@@ -165,9 +167,10 @@ async fn static_response_impl(ctx: &Context, msg: &Message, command: &str) -> Re
                 msg.reply(ctx, &response).await.context("failed to send a reply")?;
             }
         } else {
-            info!("Refusing to reply because user lacks access";
-                "message.id" => msg.id.0,
-                "access_required" => ?access,
+            info!(
+                message.id = msg.id.0,
+                access_required = ?access,
+                "Refusing to reply because user lacks access"
             );
         }
     }
@@ -179,10 +182,12 @@ async fn static_response_impl(ctx: &Context, msg: &Message, command: &str) -> Re
 pub async fn static_response(ctx: &Context, msg: &Message, command: &str) {
     match static_response_impl(ctx, msg, &extract_command(&msg.content, command)).await {
         Ok(()) => (),
-        Err(err) => {
-            error!("Static command resulted in an unexpected error";
-                "message.id" => msg.id.0,
-                "error" => ?err,
+        Err(error) => {
+            error!(
+                message.id = msg.id.0,
+                ?error,
+
+                "Static command resulted in an unexpected error"
             );
 
             let _ = msg
@@ -190,7 +195,7 @@ pub async fn static_response(ctx: &Context, msg: &Message, command: &str) {
                     ctx,
                     &format!(
                         "Simple text response command resulted in an unexpected error: {}.",
-                        err
+                        error
                     ),
                 )
                 .await;

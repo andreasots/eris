@@ -4,7 +4,7 @@ use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
 use futures::select;
 use serde_json::Value;
-use slog_scope::error;
+use tracing::error;
 use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::path::PathBuf;
@@ -87,8 +87,8 @@ impl Client {
 
                             pending.insert(request_id, channel);
 
-                            if let Err(err) = sink.send((request_id, request)).await {
-                                error!("Failed to send the request"; "error" => ?err);
+                            if let Err(error) = sink.send((request_id, request)).await {
+                                error!(?error, "Failed to send the request");
                                 return;
                             };
                         },
@@ -102,8 +102,8 @@ impl Client {
                                 let _ = channel.send(response);
                             }
                         },
-                        Some(Err(err)) => {
-                            error!("Failed to read a response"; "error" => ?err);
+                        Some(Err(error)) => {
+                            error!(?error, "Failed to read a response");
                             return;
                         },
                         None => return,

@@ -36,11 +36,8 @@ separator = { version = "0.4.1", default-features = false }
 serde = { version = "1.0.117", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.59", default-features = false }
 serenity = { version = "0.9.1", default-features = false, features = ["gateway", "cache", "rustls_backend", "standard_framework"] }
-slog = { version = "2.5.2", default-features = false, features = ["max_level_trace", "release_max_level_debug"] }
-slog-async = { version = "2.5.0", default-features = false }
-slog-scope = { version = "4.3.0", default-features = false }
-slog-json = { version = "2.3.0", default-features = false }
-slog-stdlog = "4.1.0"
+tracing = { version = "0.1.19", default-features = false, features = ["std", "attributes", "max_level_trace", "release_max_level_debug"] }
+tracing-subscriber = { version = "0.2.12", default-features = false, features = ["chrono", "fmt", "env-filter", "json", "tracing-log"] }
 strfmt = { version = "0.1.6", default-features = false }
 tokio = { version = "0.2.23", default-features = false, features = ["uds", "tcp", "fs", "io-util", "rt-threaded", "macros", "time", "stream"] }
 tokio-util = { version = "0.3.1", default-features = false, features = ["codec"] }

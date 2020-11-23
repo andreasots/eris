@@ -9,7 +9,7 @@ use chrono::{DateTime, FixedOffset};
 use diesel::OptionalExtension;
 use eris_macros::rpc_handler;
 use serde::Deserialize;
-use slog_scope::error;
+use tracing::error;
 use std::fmt::{self, Display};
 
 #[derive(Deserialize)]
@@ -99,8 +99,8 @@ async fn stream_up_inner(ctx: &ErisContext, channel: Channel) -> Result<(), Erro
 pub async fn stream_up(ctx: ErisContext, data: Channel) -> Result<(), Error> {
     let res = stream_up_inner(&ctx, data).await;
 
-    if let Err(ref err) = res {
-        error!("Failed to post a stream up announcement"; "error" => ?err);
+    if let Err(ref error) = res {
+        error!(?error, "Failed to post a stream up announcement");
     }
 
     res

@@ -13,6 +13,7 @@ use url::Url;
 #[derive(Debug)]
 pub struct Config {
     pub username: String,
+    pub channel: String,
 
     pub database_url: String,
 
@@ -63,6 +64,7 @@ impl Config {
         let ini = Ini::load_from_file(filename)?;
         Ok(Config {
             username: ini.get_from(Some("lrrbot"), "username").unwrap_or("lrrbot").into(),
+            channel: ini.get_from(Some("lrrbot"), "channel").unwrap_or("loadingreadyrun").into(),
 
             database_url: ini
                 .get_from(Some("lrrbot"), "postgres")

@@ -6,7 +6,7 @@ use crate::twitter::Twitter;
 use crate::typemap_keys::PgPool;
 use anyhow::{Context, Error};
 use serenity::model::id::ChannelId;
-use slog_scope::{error, info};
+use tracing::{error, info};
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -83,9 +83,10 @@ async fn inner<'a>(
                         {
                             if let Some(channels) = users.get(&retweeted_user_id) {
                                 if channels.contains(channel) {
-                                    info!("Skipping posting a retweet because the target already gets posted to this channel";
-                                        "channel" => channel.0,
-                                        "msg" => &message,
+                                    info!(
+                                        channel = channel.0,
+                                        msg = message.as_str(),
+                                        "Skipping posting a retweet because the target already gets posted to this channel"
                                     );
                                     continue;
                                 }
@@ -125,8 +126,8 @@ async fn inner<'a>(
 pub async fn post_tweets(ctx: ErisContext) {
     let users = match init(&ctx).await {
         Ok(users) => users,
-        Err(err) => {
-            error!("failed to initialize the tweet announcer"; "error" => ?err);
+        Err(error) => {
+            error!(?error, "failed to initialize the tweet announcer");
             return;
         }
     };
@@ -136,8 +137,8 @@ pub async fn post_tweets(ctx: ErisContext) {
     loop {
         timer.tick().await;
 
-        if let Err(err) = inner(&ctx, &users).await {
-            error!("Failed to announce new tweets"; "error" => ?err);
+        if let Err(error) = inner(&ctx, &users).await {
+            error!(?error, "Failed to announce new tweets");
         }
     }
 }

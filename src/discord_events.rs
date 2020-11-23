@@ -7,7 +7,7 @@ use serenity::async_trait;
 use serenity::http::client::Http;
 use serenity::model::prelude::*;
 use serenity::prelude::*;
-use slog_scope::error;
+use tracing::error;
 use std::convert::TryFrom;
 use std::future::Future;
 
@@ -32,7 +32,7 @@ impl DiscordEvents {
     async fn log_error<F: FnOnce() -> T, T: Future<Output = Result<(), Error>>>(f: F) {
         match f().await {
             Ok(()) => (),
-            Err(err) => error!("Error in event handler"; "error" => ?err),
+            Err(error) => error!(?error, "Error in event handler"),
         }
     }
 
@@ -212,8 +212,8 @@ impl EventHandler for DiscordEvents {
         if let Some(afk_channel) = guild.afk_channel_id {
             for (&user, voice_state) in &guild.voice_states {
                 if voice_state.channel_id == Some(afk_channel) {
-                    if let Err(err) = self.kick_from_voice(&ctx.http, guild.id, user).await {
-                        error!("failed to kick user from the AFK channel"; "error" => ?err);
+                    if let Err(error) = self.kick_from_voice(&ctx.http, guild.id, user).await {
+                        error!(?error, "failed to kick user from the AFK channel");
                     }
                 }
             }
@@ -275,10 +275,10 @@ impl EventHandler for DiscordEvents {
                 if let Some(guild) = guild.to_guild_cached(&ctx).await {
                     if let Some(afk_channel) = guild.afk_channel_id {
                         if new.channel_id == Some(afk_channel) {
-                            if let Err(err) =
+                            if let Err(error) =
                                 self.kick_from_voice(&ctx.http, guild.id, new.user_id).await
                             {
-                                error!("failed to kick user from the AFK channel"; "error" => ?err);
+                                error!(?error, "failed to kick user from the AFK channel");
                             }
                         }
                     }

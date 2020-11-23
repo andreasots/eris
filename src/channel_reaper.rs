@@ -4,7 +4,7 @@ use crate::extract::Extract;
 use anyhow::Error;
 use chrono::Utc;
 use serenity::model::prelude::*;
-use slog_scope::{error, info};
+use tracing::{error, info};
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -44,14 +44,14 @@ async fn reap_channels(ctx: &ErisContext) -> Result<(), Error> {
         if (now - created_at).to_std()? > MIN_CHANNEL_AGE
             && voice_users.get(&channel.id).copied().unwrap_or(0) == 0
         {
-            info!("Scheduling a temporary channel for deletion"; "channel.id" => channel.id.0, "channel.name" => &channel.name);
+            info!(channel.id = channel.id.0, channel.name = channel.name.as_str(), "Scheduling a temporary channel for deletion");
             unused_channels.push(channel.id);
         }
     }
 
     for channel_id in unused_channels {
-        if let Err(err) = channel_id.delete(&ctx).await {
-            error!("Failed to delete a temporary channel"; "error" => ?err, "channel.id" => channel_id.0);
+        if let Err(error) = channel_id.delete(&ctx).await {
+            error!(?error, channel.id = channel_id.0, "Failed to delete a temporary channel");
         }
     }
 
@@ -63,8 +63,8 @@ pub async fn channel_reaper(ctx: ErisContext) {
     tokio::time::delay_for(STARTUP_DELAY).await;
 
     loop {
-        if let Err(err) = reap_channels(&ctx).await {
-            error!("Failed to reap channels"; "error" => ?err);
+        if let Err(error) = reap_channels(&ctx).await {
+            error!(?error, "Failed to reap channels");
         }
         tokio::time::delay_for(REAP_INTERVAL).await;
     }
