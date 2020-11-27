@@ -59,7 +59,9 @@ async fn main() -> Result<(), Error> {
         .flatten_event(true)
         .with_current_span(true)
         .with_span_list(true)
-        .with_timer(tracing_subscriber::fmt::time::ChronoUtc::rfc3339());
+        .with_timer(tracing_subscriber::fmt::time::ChronoUtc::rfc3339())
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_filter_reloading();
     let reload_handle = builder.reload_handle();
     builder
         .try_init()
@@ -138,7 +140,7 @@ async fn main() -> Result<(), Error> {
         .await
         .context("failed to get the current application info")?;
 
-    let mut client = serenity::Client::new(&config.discord_botsecret)
+    let mut client = serenity::Client::builder(&config.discord_botsecret)
         .event_handler(crate::discord_events::DiscordEvents::new())
         .framework(
             serenity::framework::StandardFramework::new()
