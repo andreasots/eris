@@ -49,3 +49,22 @@ pub enum PgPool {}
 impl TypeMapKey for PgPool {
     type Value = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<diesel::pg::PgConnection>>;
 }
+
+pub enum ReloadHandle {}
+
+impl TypeMapKey for ReloadHandle {
+    type Value = tracing_subscriber::reload::Handle<
+        tracing_subscriber::EnvFilter,
+        tracing_subscriber::layer::Layered<
+            tracing_subscriber::fmt::Layer<
+                tracing_subscriber::Registry,
+                tracing_subscriber::fmt::format::JsonFields,
+                tracing_subscriber::fmt::format::Format<
+                    tracing_subscriber::fmt::format::Json,
+                    tracing_subscriber::fmt::time::ChronoUtc,
+                >,
+            >,
+            tracing_subscriber::Registry,
+        >
+    >;
+}

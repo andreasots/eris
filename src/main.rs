@@ -5,6 +5,9 @@ extern crate diesel;
 
 use anyhow::{Context, Error};
 use serenity::client::bridge::gateway::GatewayIntents;
+use serenity::model::id::UserId;
+use tracing_subscriber::EnvFilter;
+use std::borrow::Cow;
 
 use crate::context::ErisContext;
 use crate::extract::Extract;
@@ -53,6 +56,8 @@ impl ClientBuilderExt for serenity::client::ClientBuilder<'_> {
     }
 }
 
+const DEFAULT_TRACING_FILTER: &'static str = "info";
+
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let builder = tracing_subscriber::fmt::fmt()
@@ -61,7 +66,11 @@ async fn main() -> Result<(), Error> {
         .with_current_span(true)
         .with_span_list(true)
         .with_timer(tracing_subscriber::fmt::time::ChronoUtc::rfc3339())
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_env_filter(EnvFilter::new(match std::env::var(EnvFilter::DEFAULT_ENV) {
+            Ok(filter) => Cow::Owned(filter),
+            Err(std::env::VarError::NotPresent) => Cow::Borrowed(DEFAULT_TRACING_FILTER),
+            Err(e) => panic!("failed to read the tracing filter from ${}: {}", EnvFilter::DEFAULT_ENV, e),
+        }))
         .with_filter_reloading();
     let reload_handle = builder.reload_handle();
     builder
@@ -156,6 +165,14 @@ async fn main() -> Result<(), Error> {
                         .with_whitespace((true, true, true))
                         .on_mention(Some(current_application_info.id))
                         .case_insensitivity(true)
+                        .owners([
+                            // Defrost#0001
+                            UserId(101919755132227584),
+                            // phlip#6324
+                            UserId(153674140019064832),
+                            // qrpth#6704
+                            UserId(144128240389324800),
+                        ].iter().copied().collect())
                 })
                 .before(|_, message, command_name| {
                     Box::pin(async move {
@@ -200,6 +217,7 @@ async fn main() -> Result<(), Error> {
                 .group(&crate::commands::live::FANSTREAMS_GROUP)
                 .group(&crate::commands::quote::QUOTE_GROUP)
                 .group(&crate::commands::time::TIME_GROUP)
+                .group(&crate::commands::tracing::TRACING_GROUP)
                 .group(&crate::commands::voice::VOICE_GROUP),
         )
         .type_map_insert::<crate::rpc::LRRbot>(std::sync::Arc::new(crate::rpc::LRRbot::new(
@@ -218,6 +236,7 @@ async fn main() -> Result<(), Error> {
         .type_map_insert::<crate::google::Sheets>(spreadsheets)
         .type_map_insert::<crate::desertbus::DesertBus>(desertbus)
         .type_map_insert::<crate::twitter::Twitter>(twitter)
+        .type_map_insert::<crate::typemap_keys::ReloadHandle>(reload_handle)
         .await
         .context("failed to create the Discord client")?;
 
