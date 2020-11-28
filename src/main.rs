@@ -4,6 +4,7 @@
 extern crate diesel;
 
 use anyhow::{Context, Error};
+use serenity::client::bridge::gateway::GatewayIntents;
 
 use crate::context::ErisContext;
 use crate::extract::Extract;
@@ -141,6 +142,12 @@ async fn main() -> Result<(), Error> {
         .context("failed to get the current application info")?;
 
     let mut client = serenity::Client::builder(&config.discord_botsecret)
+        .add_intent(GatewayIntents::GUILDS)
+        .add_intent(GatewayIntents::GUILD_MEMBERS)
+        .add_intent(GatewayIntents::GUILD_EMOJIS)
+        .add_intent(GatewayIntents::GUILD_VOICE_STATES)
+        .add_intent(GatewayIntents::GUILD_MESSAGES)
+        .add_intent(GatewayIntents::DIRECT_MESSAGES)
         .event_handler(crate::discord_events::DiscordEvents::new())
         .framework(
             serenity::framework::StandardFramework::new()

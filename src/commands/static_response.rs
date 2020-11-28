@@ -28,32 +28,30 @@ impl Access {
             Access::Any => true,
             Access::Sub => {
                 // A user is a "subscriber" if they have a coloured role
-                msg.guild(ctx)
-                    .await
-                    .and_then(|guild| {
-                        guild.members.get(&msg.author.id).map(|member| {
-                            member.roles.iter().any(|role_id| {
-                                guild
-                                    .roles
-                                    .get(role_id)
-                                    .map(|role| role.colour)
-                                    .unwrap_or_else(Colour::default)
-                                    != Colour::default()
-                            })
-                        })
-                    })
-                    .unwrap_or(false)
+                if let Some(guild) = msg.guild(ctx).await {
+                    if let Ok(member) = guild.member(ctx, msg.author.id).await {
+                        for role_id in &member.roles {
+                            if let Some(role) = guild.roles.get(role_id) {
+                                if role.colour != Colour::default() {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                false
             }
             Access::Mod => {
                 if let Some(guild) = msg.guild(ctx).await {
-                    if let Some(member) = guild.members.get(&msg.author.id) {
-                        member.permissions(ctx).await.map(|p| p.administrator()).unwrap_or(false)
-                    } else {
-                        false
+                    if let Ok(member) = guild.member(&ctx, &msg.author.id).await {
+                        if let Ok(permissions) = member.permissions(ctx).await {
+                            return permissions.administrator();
+                        }
                     }
-                } else {
-                    false
                 }
+
+                false
             }
         }
     }
