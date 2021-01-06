@@ -28,7 +28,7 @@ lalrpop-util = { version = "0.19.3", default-features = false }
 lazy_static = { version = "1.4.0", default-features = false }
 log = { version = "0.4.11", default-features = false, features = ["max_level_info", "release_max_level_info", "std"] }
 ordinal = "0.2"
-rand = { version = "0.7.3", default-features = false, features = ["std"] }
+rand = { version = "0.8.1", default-features = false, features = ["std"] }
 regex = { version = "1.4.2", default-features = false, features = ["perf", "std", "unicode"] }
 reqwest = { version = "0.10.10", default-features = false, features = ["rustls-tls", "json"] }
 rust-ini = { version = "0.16.0", default-features = false }
