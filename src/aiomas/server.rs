@@ -79,21 +79,19 @@ impl<C: Clone + Send + 'static> Server<C> {
     }
 
     pub async fn serve(self) {
-        let Server { methods, mut listener, context } = self;
+        let Server { methods, listener, context } = self;
 
-        let mut listener = listener.incoming();
         let methods = Arc::new(methods);
 
         loop {
-            match listener.try_next().await {
-                Ok(Some(socket)) => {
+            match listener.accept().await {
+                Ok((socket, _remote_addr)) => {
                     tokio::spawn(Server::process(
                         methods.clone(),
                         Framed::new(socket, ServerCodec),
                         context.clone(),
                     ));
                 }
-                Ok(None) => return,
                 Err(error) => error!(?error, "Failed to accept an incoming connection"),
             }
         }

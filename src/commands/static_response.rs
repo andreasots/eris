@@ -108,7 +108,7 @@ fn replace_emojis<'a, S: Into<String>, I: Iterator<Item = &'a Emoji>>(
     for emoji in emojis {
         let regex = Regex::new(&format!(r"\b{}\b", regex::escape(&emoji.name)))
             .with_context(|| format!("invalid regex syntax with {:?}", emoji.name))?;
-        if let Cow::Owned(s) = regex.replace_all(&msg, &emoji.mention()[..]) {
+        if let Cow::Owned(s) = regex.replace_all(&msg, emoji.mention().to_string().as_str()) {
             msg = s;
         }
     }
@@ -291,7 +291,7 @@ mod tests {
 
         assert_eq!(
             super::replace_emojis("lrrDOTS lrrCIRCLE lrrARROW Visit LoadingReadyRun: http://loadingreadyrun.com/", emoji.iter()).unwrap(),
-            "<:lrrDOTS:1> <:lrrCIRCLE:2> <:lrrARROW:3> Visit LoadingReadyRun: http://loadingreadyrun.com/"
+            "<:_:1> <:_:2> <:_:3> Visit LoadingReadyRun: http://loadingreadyrun.com/"
         );
     }
 

@@ -60,12 +60,12 @@ async fn reap_channels(ctx: &ErisContext) -> Result<(), Error> {
 
 pub async fn channel_reaper(ctx: ErisContext) {
     // Delay the first reap so that it doesn't happen before the Discord connection is ready.
-    tokio::time::delay_for(STARTUP_DELAY).await;
+    tokio::time::sleep(STARTUP_DELAY).await;
 
     loop {
         if let Err(error) = reap_channels(&ctx).await {
             error!(?error, "Failed to reap channels");
         }
-        tokio::time::delay_for(REAP_INTERVAL).await;
+        tokio::time::sleep(REAP_INTERVAL).await;
     }
 }
