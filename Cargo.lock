@@ -421,7 +421,7 @@ name = "eris"
 version = "0.1.1"
 dependencies = [
  "anyhow",
- "bytes 0.5.6",
+ "bytes 1.0.1",
  "chrono",
  "chrono-tz",
  "clap",
