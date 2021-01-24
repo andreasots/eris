@@ -448,7 +448,7 @@ dependencies = [
  "serenity",
  "strfmt",
  "tokio 0.2.24",
- "tokio-util 0.3.1",
+ "tokio-util",
  "tracing",
  "tracing-subscriber",
  "unicode-width",
@@ -644,7 +644,7 @@ dependencies = [
  "indexmap",
  "slab",
  "tokio 1.1.0",
- "tokio-util 0.6.2",
+ "tokio-util",
  "tracing",
  "tracing-futures",
 ]
@@ -1907,20 +1907,6 @@ dependencies = [
  "futures-core",
  "pin-project-lite 0.2.1",
  "tokio 1.1.0",
-]
-
-[[package]]
-name = "tokio-util"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be8242891f2b6cbef26a2d7e8605133c2c554cd35b3e4948ea892d6d68436499"
-dependencies = [
- "bytes 0.5.6",
- "futures-core",
- "futures-sink",
- "log",
- "pin-project-lite 0.1.11",
- "tokio 0.2.24",
 ]
 
 [[package]]
