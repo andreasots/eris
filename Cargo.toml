@@ -33,7 +33,7 @@ regex = { version = "1.4.2", default-features = false, features = ["perf", "std"
 reqwest = { version = "0.11.0", default-features = false, features = ["rustls-tls", "json"] }
 rust-ini = { version = "0.16.0", default-features = false }
 separator = { version = "0.4.1", default-features = false }
-serde = { version = "1.0.118", default-features = false, features = ["derive"] }
+serde = { version = "1.0.122", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.61", default-features = false }
 serenity = { version = "0.10.2", default-features = false, features = ["gateway", "cache", "rustls_backend", "standard_framework"] }
 tracing = { version = "0.1.21", default-features = false, features = ["std", "attributes", "max_level_trace", "release_max_level_debug"] }
