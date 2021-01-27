@@ -439,7 +439,7 @@ dependencies = [
  "log",
  "ordinal",
  "rand",
- "regex 1.4.2",
+ "regex 1.4.3",
  "reqwest",
  "rust-ini",
  "separator",
@@ -858,8 +858,8 @@ dependencies = [
  "itertools",
  "lalrpop-util",
  "petgraph",
- "regex 1.4.2",
- "regex-syntax 0.6.21",
+ "regex 1.4.3",
+ "regex-syntax 0.6.22",
  "string_cache",
  "term",
  "tiny-keccak",
@@ -872,7 +872,7 @@ version = "0.19.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9de203e2fa3e883364fcc778a1293ab4d936f6cff400433013c20105df178c5"
 dependencies = [
- "regex 1.4.2",
+ "regex 1.4.3",
 ]
 
 [[package]]
@@ -1107,7 +1107,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c705f256449c60da65e11ff6626e0c16a0a0b96aaa348de61376b249bc340f41"
 dependencies = [
- "regex 1.4.2",
+ "regex 1.4.3",
 ]
 
 [[package]]
@@ -1118,7 +1118,7 @@ checksum = "f4c220d01f863d13d96ca82359d1e81e64a7c6bf0637bcde7b2349630addf0c6"
 dependencies = [
  "base64 0.13.0",
  "once_cell",
- "regex 1.4.2",
+ "regex 1.4.3",
 ]
 
 [[package]]
@@ -1333,13 +1333,13 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.4.2"
+version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38cf2c13ed4745de91a5eb834e11c00bcc3709e773173b2ce4c56c9fbde04b9c"
+checksum = "d9251239e129e16308e70d853559389de218ac275b515068abc96829d05b948a"
 dependencies = [
  "aho-corasick 0.7.15",
  "memchr 2.3.4",
- "regex-syntax 0.6.21",
+ "regex-syntax 0.6.22",
  "thread_local 1.0.1",
 ]
 
@@ -1350,7 +1350,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae1ded71d66a4a97f5e961fd0cb25a5f366a42a41570d16a763a69c092c26ae4"
 dependencies = [
  "byteorder",
- "regex-syntax 0.6.21",
+ "regex-syntax 0.6.22",
 ]
 
 [[package]]
@@ -1361,9 +1361,9 @@ checksum = "f9ec002c35e86791825ed294b50008eea9ddfc8def4420124fbc6b08db834957"
 
 [[package]]
 name = "regex-syntax"
-version = "0.6.21"
+version = "0.6.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b181ba2dcf07aaccad5448e8ead58db5b742cf85dfe035e2227f137a539a189"
+checksum = "b5eb417147ba9860a96cfe72a0b93bf88fee1744b5636ec99ab20c1aa9376581"
 
 [[package]]
 name = "reqwest"
@@ -1889,7 +1889,7 @@ dependencies = [
  "chrono",
  "lazy_static 1.4.0",
  "matchers",
- "regex 1.4.2",
+ "regex 1.4.3",
  "serde",
  "serde_json",
  "sharded-slab",
