@@ -233,9 +233,9 @@ dependencies = [
 
 [[package]]
 name = "command_attr"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef54b146e4ff8a036b9d632fd48c183c9757992535e5f557275f4a01dfd9c7c7"
+checksum = "d3479c246caa6e2064839ed6bb165fae9a8894bcc79d893090a091b49529b475"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1549,9 +1549,9 @@ dependencies = [
 
 [[package]]
 name = "serenity"
-version = "0.10.2"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4dac8367ecfd3380c00dcedf5eb9a47888ae74ae391419b5b1f7735895ed8df4"
+checksum = "2ab45dae7e1ffccaa56b8164d21ecb2f25805a9b40d92b8822dc2fa0c54a7e4f"
 dependencies = [
  "async-trait",
  "async-tungstenite",
@@ -1569,7 +1569,6 @@ dependencies = [
  "static_assertions",
  "tokio",
  "tracing",
- "tracing-futures",
  "typemap_rev",
  "url",
  "uwl",
@@ -1826,6 +1825,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "01ebdc2bb4498ab1ab5f5b73c5803825e60199229ccba0698170e3be0e7f959f"
 dependencies = [
  "cfg-if 1.0.0",
+ "log",
  "pin-project-lite",
  "tracing-attributes",
  "tracing-core",
@@ -1849,16 +1849,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f50de3927f93d202783f4513cda820ab47ef17f624b03c096e86ef00c67e6b5f"
 dependencies = [
  "lazy_static 1.4.0",
-]
-
-[[package]]
-name = "tracing-futures"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97d095ae15e245a057c8e8451bab9b3ee1e1f68e9ba2b4fbc18d0ac5237835f2"
-dependencies = [
- "pin-project",
- "tracing",
 ]
 
 [[package]]
