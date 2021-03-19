@@ -1609,9 +1609,9 @@ dependencies = [
 
 [[package]]
 name = "siphasher"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a5eb1d952355693ec357de97f0f8b77f76ea8ea8bcaf659b3158bb1dbae74c1"
+checksum = "cbce6d4507c7e4a3962091436e56e95290cb71fa302d0d270e32130b75fbff27"
 
 [[package]]
 name = "slab"
