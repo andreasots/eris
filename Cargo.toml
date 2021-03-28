@@ -31,7 +31,7 @@ ordinal = "0.2"
 rand = { version = "0.8.3", default-features = false, features = ["std", "std_rng"] }
 regex = { version = "1.4.5", default-features = false, features = ["perf", "std", "unicode"] }
 reqwest = { version = "0.11.2", default-features = false, features = ["rustls-tls", "json"] }
-rust-ini = { version = "0.16.1", default-features = false }
+rust-ini = { version = "0.17.0", default-features = false }
 separator = { version = "0.4.1", default-features = false }
 serde = { version = "1.0.125", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.64", default-features = false }
