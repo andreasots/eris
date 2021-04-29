@@ -1,0 +1,27 @@
+version: 2
+updates:
+- package-ecosystem: cargo
+  directory: "/"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10
+  assignees:
+  - andreasots
+  allow:
+  - dependency-type: direct
+  - dependency-type: indirect
+  ignore:
+  - dependency-name: wasm-bindgen
+    versions:
+    - 0.2.72
+  - dependency-name: libc
+    versions:
+    - 0.2.89
+- package-ecosystem: cargo
+  directory: "/eris-macros"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10
+  allow:
+  - dependency-type: direct
+  - dependency-type: indirect
