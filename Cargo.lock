@@ -412,7 +412,7 @@ dependencies = [
  "log",
  "ordinal",
  "rand 0.8.3",
- "regex 1.5.3",
+ "regex 1.5.4",
  "reqwest",
  "rust-ini",
  "separator",
@@ -839,7 +839,7 @@ dependencies = [
  "itertools",
  "lalrpop-util",
  "petgraph",
- "regex 1.5.3",
+ "regex 1.5.4",
  "regex-syntax 0.6.25",
  "string_cache",
  "term",
@@ -853,7 +853,7 @@ version = "0.19.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a708007b751af124d09e9c5d97515257902bc6b486a56b40bcafd939e8ff467"
 dependencies = [
- "regex 1.5.3",
+ "regex 1.5.4",
 ]
 
 [[package]]
@@ -1087,7 +1087,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c705f256449c60da65e11ff6626e0c16a0a0b96aaa348de61376b249bc340f41"
 dependencies = [
- "regex 1.5.3",
+ "regex 1.5.4",
 ]
 
 [[package]]
@@ -1098,7 +1098,7 @@ checksum = "fd56cbd21fea48d0c440b41cd69c589faacade08c992d9a54e471b79d0fd13eb"
 dependencies = [
  "base64 0.13.0",
  "once_cell",
- "regex 1.5.3",
+ "regex 1.5.4",
 ]
 
 [[package]]
@@ -1342,9 +1342,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.5.3"
+version = "1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce5f1ceb7f74abbce32601642fcf8e8508a8a8991e0621c7d750295b9095702b"
+checksum = "d07a8629359eb56f1e2fb1652bb04212c072a87ba68546a04065d525673ac461"
 dependencies = [
  "aho-corasick 0.7.18",
  "memchr 2.4.0",
@@ -1873,7 +1873,7 @@ dependencies = [
  "chrono",
  "lazy_static 1.4.0",
  "matchers",
- "regex 1.5.3",
+ "regex 1.5.4",
  "serde",
  "serde_json",
  "sharded-slab",
