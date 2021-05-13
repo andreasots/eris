@@ -10,13 +10,6 @@ updates:
   allow:
   - dependency-type: direct
   - dependency-type: indirect
-  ignore:
-  - dependency-name: wasm-bindgen
-    versions:
-    - 0.2.72
-  - dependency-name: libc
-    versions:
-    - 0.2.89
 - package-ecosystem: cargo
   directory: "/eris-macros"
   schedule:
