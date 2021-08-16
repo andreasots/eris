@@ -11,7 +11,7 @@ build = "build.rs"
 lalrpop = { version = "0.19.6", default-features = false, features = ["lexer"] }
 
 [dependencies]
-anyhow = { version = "1.0.42", default-features = false, features = ["std"] }
+anyhow = { version = "1.0.43", default-features = false, features = ["std"] }
 bytes = { version = "1.0.1", default-features = false }
 chrono = { version = "0.4.19", default-features = false }
 chrono-tz = { version = "0.5.3", default-features = false }
