@@ -7,9 +7,9 @@ use serenity::async_trait;
 use serenity::http::client::Http;
 use serenity::model::prelude::*;
 use serenity::prelude::*;
-use tracing::error;
 use std::convert::TryFrom;
 use std::future::Future;
+use tracing::error;
 
 pub struct DiscordEvents;
 

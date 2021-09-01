@@ -4,9 +4,9 @@ use crate::extract::Extract;
 use anyhow::Error;
 use chrono::Utc;
 use serenity::model::prelude::*;
-use tracing::{error, info};
 use std::collections::HashMap;
 use std::time::Duration;
+use tracing::{error, info};
 
 const STARTUP_DELAY: Duration = Duration::from_secs(5);
 const REAP_INTERVAL: Duration = Duration::from_secs(60);
@@ -44,7 +44,11 @@ async fn reap_channels(ctx: &ErisContext) -> Result<(), Error> {
         if (now - created_at).to_std()? > MIN_CHANNEL_AGE
             && voice_users.get(&channel.id).copied().unwrap_or(0) == 0
         {
-            info!(channel.id = channel.id.0, channel.name = channel.name.as_str(), "Scheduling a temporary channel for deletion");
+            info!(
+                channel.id = channel.id.0,
+                channel.name = channel.name.as_str(),
+                "Scheduling a temporary channel for deletion"
+            );
             unused_channels.push(channel.id);
         }
     }

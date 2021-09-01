@@ -4,12 +4,12 @@ use futures::channel::mpsc;
 use futures::future::BoxFuture;
 use futures::prelude::*;
 use serde_json::Value;
-use tracing::error;
 use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::path::Path;
 use std::sync::Arc;
 use tokio_util::codec::Framed;
+use tracing::error;
 
 #[cfg(unix)]
 use tokio::net::UnixListener;

@@ -4,11 +4,11 @@ use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
 use futures::select;
 use serde_json::Value;
-use tracing::error;
 use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::path::PathBuf;
 use tokio_util::codec::Framed;
+use tracing::error;
 
 #[cfg(unix)]
 use tokio::net::UnixStream;

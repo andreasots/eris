@@ -4,8 +4,8 @@ use crate::desertbus::DesertBus;
 use crate::extract::Extract;
 use crate::google::calendar::{Calendar, Event, LRR};
 use crate::models::{Game, GameEntry, Show, User};
-use crate::rpc::LRRbot;
 use crate::rpc::client::HeaderInfo;
+use crate::rpc::LRRbot;
 use crate::time::HumanReadable;
 use crate::twitch::helix::UserId;
 use crate::twitch::Helix;
@@ -16,9 +16,9 @@ use chrono_tz::Tz;
 use diesel::OptionalExtension;
 use separator::FixedPlaceSeparatable;
 use serenity::prelude::TypeMap;
-use tracing::error;
 use std::fmt;
 use std::time::Duration;
+use tracing::error;
 
 struct EventDisplay<'a> {
     event: &'a Event,

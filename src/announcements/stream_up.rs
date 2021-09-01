@@ -9,8 +9,8 @@ use chrono::{DateTime, FixedOffset};
 use diesel::OptionalExtension;
 use eris_macros::rpc_handler;
 use serde::Deserialize;
-use tracing::error;
 use std::fmt::{self, Display};
+use tracing::error;
 
 #[derive(Deserialize)]
 pub struct Channel {

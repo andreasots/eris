@@ -65,6 +65,6 @@ impl TypeMapKey for ReloadHandle {
                 >,
             >,
             tracing_subscriber::Registry,
-        >
+        >,
     >;
 }

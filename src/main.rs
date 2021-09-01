@@ -6,8 +6,8 @@ extern crate diesel;
 use anyhow::{Context, Error};
 use serenity::client::bridge::gateway::GatewayIntents;
 use serenity::model::id::UserId;
-use tracing_subscriber::EnvFilter;
 use std::borrow::Cow;
+use tracing_subscriber::EnvFilter;
 
 use crate::context::ErisContext;
 use crate::extract::Extract;
@@ -69,7 +69,9 @@ async fn main() -> Result<(), Error> {
         .with_env_filter(EnvFilter::new(match std::env::var(EnvFilter::DEFAULT_ENV) {
             Ok(filter) => Cow::Owned(filter),
             Err(std::env::VarError::NotPresent) => Cow::Borrowed(DEFAULT_TRACING_FILTER),
-            Err(e) => panic!("failed to read the tracing filter from ${}: {}", EnvFilter::DEFAULT_ENV, e),
+            Err(e) => {
+                panic!("failed to read the tracing filter from ${}: {}", EnvFilter::DEFAULT_ENV, e)
+            }
         }))
         .with_filter_reloading();
     let reload_handle = builder.reload_handle();
@@ -151,7 +153,14 @@ async fn main() -> Result<(), Error> {
         .context("failed to get the current application info")?;
 
     let mut client = serenity::Client::builder(&config.discord_botsecret)
-        .intents(GatewayIntents::GUILDS | GatewayIntents::GUILD_MEMBERS | GatewayIntents::GUILD_EMOJIS | GatewayIntents::GUILD_VOICE_STATES | GatewayIntents::GUILD_MESSAGES | GatewayIntents::DIRECT_MESSAGES)
+        .intents(
+            GatewayIntents::GUILDS
+                | GatewayIntents::GUILD_MEMBERS
+                | GatewayIntents::GUILD_EMOJIS
+                | GatewayIntents::GUILD_VOICE_STATES
+                | GatewayIntents::GUILD_MESSAGES
+                | GatewayIntents::DIRECT_MESSAGES,
+        )
         .event_handler(crate::discord_events::DiscordEvents::new())
         .framework(
             serenity::framework::StandardFramework::new()
@@ -160,14 +169,19 @@ async fn main() -> Result<(), Error> {
                         .with_whitespace((true, true, true))
                         .on_mention(Some(current_application_info.id))
                         .case_insensitivity(true)
-                        .owners([
-                            // Defrost#0001
-                            UserId(101919755132227584),
-                            // phlip#6324
-                            UserId(153674140019064832),
-                            // qrpth#6704
-                            UserId(144128240389324800),
-                        ].iter().copied().collect())
+                        .owners(
+                            [
+                                // Defrost#0001
+                                UserId(101919755132227584),
+                                // phlip#6324
+                                UserId(153674140019064832),
+                                // qrpth#6704
+                                UserId(144128240389324800),
+                            ]
+                            .iter()
+                            .copied()
+                            .collect(),
+                        )
                 })
                 .before(|_, message, command_name| {
                     Box::pin(async move {
@@ -178,7 +192,6 @@ async fn main() -> Result<(), Error> {
                             from.id = message.author.id.0,
                             from.name = message.author.name.as_str(),
                             from.discriminator = message.author.discriminator,
-
                             "Command received",
                         );
                         true
@@ -198,10 +211,7 @@ async fn main() -> Result<(), Error> {
                                 &format!("Command resulted in an unexpected error: {}.", error),
                             );
                         } else {
-                            info!(
-                                message.id = message.id.0,
-                                "Command processed successfully",
-                            );
+                            info!(message.id = message.id.0, "Command processed successfully",);
                         }
                     })
                 })

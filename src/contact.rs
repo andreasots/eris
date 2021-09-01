@@ -6,8 +6,8 @@ use crate::truncate::truncate;
 use anyhow::{Context, Error};
 use chrono::TimeZone;
 use chrono::{DateTime, Utc};
-use tracing::{error, info};
 use std::time::Duration;
+use tracing::{error, info};
 
 const SENT_KEY: &str = "lrrbot.sent";
 

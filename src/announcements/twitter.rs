@@ -6,9 +6,9 @@ use crate::twitter::Twitter;
 use crate::typemap_keys::PgPool;
 use anyhow::{Context, Error};
 use serenity::model::id::ChannelId;
-use tracing::{error, info};
 use std::collections::HashMap;
 use std::time::Duration;
+use tracing::{error, info};
 
 async fn init(ctx: &ErisContext) -> Result<HashMap<u64, Vec<ChannelId>>, Error> {
     let data = ctx.data.read().await;

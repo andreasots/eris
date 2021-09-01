@@ -58,7 +58,7 @@ trait PushEvent {
 
 fn url_normalise(url: &str) -> String {
     match Url::parse(url) {
-        Ok(url) => url.into_string(),
+        Ok(url) => url.into(),
         Err(url::ParseError::RelativeUrlWithoutBase) => url_normalise(&format!("http://{}", url)),
         Err(_) => String::from(url),
     }

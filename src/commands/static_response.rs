@@ -10,9 +10,9 @@ use serenity::model::channel::Message;
 use serenity::model::guild::Emoji;
 use serenity::prelude::*;
 use serenity::utils::Colour;
-use tracing::{error, info};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use tracing::{error, info};
 
 #[derive(Deserialize, Debug, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "lowercase")]
@@ -124,7 +124,6 @@ async fn static_response_impl(ctx: &Context, msg: &Message, command: &str) -> Re
         from.id = msg.author.id.0,
         from.name = msg.author.name.as_str(),
         from.discriminator = msg.author.discriminator,
-
         "Static command received"
     );
 
@@ -181,12 +180,7 @@ pub async fn static_response(ctx: &Context, msg: &Message, command: &str) {
     match static_response_impl(ctx, msg, &extract_command(&msg.content, command)).await {
         Ok(()) => (),
         Err(error) => {
-            error!(
-                message.id = msg.id.0,
-                ?error,
-
-                "Static command resulted in an unexpected error"
-            );
+            error!(message.id = msg.id.0, ?error, "Static command resulted in an unexpected error");
 
             let _ = msg
                 .reply(
@@ -290,7 +284,11 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            super::replace_emojis("lrrDOTS lrrCIRCLE lrrARROW Visit LoadingReadyRun: http://loadingreadyrun.com/", emoji.iter()).unwrap(),
+            super::replace_emojis(
+                "lrrDOTS lrrCIRCLE lrrARROW Visit LoadingReadyRun: http://loadingreadyrun.com/",
+                emoji.iter()
+            )
+            .unwrap(),
             "<:_:1> <:_:2> <:_:3> Visit LoadingReadyRun: http://loadingreadyrun.com/"
         );
     }
