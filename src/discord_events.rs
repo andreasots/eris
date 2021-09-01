@@ -83,6 +83,24 @@ impl DiscordEvents {
         guild.disconnect_member(http, user).await?;
         Ok(())
     }
+
+    async fn get_channel_and_thread_from_message(
+        &self,
+        ctx: &Context,
+        message: &Message,
+    ) -> Option<(GuildChannel, Option<GuildChannel>)> {
+        let guild = ctx.cache.guild(message.guild_id?).await?;
+
+        if let Some(channel) = guild.channels.get(&message.channel_id) {
+            return Some((channel.clone(), None));
+        }
+
+        // message sent in a guild but not a channel, thread then?
+        let thread = guild.threads.iter().find(|thread| thread.id == message.channel_id)?.clone();
+        let channel = guild.channels.get(&thread.category_id?)?.clone();
+
+        Some((channel, Some(thread)))
+    }
 }
 
 #[async_trait]
@@ -334,17 +352,29 @@ impl EventHandler for DiscordEvents {
         Self::log_error(|| async {
             let data = ctx.data.read().await;
             if let Some(influxdb) = data.get::<InfluxDB>() {
-                if let Some(channel) = new_message.channel(&ctx).await.and_then(Channel::guild) {
-                    let measurement = self
-                        .create_measurement_for_channel(&channel, "message")
-                        .add_tag("user_id", new_message.author.id.to_string())
-                        .add_field("count", 1);
+                let (channel, thread) =
+                    match self.get_channel_and_thread_from_message(&ctx, &new_message).await {
+                        Some(channel) => channel,
+                        None => return Ok(()),
+                    };
 
-                    influxdb
-                        .write(&[measurement])
-                        .await
-                        .context("failed to write the user count to InfluxDB")?;
-                }
+                let measurement = self.create_measurement_for_channel(&channel, "message");
+                let measurement = if let Some(ref thread) = thread {
+                    measurement
+                        .add_tag("thread_id", thread.id.to_string())
+                        .add_tag("thread_name", &thread.name)
+                } else {
+                    measurement
+                };
+
+                let measurement = measurement
+                    .add_tag("user_id", new_message.author.id.to_string())
+                    .add_field("count", 1);
+
+                influxdb
+                    .write(&[measurement])
+                    .await
+                    .context("failed to write the user count to InfluxDB")?;
             }
             Ok(())
         })
