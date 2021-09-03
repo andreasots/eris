@@ -7,15 +7,19 @@ use serenity::async_trait;
 use serenity::http::client::Http;
 use serenity::model::prelude::*;
 use serenity::prelude::*;
+use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::future::Future;
+use tokio::sync::RwLock;
 use tracing::error;
 
-pub struct DiscordEvents;
+pub struct DiscordEvents {
+    threads: RwLock<HashMap<ChannelId, GuildChannel>>,
+}
 
 impl DiscordEvents {
     pub fn new() -> Self {
-        Self
+        Self { threads: RwLock::new(HashMap::new()) }
     }
 }
 
@@ -96,7 +100,10 @@ impl DiscordEvents {
         }
 
         // message sent in a guild but not a channel, thread then?
-        let thread = guild.threads.iter().find(|thread| thread.id == message.channel_id)?.clone();
+        let thread = self.threads.read().await.get(&message.channel_id).cloned();
+        let thread = thread.or_else(|| {
+            guild.threads.iter().find(|thread| thread.id == message.channel_id).cloned()
+        })?;
         let channel = guild.channels.get(&thread.category_id?)?.clone();
 
         Some((channel, Some(thread)))
@@ -346,6 +353,18 @@ impl EventHandler for DiscordEvents {
             Ok(())
         })
         .await
+    }
+
+    async fn thread_create(&self, _ctx: Context, thread: GuildChannel) {
+        self.threads.write().await.insert(thread.id, thread);
+    }
+
+    async fn thread_update(&self, _ctx: Context, new_thread: GuildChannel) {
+        self.threads.write().await.insert(new_thread.id, new_thread);
+    }
+
+    async fn thread_delete(&self, _ctx: Context, thread: PartialGuildChannel) {
+        self.threads.write().await.remove(&thread.id);
     }
 
     async fn message(&self, ctx: Context, new_message: Message) {
