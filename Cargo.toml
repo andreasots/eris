@@ -41,5 +41,5 @@ tracing-subscriber = { version = "0.2.22", default-features = false, features = 
 strfmt = { version = "0.1.6", default-features = false }
 tokio = { version = "1.11.0", default-features = false, features = ["net", "fs", "io-util", "rt-multi-thread", "macros", "time"] }
 tokio-util = { version = "0.6.8", default-features = false, features = ["codec"] }
-unicode-width = { version = "0.1.8", default-features = false }
+unicode-width = { version = "0.1.9", default-features = false }
 url = { version = "2.2.2", default-features = false }
