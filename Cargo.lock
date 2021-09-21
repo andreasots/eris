@@ -192,6 +192,7 @@ dependencies = [
  "chrono",
  "chrono-tz-build",
  "phf",
+ "uncased",
 ]
 
 [[package]]
@@ -203,6 +204,7 @@ dependencies = [
  "parse-zoneinfo",
  "phf",
  "phf_codegen",
+ "uncased",
 ]
 
 [[package]]

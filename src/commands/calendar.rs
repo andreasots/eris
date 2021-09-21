@@ -21,7 +21,7 @@ struct Calendar;
 
 #[command]
 #[help_available]
-#[description = "Gets the next scheduled stream from the LoadingReadyLive calendar. Can specify a timezone, to show stream in your local time. If no time zone is specified, times will be shown in Moonbase time. Unlike on Twitch the timezone is case-sensitive."]
+#[description = "Gets the next scheduled stream from the LoadingReadyLive calendar. Can specify a timezone, to show stream in your local time. If no time zone is specified, times will be shown in Moonbase time."]
 #[usage = "[TIMEZONE]"]
 #[example = "America/New_York"]
 #[min_args("0")]
@@ -32,7 +32,7 @@ pub async fn next(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
 
 #[command]
 #[help_available]
-#[description = "Gets the next scheduled stream from the fan-streaming calendar. Can specify a timezone, to show stream in your local time. If no time zone is specified, times will be shown in Moonbase time. Unlike on Twitch the timezone is case-sensitive."]
+#[description = "Gets the next scheduled stream from the fan-streaming calendar. Can specify a timezone, to show stream in your local time. If no time zone is specified, times will be shown in Moonbase time."]
 #[usage = "[TIMEZONE]"]
 #[example = "America/New_York"]
 #[min_args("0")]
@@ -47,7 +47,7 @@ impl FromStr for Timezone {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Timezone(Tz::from_str(s).map_err(Error::msg)?))
+        Ok(Timezone(Tz::from_str_insensitive(s).map_err(Error::msg)?))
     }
 }
 
