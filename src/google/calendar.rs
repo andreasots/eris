@@ -1,11 +1,11 @@
 use crate::google::ServiceAccount;
 use anyhow::{Context, Error};
-use chrono::Duration;
-use chrono::{DateTime, FixedOffset, TimeZone};
+use chrono::{DateTime, Duration, FixedOffset, NaiveDate, TimeZone};
+use chrono_tz::Tz;
 use reqwest::header::AUTHORIZATION;
 use reqwest::Client;
 use reqwest::Url;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use std::cmp;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -14,43 +14,80 @@ pub const LRR: &str = "loadingreadyrun.com_72jmf1fn564cbbr84l048pv1go@group.cale
 pub const FANSTREAMS: &str = "caffeinatedlemur@gmail.com";
 const SCOPES: &[&str] = &["https://www.googleapis.com/auth/calendar.events.readonly"];
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug)]
 pub struct Event {
-    #[serde(deserialize_with = "deserialize_nested_datetime")]
     pub start: DateTime<FixedOffset>,
     pub summary: String,
-    #[serde(deserialize_with = "deserialize_nested_datetime")]
     pub end: DateTime<FixedOffset>,
     pub location: Option<String>,
     pub description: Option<String>,
 }
 
-#[allow(non_snake_case)]
+impl Event {
+    fn from_api_event(event: ApiEvent, timezone: Tz) -> Option<Self> {
+        Some(Self {
+            start: event.start.resolve_datetime(timezone)?,
+            summary: event.summary,
+            end: event.end.resolve_datetime(timezone)?,
+            location: event.location,
+            description: event.description,
+        })
+    }
+}
+
 #[derive(Serialize)]
 #[serde(bound = "")]
 struct ListEventsRequest<'a, Tz: TimeZone> {
-    maxResults: usize,
-    orderBy: &'a str,
-    singleEvents: bool,
-    timeMin: DateTime<Tz>,
+    #[serde(rename = "maxResults")]
+    max_results: usize,
+    #[serde(rename = "orderBy")]
+    order_by: &'a str,
+    #[serde(rename = "singleEvents")]
+    single_events: bool,
+    #[serde(rename = "timeMin")]
+    time_min: DateTime<Tz>,
 }
 
 #[derive(Deserialize)]
 struct ListEventsResponse {
-    items: Vec<Event>,
+    items: Vec<ApiEvent>,
+    #[serde(rename = "timeZone")]
+    timezone: Tz,
 }
 
-fn deserialize_nested_datetime<'de, D>(deserializer: D) -> Result<DateTime<FixedOffset>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[allow(non_snake_case)]
-    #[derive(Deserialize)]
-    struct Nested {
-        dateTime: DateTime<FixedOffset>,
-    }
+#[derive(Deserialize)]
+struct ApiEvent {
+    pub start: Time,
+    pub summary: String,
+    pub end: Time,
+    pub location: Option<String>,
+    pub description: Option<String>,
+}
 
-    Ok(Nested::deserialize(deserializer)?.dateTime)
+#[derive(Deserialize)]
+pub struct Time {
+    #[serde(rename = "dateTime")]
+    date_time: Option<DateTime<FixedOffset>>,
+    date: Option<NaiveDate>,
+    #[serde(rename = "timeZone")]
+    timezone: Option<Tz>,
+}
+
+impl Time {
+    fn resolve_datetime(&self, calendar_tz: Tz) -> Option<DateTime<FixedOffset>> {
+        if let Some(datetime) = self.date_time {
+            return Some(datetime);
+        } else if let Some(date) = self.date {
+            self.timezone
+                .unwrap_or(calendar_tz)
+                .from_local_date(&date)
+                .and_hms_opt(0, 0, 0)
+                .earliest()
+                .map(|datetime| datetime.with_timezone(&FixedOffset::east(0)))
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -92,15 +129,15 @@ impl Calendar {
             .await
             .context("failed to get a service account OAuth2 token")?;
 
-        Ok(self
+        let res = self
             .client
             .get(url)
             .header(AUTHORIZATION, token)
             .query(&ListEventsRequest {
-                maxResults: 10,
-                orderBy: "startTime",
-                singleEvents: true,
-                timeMin: after,
+                max_results: 10,
+                order_by: "startTime",
+                single_events: true,
+                time_min: after,
             })
             .send()
             .await
@@ -109,8 +146,9 @@ impl Calendar {
             .context("request failed")?
             .json::<ListEventsResponse>()
             .await
-            .context("failed to parse calendar events")?
-            .items)
+            .context("failed to parse calendar events")?;
+        let timezone = res.timezone;
+        Ok(res.items.into_iter().flat_map(|event| Event::from_api_event(event, timezone)).collect())
     }
 
     pub fn get_next_event<Tz: TimeZone>(
