@@ -6,13 +6,11 @@ use crate::google::calendar::{Calendar, Event, LRR};
 use crate::models::{Game, GameEntry, Show, User};
 use crate::rpc::client::HeaderInfo;
 use crate::rpc::LRRbot;
-use crate::time::HumanReadable;
 use crate::twitch::helix::UserId;
 use crate::twitch::Helix;
 use crate::{truncate::truncate, typemap_keys::PgPool};
 use anyhow::{Context, Error};
 use chrono::{DateTime, FixedOffset, Utc};
-use chrono_tz::Tz;
 use diesel::OptionalExtension;
 use separator::FixedPlaceSeparatable;
 use serenity::prelude::TypeMap;
@@ -20,36 +18,25 @@ use std::fmt;
 use std::time::Duration;
 use tracing::error;
 
+const TOPIC_MAX_LEN: usize = 1024;
+
 struct EventDisplay<'a> {
     event: &'a Event,
-    now: DateTime<Utc>,
-    tz: Tz,
 }
 
 impl<'a> fmt::Display for EventDisplay<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let start = self.event.start.with_timezone(&Utc);
-        if start > self.now {
-            write!(f, "In {}: ", HumanReadable::new(start - self.now))?;
-        } else {
-            write!(f, "{} ago: ", HumanReadable::new(self.now - start))?;
-        }
-
-        f.write_str(&self.event.summary)?;
+        write!(f, "<t:{}:R>: {} ", self.event.start.timestamp(), self.event.summary)?;
 
         if let Some(ref location) = self.event.location {
-            write!(f, " ({})", location)?;
+            write!(f, "({}) ", location)?;
         }
 
         if let Some(ref desc) = self.event.description {
             // TODO: shorten to 200 characters.
-            write!(f, " ({})", Calendar::format_description(desc))?;
+            write!(f, "({}) ", Calendar::format_description(desc))?;
         }
-        write!(
-            f,
-            " on {}.",
-            self.event.start.with_timezone(&self.tz).format("%a %e %b at %I:%M %p %Z")
-        )?;
+        write!(f, "on <t:{}:F>.", self.event.start.timestamp())?;
 
         Ok(())
     }
@@ -170,19 +157,39 @@ impl Autotopic {
             if !desertbus.is_empty() {
                 messages.extend(desertbus);
             } else {
-                let tz = data.extract::<Config>()?.timezone;
-                messages
-                    .extend(events.iter().map(|event| EventDisplay { event, now, tz }.to_string()));
+                messages.extend(events.iter().map(|event| EventDisplay { event }.to_string()));
             }
         }
 
-        if let Some(advice) = header.advice {
-            messages.push(advice);
+        let mut channel = data
+            .extract::<Config>()?
+            .general_channel
+            .to_channel(&ctx)
+            .await
+            .context("failed to get the #general channel")?
+            .guild()
+            .context("#general is not a guild channel?")?;
+
+        let mut topic = messages.join(" ");
+
+        if channel
+            .topic
+            .as_deref()
+            .unwrap_or_default()
+            .starts_with(truncate(&topic, TOPIC_MAX_LEN).0)
+        {
+            return Ok(());
         }
 
-        data.extract::<Config>()?
-            .general_channel
-            .edit(ctx, |c| c.topic(truncate(&messages.join(" "), 1024).0))
+        if let Some(advice) = header.advice {
+            if !topic.is_empty() {
+                topic.push_str(" ");
+            }
+            topic.push_str(&advice);
+        }
+
+        channel
+            .edit(ctx, |c| c.topic(truncate(&topic, TOPIC_MAX_LEN).0))
             .await
             .context("failed to update the topic")?;
 
@@ -199,12 +206,7 @@ impl Autotopic {
             .await
             .context("failed to get the stream")?
             .first()
-            .map(|stream| {
-                format!(
-                    "The stream has been live for {}.",
-                    HumanReadable::new(Utc::now() - stream.started_at.with_timezone(&Utc))
-                )
-            })
+            .map(|stream| format!("The stream started <t:{}:R>.", stream.started_at.timestamp()))
             .unwrap_or_else(|| String::from("The stream is not live.")))
     }
 
@@ -250,8 +252,6 @@ impl Autotopic {
                             )),
                             description: None,
                         },
-                        now,
-                        tz: data.extract::<Config>()?.timezone,
                     }
                     .to_string(),
                 );

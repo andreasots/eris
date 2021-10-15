@@ -1,5 +1,6 @@
 use serenity::cache::Cache;
 use serenity::http::client::Http;
+use serenity::http::CacheHttp;
 use serenity::prelude::{RwLock, TypeMap};
 use serenity::{CacheAndHttp, Client};
 use std::sync::Arc;
@@ -13,6 +14,16 @@ pub struct ErisContext {
 impl ErisContext {
     pub fn from_client(client: &Client) -> ErisContext {
         ErisContext { cache_and_http: client.cache_and_http.clone(), data: client.data.clone() }
+    }
+}
+
+impl CacheHttp for ErisContext {
+    fn http(&self) -> &Http {
+        &self.cache_and_http.http
+    }
+
+    fn cache(&self) -> Option<&Arc<Cache>> {
+        Some(&self.cache_and_http.cache)
     }
 }
 
