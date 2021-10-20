@@ -63,7 +63,7 @@ impl DiscordEvents {
     ) -> Measurement<'a, New> {
         let kind = match channel.kind {
             ChannelType::Voice => "voice_channels",
-            ChannelType::Text => "text_channels",
+            ChannelType::Text | ChannelType::News => "text_channels",
             kind => unimplemented!("channel type: {:?}", kind),
         };
 
