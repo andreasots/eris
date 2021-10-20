@@ -3,6 +3,7 @@ use crate::context::ErisContext;
 use crate::extract::Extract;
 use crate::models::{Game, GameEntry, Show};
 use crate::rpc::LRRbot;
+use crate::try_crosspost::TryCrosspost;
 use crate::typemap_keys::PgPool;
 use anyhow::{Context, Error};
 use chrono::{DateTime, FixedOffset};
@@ -90,7 +91,10 @@ async fn stream_up_inner(ctx: &ErisContext, channel: Channel) -> Result<(), Erro
     announcements_channel
         .say(ctx, format!("{}", StreamUp { channel, what }))
         .await
-        .context("failed to send the announcement message")?;
+        .context("failed to send the announcement message")?
+        .try_crosspost(ctx)
+        .await
+        .context("failed to crosspost the announcement message")?;
 
     Ok(())
 }

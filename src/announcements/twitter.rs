@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::context::ErisContext;
 use crate::extract::Extract;
 use crate::models::State;
+use crate::try_crosspost::TryCrosspost;
 use crate::twitter::Twitter;
 use crate::typemap_keys::PgPool;
 use anyhow::{Context, Error};
@@ -95,7 +96,10 @@ async fn inner<'a>(
                         channel
                             .say(ctx, &message)
                             .await
-                            .context("failed to send the announcement message")?;
+                            .context("failed to send the announcement message")?
+                            .try_crosspost(ctx)
+                            .await
+                            .context("failed to crosspost the announcement message")?;
                     }
 
                     {

@@ -34,6 +34,7 @@ mod schema;
 mod service;
 mod time;
 mod truncate;
+mod try_crosspost;
 mod twitch;
 mod twitter;
 mod typemap_keys;
