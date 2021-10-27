@@ -1,7 +1,5 @@
-[![Build Status](https://travis-ci.com/andreasots/eris.svg?branch=master)](https://travis-ci.com/andreasots/eris) [![Dependabot Status](https://api.dependabot.com/badges/status?host=github&repo=andreasots/eris)](https://dependabot.com)
-
 # eris
-LRRbot's Discord part but in Rust because discord.py sucks out loud.
+LRRbot's Discord part but in Rust.
 
 ## License
 Licensed under Apache-2.0 ([LICENSE](LICENSE) or [https://www.apache.org/licenses/LICENSE-2.0](https://www.apache.org/licenses/LICENSE-2.0)).
