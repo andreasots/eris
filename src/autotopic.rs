@@ -19,6 +19,12 @@ use std::time::Duration;
 use tracing::error;
 
 const TOPIC_MAX_LEN: usize = 1024;
+// Hopefully normal messages don't contain this sequence.
+const DYNAMIC_TAIL_SEPARATOR: &str = " \u{2009}\u{200A}\u{200B}";
+// Don't update the topic if the old and new topics have a Levenshtein distance below `SIMILARITY_THRESHOLD`.
+const SIMILARITY_THRESHOLD: usize = 5;
+// But even then update the topic every `SIMILAR_MIN_UPDATE_INTERVAL_MINUTES` minutes.
+const SIMILAR_MIN_UPDATE_INTERVAL_MINUTES: i64 = 30;
 
 struct EventDisplay<'a> {
     event: &'a Event,
@@ -44,21 +50,76 @@ impl<'a> fmt::Display for EventDisplay<'a> {
 
 pub async fn autotopic(ctx: ErisContext) {
     let mut timer = tokio::time::interval(Duration::from_secs(60));
+    let mut autotopic = Autotopic { last_updated: None };
 
     loop {
         timer.tick().await;
 
-        if let Err(error) = Autotopic.update_topic(&ctx).await {
+        if let Err(error) = autotopic.update_topic(&ctx).await {
             error!(?error, "Failed to update the topic");
         }
     }
 }
 
 #[derive(Copy, Clone)]
-struct Autotopic;
+struct Autotopic {
+    last_updated: Option<DateTime<Utc>>,
+}
 
 impl Autotopic {
-    async fn update_topic(self, ctx: &ErisContext) -> Result<(), Error> {
+    async fn set_topic(
+        &mut self,
+        new_topic: &str,
+        is_dynamic: bool,
+        ctx: &ErisContext,
+        data: &TypeMap,
+    ) -> Result<(), Error> {
+        let new_topic = truncate(new_topic, TOPIC_MAX_LEN).0;
+
+        let mut channel = data
+            .extract::<Config>()?
+            .general_channel
+            .to_channel(&ctx)
+            .await
+            .context("failed to get the #general channel")?
+            .guild()
+            .context("#general is not a guild channel?")?;
+
+        let old_topic = channel.topic.as_deref().unwrap_or_default();
+
+        let new_topic_static_prefix =
+            new_topic.rsplit_once(DYNAMIC_TAIL_SEPARATOR).unwrap_or((new_topic, "")).0;
+        let old_topic_static_prefix =
+            old_topic.rsplit_once(DYNAMIC_TAIL_SEPARATOR).unwrap_or((old_topic, "")).0;
+
+        let now = Utc::now();
+
+        if !is_dynamic {
+            if old_topic_static_prefix == new_topic_static_prefix {
+                return Ok(());
+            }
+        } else {
+            let distance =
+                levenshtein::levenshtein(old_topic_static_prefix, new_topic_static_prefix);
+            if distance == 0 {
+                return Ok(());
+            } else if distance < SIMILARITY_THRESHOLD {
+                // Unfortunately `chrono::Duration`'s constructors are not `const`.
+                let update_interval =
+                    chrono::Duration::minutes(SIMILAR_MIN_UPDATE_INTERVAL_MINUTES);
+                if self.last_updated.map(|t| (now - t) < update_interval).unwrap_or(false) {
+                    return Ok(());
+                }
+            }
+        }
+
+        channel.edit(ctx, |c| c.topic(new_topic)).await.context("failed to update the topic")?;
+        self.last_updated = Some(now);
+
+        Ok(())
+    }
+
+    async fn update_topic(&mut self, ctx: &ErisContext) -> Result<(), Error> {
         let data = ctx.data.read().await;
 
         let header = match data.extract::<LRRbot>()?.get_header_info().await {
@@ -77,6 +138,7 @@ impl Autotopic {
         };
 
         let mut messages = vec![];
+        let mut is_dynamic = false;
 
         let user;
         let game;
@@ -153,43 +215,25 @@ impl Autotopic {
                 .context("failed to get the next scheduled stream")?;
             let events = Calendar::get_next_event(&events, now, false);
 
-            let desertbus = self.desertbus(&data, &user, now, &events).await?;
+            let (desertbus, desertbus_is_dynamic) =
+                self.desertbus(&data, &user, now, &events).await?;
             if !desertbus.is_empty() {
                 messages.extend(desertbus);
+                is_dynamic |= desertbus_is_dynamic;
             } else {
                 messages.extend(events.iter().map(|event| EventDisplay { event }.to_string()));
             }
         }
 
-        let mut channel = data
-            .extract::<Config>()?
-            .general_channel
-            .to_channel(&ctx)
-            .await
-            .context("failed to get the #general channel")?
-            .guild()
-            .context("#general is not a guild channel?")?;
-
         let mut topic = messages.join(" ");
-
-        if channel
-            .topic
-            .as_deref()
-            .unwrap_or_default()
-            .starts_with(truncate(&topic, TOPIC_MAX_LEN).0)
-        {
-            return Ok(());
-        }
-
         if let Some(advice) = header.advice {
             if !topic.is_empty() {
-                topic.push_str(" ");
+                topic.push_str(DYNAMIC_TAIL_SEPARATOR);
             }
             topic.push_str(&advice);
         }
 
-        channel
-            .edit(ctx, |c| c.topic(truncate(&topic, TOPIC_MAX_LEN).0))
+        self.set_topic(&topic, is_dynamic, ctx, &data)
             .await
             .context("failed to update the topic")?;
 
@@ -216,16 +260,17 @@ impl Autotopic {
         user: &User,
         now: DateTime<Utc>,
         events: &[Event],
-    ) -> Result<Vec<String>, Error> {
+    ) -> Result<(Vec<String>, bool), Error> {
         let start = DesertBus::start_time().with_timezone(&Utc);
         let announce_start = start - chrono::Duration::days(2);
         let announce_end = start + chrono::Duration::days(9);
         let mut messages = vec![];
+        let mut is_dynamic = false;
 
         if announce_start <= now && now <= announce_end {
             if let Some(next_event_start) = events.get(0).map(|event| event.start) {
                 if next_event_start.with_timezone(&Utc) < start {
-                    return Ok(messages);
+                    return Ok((messages, is_dynamic));
                 }
             }
             let desertbus = data.extract::<DesertBus>()?;
@@ -235,7 +280,7 @@ impl Autotopic {
                 Err(error) => {
                     error!(?error, "Failed to fetch the current Desert Bus total");
                     messages.push(String::from("DESERT BUS?"));
-                    return Ok(messages);
+                    return Ok((messages, is_dynamic));
                 }
             };
             let total_hours = DesertBus::hours_raised(money_raised) as i64;
@@ -259,6 +304,7 @@ impl Autotopic {
                     "${} raised.",
                     money_raised.separated_string_with_fixed_place(2)
                 ));
+                is_dynamic = true;
             } else if now <= start + chrono::Duration::hours(total_hours)
                 || self.is_desertbus_live(data, user).await?
             {
@@ -276,10 +322,11 @@ impl Autotopic {
                     bussed.num_minutes() % 60,
                     total_hours
                 ));
+                is_dynamic = true;
             }
         }
 
-        Ok(messages)
+        Ok((messages, is_dynamic))
     }
 
     async fn is_desertbus_live(self, data: &TypeMap, user: &User) -> Result<bool, Error> {
