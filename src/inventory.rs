@@ -6,13 +6,4 @@ pub struct AiomasHandler {
     pub handler: &'static (dyn Handler<ErisContext> + Send + Sync + 'static),
 }
 
-impl AiomasHandler {
-    pub fn new(
-        method: &'static str,
-        handler: &'static (dyn Handler<ErisContext> + Send + Sync + 'static),
-    ) -> AiomasHandler {
-        AiomasHandler { method, handler }
-    }
-}
-
 inventory::collect!(AiomasHandler);

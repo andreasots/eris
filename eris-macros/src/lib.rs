@@ -103,7 +103,7 @@ pub fn rpc_handler(attr: TokenStream, item: TokenStream) -> TokenStream {
 
             static HANDLER: &'static (dyn crate::aiomas::Handler<crate::context::ErisContext> + Send + Sync + 'static) = &handler;
 
-            crate::inventory::AiomasHandler::new(#name, HANDLER)
+            crate::inventory::AiomasHandler { method: #name, handler: HANDLER }
         }
 
         #function
