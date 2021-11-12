@@ -24,7 +24,7 @@ impl DesertBus {
     }
 
     pub fn start_time() -> DateTime<Tz> {
-        TIMEZONE.ymd(2021, 11, 12).and_hms(10, 0, 0)
+        TIMEZONE.ymd(2021, 11, 12).and_hms(18, 0, 0)
     }
 
     pub fn hours_raised(money_raised: f64) -> f64 {
