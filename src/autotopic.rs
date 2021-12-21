@@ -6,9 +6,10 @@ use crate::google::calendar::{Calendar, Event, LRR};
 use crate::models::{Game, GameEntry, Show, User};
 use crate::rpc::client::HeaderInfo;
 use crate::rpc::LRRbot;
+use crate::shorten::shorten;
 use crate::twitch::helix::UserId;
 use crate::twitch::Helix;
-use crate::{truncate::truncate, typemap_keys::PgPool};
+use crate::typemap_keys::PgPool;
 use anyhow::{Context, Error};
 use chrono::{DateTime, FixedOffset, Utc};
 use diesel::OptionalExtension;
@@ -74,7 +75,8 @@ impl Autotopic {
         ctx: &ErisContext,
         data: &TypeMap,
     ) -> Result<(), Error> {
-        let new_topic = truncate(new_topic, TOPIC_MAX_LEN).0;
+        let new_topic = shorten(new_topic, TOPIC_MAX_LEN);
+        let new_topic = new_topic.as_ref();
 
         let mut channel = data
             .extract::<Config>()?
