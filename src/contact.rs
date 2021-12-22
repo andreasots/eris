@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::context::ErisContext;
 use crate::extract::Extract;
 use crate::google::sheets::{CellData, ExtendedValue, Sheets, Spreadsheet};
-use crate::shorten::shorten;
+use crate::shorten::{shorten, split_to_parts};
 use anyhow::{Context, Error};
 use chrono::TimeZone;
 use chrono::{DateTime, Utc};
@@ -124,20 +124,23 @@ async fn inner(ctx: &ErisContext) -> Result<(), Error> {
         .ok_or_else(|| Error::msg("no sheets or required information missing"))?;
 
     for message in unsent {
-        mods_channel
-            .send_message(ctx, |m| {
-                m.content("New message from the contact form:").embed(|mut embed| {
-                    embed = embed
-                        .description(shorten(message.message, 4096))
-                        .timestamp(message.timestamp.to_rfc3339());
-                    if let Some(user) = message.username {
-                        embed = embed.author(|e| e.name(user))
+        for (i, part) in split_to_parts(message.message, 4096).into_iter().enumerate() {
+            mods_channel
+                .send_message(ctx, |m| {
+                    if i == 0 {
+                        m.content("New message from the contact form:");
                     }
-                    embed
+                    m.embed(|embed| {
+                        embed.description(part).timestamp(message.timestamp.to_rfc3339());
+                        if let Some(user) = message.username {
+                            embed.author(|e| e.name(shorten(user, 256)));
+                        }
+                        embed
+                    })
                 })
-            })
-            .await
-            .context("failed to forward the message")?;
+                .await
+                .context("failed to forward the message")?;
+        }
 
         sheets
             .create_developer_metadata_for_row(

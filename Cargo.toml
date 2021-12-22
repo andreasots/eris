@@ -26,6 +26,7 @@ joinery = "2.1.0"
 jsonwebtoken = { version = "7.2.0", default-features = false }
 lalrpop-util = { version = "0.19.6", default-features = false }
 lazy_static = { version = "1.4.0", default-features = false }
+levenshtein = "1.0.5"
 log = { version = "0.4.14", default-features = false, features = ["max_level_info", "release_max_level_info", "std"] }
 ordinal = "0.2"
 rand = { version = "0.8.4", default-features = false, features = ["std", "std_rng"] }
@@ -36,11 +37,11 @@ separator = { version = "0.4.1", default-features = false }
 serde = { version = "1.0.132", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.73", default-features = false }
 serenity = { version = "0.10.9", default-features = false, features = ["gateway", "cache", "rustls_backend", "standard_framework"] }
-tracing = { version = "0.1.29", default-features = false, features = ["std", "attributes", "max_level_trace", "release_max_level_debug"] }
-tracing-subscriber = { version = "0.2.25", default-features = false, features = ["chrono", "fmt", "env-filter", "json", "tracing-log"] }
 strfmt = { version = "0.1.6", default-features = false }
 tokio = { version = "1.15.0", default-features = false, features = ["net", "fs", "io-util", "rt-multi-thread", "macros", "time"] }
 tokio-util = { version = "0.6.9", default-features = false, features = ["codec"] }
+tracing = { version = "0.1.29", default-features = false, features = ["std", "attributes", "max_level_trace", "release_max_level_debug"] }
+tracing-subscriber = { version = "0.2.25", default-features = false, features = ["chrono", "fmt", "env-filter", "json", "tracing-log"] }
+unicode-segmentation = "1.8.0"
 unicode-width = { version = "0.1.9", default-features = false }
 url = { version = "2.2.2", default-features = false }
-levenshtein = "1.0.5"
