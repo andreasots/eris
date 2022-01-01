@@ -9,15 +9,8 @@ use serenity::prelude::*;
 
 #[group("Date")]
 #[description = "Date commands"]
-#[commands(march, september, november)]
+#[commands(september, november)]
 struct Date;
-
-#[command]
-#[description = "Post the current date.\n\n(https://en.wikipedia.org/wiki/COVID-19)"]
-#[num_args(0)]
-async fn march(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
-    eternal(ctx, msg, NaiveDate::from_ymd(2020, 3, 1)).await
-}
 
 #[command]
 #[description = "Post the current date.\n\n(https://en.wikipedia.org/wiki/Eternal_September)"]
