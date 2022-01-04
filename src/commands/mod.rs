@@ -1,5 +1,4 @@
 pub mod calendar;
-pub mod date;
 pub mod help;
 pub mod live;
 pub mod quote;
