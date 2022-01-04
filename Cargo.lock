@@ -210,13 +210,14 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "2.34.0"
+version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0610544180c38b88101fecf2dd634b174a62eef6946f84dfc6a7127512b381c"
+checksum = "b1121e32687f7f90b905d4775273305baa4f32cd418923e9b0fa726533221857"
 dependencies = [
  "bitflags",
+ "indexmap",
+ "os_str_bytes",
  "textwrap",
- "unicode-width",
 ]
 
 [[package]]
@@ -1050,6 +1051,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "os_str_bytes"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e22443d1643a904602595ba1cd8f7d896afe56d26712531c5ff73a15b2fbf64"
+dependencies = [
+ "memchr 2.4.1",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1558,9 +1568,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.73"
+version = "1.0.74"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcbd0344bc6533bc7ec56df11d42fb70f1b912351c0825ccb7211b59d8af7cf5"
+checksum = "ee2bb9cd061c5865d345bb02ca49fcef1391741b672b54a0bf7b679badec3142"
 dependencies = [
  "itoa 1.0.1",
  "ryu",
@@ -1722,12 +1732,9 @@ dependencies = [
 
 [[package]]
 name = "textwrap"
-version = "0.11.0"
+version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
-dependencies = [
- "unicode-width",
-]
+checksum = "0066c8d12af8b5acd21e00547c3797fde4e8677254a7ee429176ccebbe93dd80"
 
 [[package]]
 name = "thread-id"
