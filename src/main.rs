@@ -86,15 +86,15 @@ async fn main() -> Result<(), Error> {
         .author(env!("CARGO_PKG_AUTHORS"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .arg(
-            clap::Arg::with_name("conf")
-                .short("c")
+            clap::Arg::new("conf")
+                .short('c')
                 .value_name("FILE")
                 .help("Config file")
                 .default_value("lrrbot.conf"),
         )
         .arg(
-            clap::Arg::with_name("google-service-account")
-                .short("k")
+            clap::Arg::new("google-service-account")
+                .short('k')
                 .value_name("FILE")
                 .help("JSON file containing the Google service account key")
                 .default_value("keys.json"),
