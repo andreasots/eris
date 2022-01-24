@@ -8,7 +8,7 @@ edition = "2018"
 build = "build.rs"
 
 [build-dependencies]
-lalrpop = { version = "0.19.6", default-features = false, features = ["lexer"] }
+lalrpop = { version = "0.19.7", default-features = false, features = ["lexer"] }
 
 [dependencies]
 anyhow = { version = "1.0.53", default-features = false, features = ["std"] }
