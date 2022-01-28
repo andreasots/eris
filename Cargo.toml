@@ -15,7 +15,7 @@ anyhow = { version = "1.0.53", default-features = false, features = ["std"] }
 bytes = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false }
 chrono-tz = { version = "0.6.1", default-features = false, features = ["case-insensitive", "serde"] }
-clap = { version = "3.0.10", default-features = false, features = ["std"] }
+clap = { version = "3.0.13", default-features = false, features = ["std"] }
 diesel = { version = "1.4.8", default-features = false, features = ["chrono", "postgres", "r2d2", "serde_json"] }
 diesel_full_text_search = { version = "1.0.1", default-features = false }
 egg-mode-text = { version = "1.14.7", default-features = false }
@@ -28,13 +28,13 @@ lalrpop-util = { version = "0.19.7", default-features = false }
 lazy_static = { version = "1.4.0", default-features = false }
 levenshtein = "1.0.5"
 log = { version = "0.4.14", default-features = false, features = ["max_level_info", "release_max_level_info", "std"] }
-ordinal = "0.2"
+ordinal = "0.3"
 rand = { version = "0.8.4", default-features = false, features = ["std", "std_rng"] }
 regex = { version = "1.5.4", default-features = false, features = ["perf", "std", "unicode"] }
 reqwest = { version = "0.11.9", default-features = false, features = ["rustls-tls", "json"] }
 rust-ini = { version = "0.17.0", default-features = false }
 separator = { version = "0.4.1", default-features = false }
-serde = { version = "1.0.134", default-features = false, features = ["derive"] }
+serde = { version = "1.0.136", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.76", default-features = false }
 serenity = { version = "0.10.9", default-features = false, features = ["gateway", "cache", "rustls_backend", "standard_framework"] }
 strfmt = { version = "0.1.6", default-features = false }
