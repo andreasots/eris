@@ -1043,9 +1043,9 @@ dependencies = [
 
 [[package]]
 name = "ordinal"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9200d1a8c0ee56a222facaca7948dbc4f22e26f0d71240b734938d1f8c510cf"
+checksum = "c80c1530f46e9d8985706d7deb80b83172b250538902f607dea6cd6028851083"
 dependencies = [
  "num-integer",
 ]
