@@ -23,7 +23,7 @@ eris-macros = { path = "eris-macros" }
 futures = { version = "0.3.19", default-features = false, features = ["std", "async-await"] }
 inventory = { version = "0.2.2", default-features = false }
 joinery = "2.1.0"
-jsonwebtoken = { version = "7.2.0", default-features = false }
+jsonwebtoken = { version = "8.0.0", default-features = false }
 lalrpop-util = { version = "0.19.7", default-features = false }
 lazy_static = { version = "1.4.0", default-features = false }
 levenshtein = "1.0.5"
