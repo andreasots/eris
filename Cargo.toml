@@ -40,7 +40,7 @@ serenity = { version = "0.10.10", default-features = false, features = ["gateway
 strfmt = { version = "0.1.6", default-features = false }
 tokio = { version = "1.16.1", default-features = false, features = ["net", "fs", "io-util", "rt-multi-thread", "macros", "time"] }
 tokio-util = { version = "0.6.9", default-features = false, features = ["codec"] }
-tracing = { version = "0.1.29", default-features = false, features = ["std", "attributes", "max_level_trace", "release_max_level_debug"] }
+tracing = { version = "0.1.30", default-features = false, features = ["std", "attributes", "max_level_trace", "release_max_level_debug"] }
 tracing-subscriber = { version = "0.2.25", default-features = false, features = ["chrono", "fmt", "env-filter", "json", "tracing-log"] }
 unicode-segmentation = "1.8.0"
 unicode-width = { version = "0.1.9", default-features = false }
