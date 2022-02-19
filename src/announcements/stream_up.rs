@@ -16,7 +16,6 @@ use tracing::error;
 #[derive(Deserialize)]
 pub struct Channel {
     pub display_name: Option<String>,
-    pub game: Option<String>,
     pub name: String,
     pub status: Option<String>,
     pub stream_created_at: Option<DateTime<FixedOffset>>,
