@@ -20,7 +20,7 @@ diesel = { version = "1.4.8", default-features = false, features = ["chrono", "p
 diesel_full_text_search = { version = "1.0.1", default-features = false }
 egg-mode-text = { version = "1.14.7", default-features = false }
 eris-macros = { path = "eris-macros" }
-futures = { version = "0.3.19", default-features = false, features = ["std", "async-await"] }
+futures = { version = "0.3.21", default-features = false, features = ["std", "async-await"] }
 inventory = { version = "0.2.2", default-features = false }
 joinery = "2.1.0"
 jsonwebtoken = { version = "8.0.1", default-features = false, features = ["use_pem"] }
