@@ -1,6 +1,8 @@
 use crate::config::Config;
 use anyhow::{Context, Error};
 use chrono::{DateTime, FixedOffset};
+use futures::stream::FuturesOrdered;
+use futures::StreamExt;
 use reqwest::header::HeaderValue;
 use reqwest::Client;
 use serde::Deserialize;
@@ -174,10 +176,14 @@ impl Helix {
         ids: &[I],
     ) -> Result<Vec<T>, Error> {
         let mut result = vec![];
+        let mut futures = FuturesOrdered::new();
 
-        // FIXME: do it in parallel. Blocked by rust-lang/rust#64552.
         for chunk in ids.chunks(100) {
-            result.extend(self.paginated(url, token, chunk).await?);
+            futures.push(self.paginated(url, token, chunk));
+        }
+
+        while let Some(res) = futures.next().await {
+            result.extend(res?);
         }
 
         Ok(result)
