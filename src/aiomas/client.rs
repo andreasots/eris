@@ -1,13 +1,11 @@
-use super::codec::{ClientCodec, Exception, Request};
+use super::codec::{self, Exception, Request};
 use anyhow::{Context, Error};
 use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
 use futures::select;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::error::Error as StdError;
 use std::path::PathBuf;
-use tokio_util::codec::Framed;
 use tracing::error;
 
 #[cfg(unix)]
@@ -59,18 +57,17 @@ impl Client {
     ) -> Client {
         let (tx, rx) = mpsc::channel(16);
 
-        tokio::spawn(Client::dispatch(rx, Framed::new(stream, ClientCodec)));
+        tokio::spawn(Client::dispatch(rx, codec::client(stream)));
 
         Client { channel: tx }
     }
 
-    async fn dispatch<T, E>(
+    async fn dispatch<T>(
         mut channel: mpsc::Receiver<(Request, oneshot::Sender<Result<Value, Exception>>)>,
         stream: T,
     ) where
-        T: Sink<(u64, Request), Error = E>
-            + Stream<Item = Result<(u64, Result<Value, Exception>), E>>,
-        E: StdError,
+        T: Sink<(u64, Request), Error = Error>
+            + Stream<Item = Result<(u64, Result<Value, Exception>), Error>>,
     {
         let (mut sink, mut stream) = stream.split();
 

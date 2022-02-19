@@ -1,14 +1,12 @@
-use crate::aiomas::codec::{Exception, Request, ServerCodec};
+use crate::aiomas::codec::{self, Exception, Request};
 use anyhow::{Context, Error};
 use futures::channel::mpsc;
 use futures::future::BoxFuture;
 use futures::prelude::*;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::error::Error as StdError;
 use std::path::Path;
 use std::sync::Arc;
-use tokio_util::codec::Framed;
 use tracing::error;
 
 #[cfg(unix)]
@@ -88,7 +86,7 @@ impl<C: Clone + Send + 'static> Server<C> {
                 Ok((socket, _remote_addr)) => {
                     tokio::spawn(Server::process(
                         methods.clone(),
-                        Framed::new(socket, ServerCodec),
+                        codec::server(socket),
                         context.clone(),
                     ));
                 }
@@ -97,17 +95,16 @@ impl<C: Clone + Send + 'static> Server<C> {
         }
     }
 
-    async fn process<T, E>(
+    async fn process<T>(
         methods: Arc<HashMap<String, &'static (dyn Handler<C> + Send + Sync + 'static)>>,
         transport: T,
         context: C,
     ) where
-        T: Sink<(u64, Result<Value, Exception>), Error = E>
-            + Stream<Item = Result<(u64, Request), E>>
+        T: Sink<(u64, Result<Value, Exception>), Error = Error>
+            + Stream<Item = Result<(u64, Request), Error>>
             + Send
             + Sync
             + 'static,
-        E: StdError,
     {
         let (mut sink, mut stream) = transport.split();
         let (tx, mut rx) = mpsc::channel(16);

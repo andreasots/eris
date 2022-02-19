@@ -1,12 +1,13 @@
-use bytes::{Buf, BufMut, BytesMut};
+use anyhow::Error;
+use bytes::{Bytes, BytesMut};
+use futures::{Sink, SinkExt, Stream, TryStreamExt};
 use serde::de::{Error as DeserializationError, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{self, Value};
 use std::collections::HashMap;
 use std::fmt::{Formatter, Result as FmtResult};
-use std::io::{Error, ErrorKind};
-use std::u32;
-use tokio_util::codec::{Decoder, Encoder};
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio_util::codec::LengthDelimitedCodec;
 
 #[derive(Copy, Clone, Debug)]
 enum FrameType {
@@ -48,88 +49,63 @@ impl<'de> Deserialize<'de> for FrameType {
 
 type Frame<T> = (FrameType, u64, T);
 
-fn encode_frame<T: Serialize>(frame: &Frame<T>, dst: &mut BytesMut) -> Result<(), Error> {
-    let request = serde_json::to_vec(frame)?;
-    if request.len() > u32::MAX as usize {
-        return Err(Error::new(ErrorKind::Other, "request larger than u32::MAX"));
-    }
-    dst.put_u32(request.len() as u32);
-    dst.put_slice(&request);
-    Ok(())
-}
-
-fn decode_frame<T: for<'de> Deserialize<'de>>(
-    src: &mut BytesMut,
-) -> Result<Option<Frame<T>>, Error> {
-    if src.len() < 4 {
-        return Ok(None);
-    }
-    let len = u32::from_be_bytes([src[0], src[1], src[2], src[3]]) as usize;
-    if src.len() < 4 + len {
-        return Ok(None);
-    }
-    src.advance(4);
-    let data = src.split_to(len);
-    Ok(Some(serde_json::from_slice::<Frame<T>>(&data)?))
-}
-
 pub type Request = (String, Vec<Value>, HashMap<String, Value>);
 pub type Exception = String;
 
-pub struct ClientCodec;
-
-impl Encoder<(u64, Request)> for ClientCodec {
-    type Error = Error;
-    fn encode(
-        &mut self,
-        (request_id, payload): (u64, Request),
-        dst: &mut BytesMut,
-    ) -> Result<(), Self::Error> {
-        encode_frame(&(FrameType::Request, request_id, payload), dst)
-    }
+async fn encode_request((request_id, payload): (u64, Request)) -> Result<Bytes, Error> {
+    Ok(serde_json::to_vec(&(FrameType::Request, request_id, payload))?.into())
 }
 
-impl Decoder for ClientCodec {
-    type Item = (u64, Result<Value, Exception>);
-    type Error = Error;
-    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        match decode_frame(src)? {
-            Some((FrameType::Result, request_id, payload)) => Ok(Some((request_id, Ok(payload)))),
-            Some((FrameType::Exception, request_id, payload)) => {
-                Ok(Some((request_id, Err(serde_json::from_value(payload)?))))
-            }
-            Some((ty, _, _)) => {
-                Err(Error::new(ErrorKind::Other, format!("response type {:?} invalid", ty)))
-            }
-            None => Ok(None),
+async fn decode_response(buf: BytesMut) -> Result<(u64, Result<Value, Exception>), Error> {
+    match serde_json::from_slice::<Frame<Value>>(&buf)? {
+        (FrameType::Result, request_id, payload) => Ok((request_id, Ok(payload))),
+        (FrameType::Exception, request_id, payload) => {
+            Ok((request_id, Err(serde_json::from_value(payload)?)))
         }
+        (ty, _, _) => anyhow::bail!("response type {:?} invalid", ty),
     }
 }
 
-pub struct ServerCodec;
+async fn encode_response(
+    (request_id, payload): (u64, Result<Value, Exception>),
+) -> Result<Bytes, Error> {
+    Ok(serde_json::to_vec(&(
+        if payload.is_ok() { FrameType::Result } else { FrameType::Exception },
+        request_id,
+        payload.unwrap_or_else(Value::String),
+    ))?
+    .into())
+}
 
-impl Encoder<(u64, Result<Value, Exception>)> for ServerCodec {
-    type Error = Error;
-    fn encode(
-        &mut self,
-        (request_id, payload): (u64, Result<Value, Exception>),
-        dst: &mut BytesMut,
-    ) -> Result<(), Self::Error> {
-        let ty = if payload.is_ok() { FrameType::Result } else { FrameType::Exception };
-        encode_frame(&(ty, request_id, payload.unwrap_or_else(Value::String)), dst)
+async fn decode_request(buf: BytesMut) -> Result<(u64, Request), Error> {
+    match serde_json::from_slice::<Frame<Request>>(&buf)? {
+        (FrameType::Request, request_id, payload) => Ok((request_id, payload)),
+        (ty, _, _) => anyhow::bail!("request type {:?} invalid", ty),
     }
 }
 
-impl Decoder for ServerCodec {
-    type Item = (u64, Request);
-    type Error = Error;
-    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        match decode_frame(src)? {
-            Some((FrameType::Request, request_id, payload)) => Ok(Some((request_id, payload))),
-            Some((ty, _, _)) => {
-                Err(Error::new(ErrorKind::Other, format!("request type {:?} invalid", ty)))
-            }
-            None => Ok(None),
-        }
-    }
+pub fn client<T: AsyncRead + AsyncWrite>(
+    io: T,
+) -> impl Stream<Item = Result<(u64, Result<Value, Exception>), Error>>
+       + Sink<(u64, Request), Error = Error> {
+    LengthDelimitedCodec::builder()
+        .big_endian()
+        .length_field_length(4)
+        .new_framed(io)
+        .err_into()
+        .and_then(decode_response)
+        .with(encode_request)
+}
+
+pub fn server<T: AsyncRead + AsyncWrite>(
+    io: T,
+) -> impl Stream<Item = Result<(u64, Request), Error>>
+       + Sink<(u64, Result<Value, Exception>), Error = Error> {
+    LengthDelimitedCodec::builder()
+        .big_endian()
+        .length_field_length(4)
+        .new_framed(io)
+        .err_into()
+        .and_then(decode_request)
+        .with(encode_response)
 }
