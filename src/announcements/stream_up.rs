@@ -6,7 +6,6 @@ use crate::rpc::LRRbot;
 use crate::try_crosspost::TryCrosspost;
 use crate::typemap_keys::PgPool;
 use anyhow::{Context, Error};
-use chrono::{DateTime, FixedOffset};
 use diesel::OptionalExtension;
 use eris_macros::rpc_handler;
 use serde::Deserialize;
@@ -16,11 +15,9 @@ use tracing::error;
 #[derive(Deserialize)]
 pub struct Channel {
     pub display_name: Option<String>,
-    pub name: String,
+    pub login: String,
     pub status: Option<String>,
-    pub stream_created_at: Option<DateTime<FixedOffset>>,
     pub live: bool,
-    pub url: String,
 }
 
 struct StreamUp {
@@ -30,7 +27,7 @@ struct StreamUp {
 
 impl Display for StreamUp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.channel.display_name.as_ref().unwrap_or(&self.channel.name))?;
+        f.write_str(&self.channel.display_name.as_ref().unwrap_or(&self.channel.login))?;
         f.write_str(" is live with ")?;
         f.write_str(&self.what)?;
         if let Some(ref status) = self.channel.status {
@@ -38,8 +35,8 @@ impl Display for StreamUp {
             f.write_str(&status)?;
             f.write_str(")")?;
         }
-        f.write_str("! <")?;
-        f.write_str(&self.channel.url)?;
+        f.write_str("! <https://twitch.tv/")?;
+        f.write_str(&self.channel.login)?;
         f.write_str(">")?;
         Ok(())
     }
