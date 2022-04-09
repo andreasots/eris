@@ -215,9 +215,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.1.6"
+version = "3.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8c93436c21e4698bacadf42917db28b23017027a4deccb35dbe47a7e7840123"
+checksum = "71c47df61d9e16dc010b55dba1952a57d8c215dbb533fd13cdd13369aac73b1c"
 dependencies = [
  "bitflags",
  "indexmap",
@@ -375,9 +375,9 @@ dependencies = [
 
 [[package]]
 name = "encoding_rs"
-version = "0.8.30"
+version = "0.8.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7896dc8abb250ffdda33912550faa54c88ec8b998dec0b2c55ab224921ce11df"
+checksum = "9852635589dc9f9ea1b6fe9f05b50ef208c85c834a562f0c6abb1c475736ec2b"
 dependencies = [
  "cfg-if",
 ]
@@ -588,9 +588,9 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.3.12"
+version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62eeb471aa3e3c9197aa4bfeabfe02982f6dc96f750486c0bb0009ac58b26d2b"
+checksum = "37a82c6d637fc9515a4694bbf1cb2457b79d81ce52b3108bdeea58b07dd34a57"
 dependencies = [
  "bytes 1.1.0",
  "fnv",
@@ -601,7 +601,7 @@ dependencies = [
  "indexmap",
  "slab",
  "tokio",
- "tokio-util 0.6.9",
+ "tokio-util 0.7.1",
  "tracing",
 ]
 
@@ -860,9 +860,9 @@ checksum = "db13adb97ab515a3691f56e4dbab09283d0b86cb45abd991d8634a9d6f501760"
 
 [[package]]
 name = "libc"
-version = "0.2.119"
+version = "0.2.122"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bf2e165bb3457c8e098ea76f3e3bc9db55f87aa90d52d0e6be741470916aaa4"
+checksum = "ec647867e2bf0772e28c8bcde4f0d19a9216916e890543b5a03ed8ef27b8f259"
 
 [[package]]
 name = "lock_api"
@@ -1678,9 +1678,9 @@ checksum = "7bd3e3206899af3f8b12af284fafc038cc1dc2b41d1b89dd17297221c5d225de"
 
 [[package]]
 name = "slab"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9def91fd1e018fe007022791f865d0ccc9b3a0d5001e01aabb8b40e46000afb5"
+checksum = "eb703cfe953bccee95685111adeedb76fabe4e97549a58d16f03ea7b9367bb32"
 
 [[package]]
 name = "smallvec"
@@ -2214,9 +2214,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-futures"
-version = "0.4.29"
+version = "0.4.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2eb6ec270a31b1d3c7e266b999739109abce8b6c87e4b31fcfcd788b65267395"
+checksum = "6f741de44b75e14c35df886aff5f1eb73aa114fa5d4d00dcd37b5e01259bf3b2"
 dependencies = [
  "cfg-if",
  "js-sys",
