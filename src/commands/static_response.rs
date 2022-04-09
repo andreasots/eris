@@ -2,12 +2,10 @@ use crate::extract::Extract;
 use crate::rpc::LRRbot;
 use anyhow::{Context as _, Error};
 use rand::seq::SliceRandom;
-use regex::Regex;
 use serde::{Deserialize, Deserializer};
 use serenity::framework::standard::macros::hook;
 use serenity::framework::standard::{Args, Delimiter};
 use serenity::model::channel::Message;
-use serenity::model::guild::Emoji;
 use serenity::prelude::*;
 use serenity::utils::Colour;
 use std::borrow::Cow;
@@ -99,23 +97,6 @@ where
     deserializer.deserialize_any(StringOrVec)
 }
 
-fn replace_emojis<'a, S: Into<String>, I: Iterator<Item = &'a Emoji>>(
-    msg: S,
-    emojis: I,
-) -> Result<String, Error> {
-    let mut msg = msg.into();
-
-    for emoji in emojis {
-        let regex = Regex::new(&format!(r"\b{}\b", regex::escape(&emoji.name)))
-            .with_context(|| format!("invalid regex syntax with {:?}", emoji.name))?;
-        if let Cow::Owned(s) = regex.replace_all(&msg, emoji.mention().to_string().as_str()) {
-            msg = s;
-        }
-    }
-
-    Ok(msg)
-}
-
 async fn static_response_impl(ctx: &Context, msg: &Message, command: &str) -> Result<(), Error> {
     info!(
         command_name = command,
@@ -155,12 +136,6 @@ async fn static_response_impl(ctx: &Context, msg: &Message, command: &str) -> Re
                 );
                 let response =
                     strfmt::strfmt(response, &vars).context("failed to format the reply")?;
-                let response = if let Some(guild) = msg.guild(&ctx).await {
-                    replace_emojis(response, guild.emojis.values())
-                        .context("failed to replace emojis")?
-                } else {
-                    response
-                };
                 msg.reply(ctx, &response).await.context("failed to send a reply")?;
             }
         } else {
@@ -212,85 +187,40 @@ fn extract_command(msg: &str, command: &str) -> String {
     command
 }
 
-#[test]
-fn test_deserialize_single_response() {
-    let res = serde_json::from_str::<Response>(
-        r#"{"access": "any", "response": "Help: https://lrrbot.com/help"}"#,
-    )
-    .unwrap();
-    assert_eq!(
-        res,
-        Response::Some {
-            access: Access::Any,
-            response: vec!["Help: https://lrrbot.com/help".into()]
-        }
-    );
-}
-
-#[test]
-fn test_deserialize_multi_response() {
-    let res =
-        serde_json::from_str::<Response>(r#"{"access": "sub", "response": ["peach", "barf"]}"#)
-            .unwrap();
-    assert_eq!(
-        res,
-        Response::Some { access: Access::Sub, response: vec!["peach".into(), "barf".into()] }
-    );
-}
-
 #[cfg(test)]
 mod tests {
-    use super::Response;
-    use serenity::model::guild::Emoji;
+    use super::{Access, Response};
+
+    #[test]
+    fn test_deserialize_single_response() {
+        let res = serde_json::from_str::<Response>(
+            r#"{"access": "any", "response": "Help: https://lrrbot.com/help"}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            res,
+            Response::Some {
+                access: Access::Any,
+                response: vec!["Help: https://lrrbot.com/help".into()]
+            }
+        );
+    }
+
+    #[test]
+    fn test_deserialize_multi_response() {
+        let res =
+            serde_json::from_str::<Response>(r#"{"access": "sub", "response": ["peach", "barf"]}"#)
+                .unwrap();
+        assert_eq!(
+            res,
+            Response::Some { access: Access::Sub, response: vec!["peach".into(), "barf".into()] }
+        );
+    }
 
     #[test]
     fn deserialize_missing() {
         let res = serde_json::from_str::<Response>("{}").unwrap();
         assert_eq!(res, Response::None {});
-    }
-
-    #[test]
-    fn replace_emojis() {
-        let emoji = serde_json::from_str::<Vec<Emoji>>(
-            r#"
-            [
-                {
-                    "animated": false,
-                    "id": "1",
-                    "name": "lrrDOTS",
-                    "managed": true,
-                    "require_colons": true,
-                    "roles": []
-                },
-                {
-                    "animated": false,
-                    "id": "2",
-                    "name": "lrrCIRCLE",
-                    "managed": true,
-                    "require_colons": true,
-                    "roles": []
-                },
-                {
-                    "animated": false,
-                    "id": "3",
-                    "name": "lrrARROW",
-                    "managed": true,
-                    "require_colons": true,
-                    "roles": []
-                }
-            ]
-        "#,
-        )
-        .unwrap();
-
-        assert_eq!(
-            super::replace_emojis(
-                "lrrDOTS lrrCIRCLE lrrARROW Visit LoadingReadyRun: http://loadingreadyrun.com/",
-                emoji.iter()
-            )
-            .unwrap(),
-            "<:_:1> <:_:2> <:_:3> Visit LoadingReadyRun: http://loadingreadyrun.com/"
-        );
     }
 
     #[test]
