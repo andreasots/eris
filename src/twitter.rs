@@ -14,7 +14,7 @@ struct OAuth2TokenResponse {
     access_token: String,
 }
 
-/// https://developer.twitter.com/en/docs/tweets/data-dictionary/overview/user-object
+/// <https://developer.twitter.com/en/docs/tweets/data-dictionary/overview/user-object>
 #[derive(Deserialize)]
 pub struct User {
     pub id: u64,
@@ -31,7 +31,7 @@ struct UserTimelineRequest {
     since_id: Option<u64>,
 }
 
-/// https://developer.twitter.com/en/docs/tweets/data-dictionary/overview/tweet-object
+/// <https://developer.twitter.com/en/docs/tweets/data-dictionary/overview/tweet-object>
 #[derive(Deserialize)]
 pub struct Tweet {
     pub id: u64,

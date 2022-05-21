@@ -10,35 +10,35 @@ use std::sync::Arc;
 
 const SCOPES: &[&str] = &["https://www.googleapis.com/auth/spreadsheets"];
 
-/// https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets#Spreadsheet
+/// <https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets#Spreadsheet>
 #[derive(Deserialize, Debug)]
 pub struct Spreadsheet {
     pub properties: Option<SpreadsheetProperties>,
     pub sheets: Option<Vec<Sheet>>,
 }
 
-/// https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets#Sheet
+/// <https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets#Sheet>
 #[derive(Deserialize, Debug)]
 pub struct Sheet {
     pub properties: Option<SheetProperties>,
     pub data: Option<Vec<GridData>>,
 }
 
-/// https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets#SheetProperties
+/// <https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets#SheetProperties>
 #[derive(Deserialize, Debug)]
 pub struct SheetProperties {
     #[serde(rename = "sheetId")]
     pub sheet_id: Option<u64>,
 }
 
-/// https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets#SpreadsheetProperties
+/// <https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets#SpreadsheetProperties>
 #[derive(Deserialize, Debug)]
 pub struct SpreadsheetProperties {
     #[serde(rename = "timeZone")]
     pub timezone: Option<String>,
 }
 
-/// https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets#GridData
+/// <https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets#GridData>
 #[derive(Deserialize, Debug)]
 pub struct GridData {
     #[serde(rename = "startRow")]
@@ -51,14 +51,14 @@ pub struct GridData {
     pub row_metadata: Option<Vec<DimensionProperties>>,
 }
 
-/// https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets#DimensionProperties
+/// <https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets#DimensionProperties>
 #[derive(Deserialize, Debug)]
 pub struct DimensionProperties {
     #[serde(rename = "developerMetadata")]
     pub developer_metadata: Option<Vec<DeveloperMetadata>>,
 }
 
-/// https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.developerMetadata#DeveloperMetadata
+/// <https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.developerMetadata#DeveloperMetadata>
 #[derive(Deserialize, Debug)]
 pub struct DeveloperMetadata {
     #[serde(rename = "metadataId")]
@@ -72,7 +72,7 @@ pub struct DeveloperMetadata {
     pub visibility: Option<DeveloperMetadataVisibility>,
 }
 
-/// https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.developerMetadata#DeveloperMetadata.DeveloperMetadataVisibility
+/// <https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.developerMetadata#DeveloperMetadata.DeveloperMetadataVisibility>
 #[derive(Deserialize, Debug)]
 pub enum DeveloperMetadataVisibility {
     #[serde(rename = "DEVELOPER_METADATA_VISIBILITY_UNSPECIFIED")]
@@ -83,20 +83,20 @@ pub enum DeveloperMetadataVisibility {
     Project,
 }
 
-/// https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets#RowData
+/// <https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets#RowData>
 #[derive(Deserialize, Debug)]
 pub struct RowData {
     pub values: Option<Vec<CellData>>,
 }
 
-/// https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/cells#CellData
+/// <https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/cells#CellData>
 #[derive(Deserialize, Debug)]
 pub struct CellData {
     #[serde(rename = "effectiveValue")]
     pub effective_value: Option<ExtendedValue>,
 }
 
-/// https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/other#ExtendedValue
+/// <https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/other#ExtendedValue>
 #[derive(Deserialize, Debug)]
 pub enum ExtendedValue {
     #[serde(rename = "numberValue")]
@@ -107,7 +107,7 @@ pub enum ExtendedValue {
     Bool(bool),
     #[serde(rename = "formulaValue")]
     Formula(String),
-    /// https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/other#ErrorValue
+    /// <https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/other#ErrorValue>
     #[serde(rename = "errorValue")]
     Error {
         #[serde(rename = "type")]
@@ -116,7 +116,7 @@ pub enum ExtendedValue {
     },
 }
 
-/// https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/other#ErrorType
+/// <https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/other#ErrorType>
 #[derive(Deserialize, Debug)]
 pub enum ErrorType {
     #[serde(rename = "ERROR_TYPE_UNSPECIFIED")]
