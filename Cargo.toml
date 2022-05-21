@@ -8,14 +8,14 @@ edition = "2018"
 build = "build.rs"
 
 [build-dependencies]
-lalrpop = { version = "0.19.7", default-features = false, features = ["lexer"] }
+lalrpop = { version = "0.19.8", default-features = false, features = ["lexer"] }
 
 [dependencies]
 anyhow = { version = "1.0.57", default-features = false, features = ["std"] }
 bytes = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false }
 chrono-tz = { version = "0.6.1", default-features = false, features = ["case-insensitive", "serde"] }
-clap = { version = "3.1.17", default-features = false, features = ["std"] }
+clap = { version = "3.1.18", default-features = false, features = ["std"] }
 diesel = { version = "1.4.8", default-features = false, features = ["chrono", "postgres", "r2d2", "serde_json"] }
 diesel_full_text_search = { version = "1.0.1", default-features = false }
 egg-mode-text = { version = "1.14.7", default-features = false }
@@ -39,7 +39,7 @@ serde_json = { version = "1.0.81", default-features = false }
 serenity = { version = "0.10.10", default-features = false, features = ["gateway", "cache", "rustls_backend", "standard_framework"] }
 strfmt = { version = "0.1.6", default-features = false }
 tokio = { version = "1.18.2", default-features = false, features = ["net", "fs", "io-util", "rt-multi-thread", "macros", "time"] }
-tokio-util = { version = "0.7.1", default-features = false, features = ["codec"] }
+tokio-util = { version = "0.7.2", default-features = false, features = ["codec"] }
 tracing = { version = "0.1.34", default-features = false, features = ["std", "attributes", "max_level_trace", "release_max_level_debug"] }
 tracing-subscriber = { version = "0.2.25", default-features = false, features = ["chrono", "fmt", "env-filter", "json", "tracing-log"] }
 unicode-segmentation = "1.9.0"
