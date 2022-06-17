@@ -31,7 +31,7 @@ log = { version = "0.4.17", default-features = false, features = ["max_level_inf
 ordinal = "0.3"
 rand = { version = "0.8.5", default-features = false, features = ["std", "std_rng"] }
 regex = { version = "1.5.6", default-features = false, features = ["perf", "std", "unicode"] }
-reqwest = { version = "0.11.10", default-features = false, features = ["rustls-tls", "json"] }
+reqwest = { version = "0.11.11", default-features = false, features = ["rustls-tls", "json"] }
 rust-ini = { version = "0.18.0", default-features = false }
 separator = { version = "0.4.1", default-features = false }
 serde = { version = "1.0.137", default-features = false, features = ["derive"] }
@@ -40,7 +40,7 @@ serenity = { version = "0.10.10", default-features = false, features = ["gateway
 strfmt = { version = "0.1.6", default-features = false }
 tokio = { version = "1.18.2", default-features = false, features = ["net", "fs", "io-util", "rt-multi-thread", "macros", "time"] }
 tokio-util = { version = "0.7.2", default-features = false, features = ["codec"] }
-tracing = { version = "0.1.34", default-features = false, features = ["std", "attributes", "max_level_trace", "release_max_level_debug"] }
+tracing = { version = "0.1.35", default-features = false, features = ["std", "attributes", "max_level_trace", "release_max_level_debug"] }
 tracing-subscriber = { version = "0.2.25", default-features = false, features = ["chrono", "fmt", "env-filter", "json", "tracing-log"] }
 unicode-segmentation = "1.9.0"
 unicode-width = { version = "0.1.9", default-features = false }
