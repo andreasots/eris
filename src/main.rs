@@ -90,6 +90,7 @@ async fn main() -> Result<(), Error> {
                 .short('c')
                 .value_name("FILE")
                 .help("Config file")
+                .allow_invalid_utf8(true)
                 .default_value("lrrbot.conf"),
         )
         .arg(
@@ -97,6 +98,7 @@ async fn main() -> Result<(), Error> {
                 .short('k')
                 .value_name("FILE")
                 .help("JSON file containing the Google service account key")
+                .allow_invalid_utf8(true)
                 .default_value("keys.json"),
         )
         .get_matches();
