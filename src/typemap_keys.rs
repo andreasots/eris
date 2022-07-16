@@ -61,7 +61,9 @@ impl TypeMapKey for ReloadHandle {
                 tracing_subscriber::fmt::format::JsonFields,
                 tracing_subscriber::fmt::format::Format<
                     tracing_subscriber::fmt::format::Json,
-                    tracing_subscriber::fmt::time::ChronoUtc,
+                    tracing_subscriber::fmt::time::UtcTime<
+                        time::format_description::well_known::Rfc3339,
+                    >,
                 >,
             >,
             tracing_subscriber::Registry,

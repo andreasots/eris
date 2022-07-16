@@ -15,33 +15,34 @@ anyhow = { version = "1.0.58", default-features = false, features = ["std"] }
 bytes = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false }
 chrono-tz = { version = "0.6.1", default-features = false, features = ["case-insensitive", "serde"] }
-clap = { version = "3.2.5", default-features = false, features = ["std"] }
+clap = { version = "3.2.12", default-features = false, features = ["std"] }
 diesel = { version = "1.4.8", default-features = false, features = ["chrono", "postgres", "r2d2", "serde_json"] }
 diesel_full_text_search = { version = "1.0.1", default-features = false }
-egg-mode-text = { version = "1.14.7", default-features = false }
+egg-mode-text = { version = "1.15.0", default-features = false }
 eris-macros = { path = "eris-macros" }
 futures = { version = "0.3.21", default-features = false, features = ["std", "async-await"] }
-inventory = { version = "0.2.3", default-features = false }
+inventory = { version = "0.3.0", default-features = false }
 joinery = "2.1.0"
 jsonwebtoken = { version = "8.1.1", default-features = false, features = ["use_pem"] }
 lalrpop-util = { version = "0.19.8", default-features = false }
 lazy_static = { version = "1.4.0", default-features = false }
 levenshtein = "1.0.5"
 log = { version = "0.4.17", default-features = false, features = ["max_level_info", "release_max_level_info", "std"] }
-ordinal = "0.3"
+ordinal = "0.3.2"
 rand = { version = "0.8.5", default-features = false, features = ["std", "std_rng"] }
-regex = { version = "1.5.6", default-features = false, features = ["perf", "std", "unicode"] }
+regex = { version = "1.6.0", default-features = false, features = ["perf", "std", "unicode"] }
 reqwest = { version = "0.11.11", default-features = false, features = ["rustls-tls", "json"] }
 rust-ini = { version = "0.18.0", default-features = false }
 separator = { version = "0.4.1", default-features = false }
-serde = { version = "1.0.137", default-features = false, features = ["derive"] }
-serde_json = { version = "1.0.81", default-features = false }
+serde = { version = "1.0.139", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0.82", default-features = false }
 serenity = { version = "0.10.10", default-features = false, features = ["gateway", "cache", "rustls_backend", "standard_framework"] }
 strfmt = { version = "0.1.6", default-features = false }
-tokio = { version = "1.18.2", default-features = false, features = ["net", "fs", "io-util", "rt-multi-thread", "macros", "time"] }
+time = { version = "0.3.11", default-features = false, features = ["formatting", "parsing"] }
+tokio = { version = "1.20.0", default-features = false, features = ["net", "fs", "io-util", "rt-multi-thread", "macros", "time"] }
 tokio-util = { version = "0.7.3", default-features = false, features = ["codec"] }
 tracing = { version = "0.1.35", default-features = false, features = ["std", "attributes", "max_level_trace", "release_max_level_debug"] }
-tracing-subscriber = { version = "0.2.25", default-features = false, features = ["chrono", "fmt", "env-filter", "json", "tracing-log"] }
+tracing-subscriber = { version = "0.3.14", default-features = false, features = ["fmt", "std", "time", "env-filter", "json", "tracing-log"] }
 unicode-segmentation = "1.9.0"
 unicode-width = { version = "0.1.9", default-features = false }
 url = { version = "2.2.2", default-features = false }
