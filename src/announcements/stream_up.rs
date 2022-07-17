@@ -1,13 +1,15 @@
 use crate::config::Config;
 use crate::context::ErisContext;
 use crate::extract::Extract;
-use crate::models::{Game, GameEntry, Show};
+use crate::models::game;
+use crate::models::game_entry;
+use crate::models::show;
 use crate::rpc::LRRbot;
 use crate::try_crosspost::TryCrosspost;
 use crate::typemap_keys::PgPool;
 use anyhow::{Context, Error};
-use diesel::OptionalExtension;
 use eris_macros::rpc_handler;
+use sea_orm::EntityTrait;
 use serde::Deserialize;
 use std::fmt::{self, Display};
 use tracing::error;
@@ -51,25 +53,25 @@ async fn stream_up_inner(ctx: &ErisContext, channel: Channel) -> Result<(), Erro
     let show_id = lrrbot.get_show_id().await.context("failed to get the show ID")?;
 
     let (game, show, game_entry) = {
-        let conn = ctx
-            .data
-            .read()
-            .await
-            .extract::<PgPool>()?
-            .get()
-            .context("failed to get a database connection from the pool")?;
+        let data = ctx.data.read().await;
+        let conn = data.extract::<PgPool>()?;
 
-        let game = game_id
-            .map(|game_id| Game::find(game_id, &conn))
-            .transpose()
-            .context("failed to load the game")?;
-        let show = Show::find(show_id, &conn).context("failed to load the show")?;
-        let game_entry = game_id
-            .map(|game_id| GameEntry::find(game_id, show_id, &conn))
-            .transpose()
-            .optional()
-            .context("failed to load the game entry")?
-            .and_then(|entry| entry);
+        let (game, game_entry) = if let Some(game_id) = game_id {
+            (
+                game::Entity::find_by_id(game_id)
+                    .one(conn)
+                    .await
+                    .context("failed to load the game")?,
+                game_entry::Entity::find_by_id((game_id, show_id))
+                    .one(conn)
+                    .await
+                    .context("failed to load the game entry")?,
+            )
+        } else {
+            (None, None)
+        };
+        let show =
+            show::Entity::find_by_id(show_id).one(conn).await.context("failed to load the show")?;
 
         (game, show, game_entry)
     };
@@ -81,7 +83,11 @@ async fn stream_up_inner(ctx: &ErisContext, channel: Channel) -> Result<(), Erro
             game_entry.and_then(|entry| entry.display_name.as_ref()).unwrap_or(&game.name)
         });
 
-        game_display_name.map(|name| format!("{} on {}", name, show.name)).unwrap_or(show.name)
+        if let Some(show) = show {
+            game_display_name.map(|name| format!("{} on {}", name, show.name)).unwrap_or(show.name)
+        } else {
+            game_display_name.cloned().unwrap_or_else(|| "nothing".to_string())
+        }
     };
 
     announcements_channel

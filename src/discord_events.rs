@@ -7,19 +7,15 @@ use serenity::async_trait;
 use serenity::http::client::Http;
 use serenity::model::prelude::*;
 use serenity::prelude::*;
-use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::future::Future;
-use tokio::sync::RwLock;
 use tracing::error;
 
-pub struct DiscordEvents {
-    threads: RwLock<HashMap<ChannelId, GuildChannel>>,
-}
+pub struct DiscordEvents;
 
 impl DiscordEvents {
     pub fn new() -> Self {
-        Self { threads: RwLock::new(HashMap::new()) }
+        Self
     }
 }
 
@@ -71,7 +67,7 @@ impl DiscordEvents {
             .add_tag("channel_id", channel.id.to_string())
             .add_tag("channel_name", channel.name.as_str())
             .add_tag("event", event);
-        if let Some(category_id) = channel.category_id {
+        if let Some(category_id) = channel.parent_id {
             measurement = measurement.add_tag("category_id", category_id.to_string());
         }
 
@@ -93,18 +89,18 @@ impl DiscordEvents {
         ctx: &Context,
         message: &Message,
     ) -> Option<(GuildChannel, Option<GuildChannel>)> {
-        let guild = ctx.cache.guild(message.guild_id?).await?;
+        let guild = ctx.cache.guild(message.guild_id?)?;
 
-        if let Some(channel) = guild.channels.get(&message.channel_id) {
+        if let Some(Channel::Guild(channel)) = guild.channels.get(&message.channel_id) {
             return Some((channel.clone(), None));
         }
 
         // message sent in a guild but not a channel, thread then?
-        let thread = self.threads.read().await.get(&message.channel_id).cloned();
+        let thread = guild.threads.iter().find(|thread| thread.id == message.channel_id).cloned();
         let thread = thread.or_else(|| {
             guild.threads.iter().find(|thread| thread.id == message.channel_id).cloned()
         })?;
-        let channel = guild.channels.get(&thread.category_id?)?.clone();
+        let channel = guild.channels.get(&thread.parent_id?)?.clone().guild().unwrap();
 
         Some((channel, Some(thread)))
     }
@@ -126,7 +122,7 @@ impl EventHandler for DiscordEvents {
             if let Some(influxdb) = data.get::<InfluxDB>() {
                 let measurement = match channel.kind {
                     ChannelType::Voice => {
-                        let guild = match channel.guild(&ctx).await {
+                        let guild = match channel.guild(&ctx) {
                             Some(guild) => guild,
                             None => {
                                 bail!("failed to get the guild for the channel {:?}", channel.name)
@@ -197,7 +193,7 @@ impl EventHandler for DiscordEvents {
                 };
                 let measurement = match channel.kind {
                     ChannelType::Voice => {
-                        let guild = match channel.guild(&ctx).await {
+                        let guild = match channel.guild(&ctx) {
                             Some(guild) => guild,
                             None => {
                                 bail!("failed to get the guild for the channel {:?}", channel.name)
@@ -250,18 +246,23 @@ impl EventHandler for DiscordEvents {
                 let measurements = guild
                     .channels
                     .values()
-                    .filter_map(|channel| match channel.kind {
-                        ChannelType::Text => {
+                    .filter_map(|channel| match channel {
+                        Channel::Guild(
+                            channel @ GuildChannel {
+                                kind: ChannelType::Text | ChannelType::News,
+                                ..
+                            },
+                        ) => {
                             let measurement = self
-                                .create_measurement_for_channel(&channel, "guild_create")
+                                .create_measurement_for_channel(channel, "guild_create")
                                 .add_field("count", 0);
                             Some(measurement)
                         }
-                        ChannelType::Voice => {
+                        Channel::Guild(channel @ GuildChannel { kind: ChannelType::Voice, .. }) => {
                             let users = Self::users_for(&guild, channel.id);
 
                             let mut measurement = self
-                                .create_measurement_for_channel(&channel, "guild_create")
+                                .create_measurement_for_channel(channel, "guild_create")
                                 .add_field(
                                     "count",
                                     i64::try_from(users.len()).unwrap_or(std::i64::MAX),
@@ -286,18 +287,12 @@ impl EventHandler for DiscordEvents {
         .await
     }
 
-    async fn voice_state_update(
-        &self,
-        ctx: Context,
-        guild: Option<GuildId>,
-        old: Option<VoiceState>,
-        new: VoiceState,
-    ) {
+    async fn voice_state_update(&self, ctx: Context, old: Option<VoiceState>, new: VoiceState) {
         Self::log_error(|| async {
             let data = ctx.data.read().await;
 
-            if let Some(guild) = guild {
-                if let Some(guild) = guild.to_guild_cached(&ctx).await {
+            if let Some(guild) = new.guild_id {
+                if let Some(guild) = guild.to_guild_cached(&ctx) {
                     if let Some(afk_channel) = guild.afk_channel_id {
                         if new.channel_id == Some(afk_channel) {
                             if let Err(error) =
@@ -311,10 +306,9 @@ impl EventHandler for DiscordEvents {
             }
 
             if let Some(influxdb) = data.get::<InfluxDB>() {
-                let guild = match guild {
+                let guild = match new.guild_id {
                     Some(guild) => guild
                         .to_guild_cached(&ctx)
-                        .await
                         .ok_or_else(|| Error::msg("failed to get the guild"))?,
                     None => return Ok(()),
                 };
@@ -328,7 +322,8 @@ impl EventHandler for DiscordEvents {
                 let mut measurements = Vec::with_capacity(2);
                 for channel_id in channels {
                     let channel = match guild.channels.get(&channel_id) {
-                        Some(channel) => channel,
+                        Some(Channel::Guild(channel)) => channel,
+                        Some(_) => unreachable!(),
                         None => continue,
                     };
 
@@ -353,18 +348,6 @@ impl EventHandler for DiscordEvents {
             Ok(())
         })
         .await
-    }
-
-    async fn thread_create(&self, _ctx: Context, thread: GuildChannel) {
-        self.threads.write().await.insert(thread.id, thread);
-    }
-
-    async fn thread_update(&self, _ctx: Context, new_thread: GuildChannel) {
-        self.threads.write().await.insert(new_thread.id, new_thread);
-    }
-
-    async fn thread_delete(&self, _ctx: Context, thread: PartialGuildChannel) {
-        self.threads.write().await.remove(&thread.id);
     }
 
     async fn message(&self, ctx: Context, new_message: Message) {

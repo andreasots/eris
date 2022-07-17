@@ -1,11 +1,11 @@
 use crate::config::Config;
 use anyhow::{Context, Error};
-use chrono::{DateTime, FixedOffset};
 use futures::stream::FuturesOrdered;
 use futures::StreamExt;
 use reqwest::header::HeaderValue;
 use reqwest::Client;
 use serde::Deserialize;
+use time::OffsetDateTime;
 
 #[derive(Copy, Clone, Debug)]
 pub enum UserId<'a> {
@@ -22,7 +22,8 @@ pub enum GameId<'a> {
 #[derive(Clone, Debug, Deserialize)]
 pub struct Stream {
     pub game_id: String,
-    pub started_at: DateTime<FixedOffset>,
+    #[serde(with = "time::serde::rfc3339")]
+    pub started_at: OffsetDateTime,
     pub title: String,
     pub user_id: String,
     pub user_name: String,
@@ -34,7 +35,8 @@ pub struct Follow {
     pub from_name: String,
     pub to_id: String,
     pub to_name: String,
-    pub followed_at: DateTime<FixedOffset>,
+    #[serde(with = "time::serde::rfc3339")]
+    pub followed_at: OffsetDateTime,
 }
 
 #[derive(Clone, Debug, Deserialize)]

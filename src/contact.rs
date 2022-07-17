@@ -4,9 +4,8 @@ use crate::extract::Extract;
 use crate::google::sheets::{CellData, ExtendedValue, Sheets, Spreadsheet};
 use crate::shorten::{shorten, split_to_parts};
 use anyhow::{Context, Error};
-use chrono::TimeZone;
-use chrono::{DateTime, Utc};
 use std::time::Duration;
+use time::OffsetDateTime;
 use tracing::{error, info};
 
 const SENT_KEY: &str = "lrrbot.sent";
@@ -37,7 +36,7 @@ pub async fn post_messages(ctx: ErisContext) {
 
 #[derive(Debug)]
 struct Entry<'a> {
-    timestamp: DateTime<Utc>,
+    timestamp: OffsetDateTime,
     message: &'a str,
     username: Option<&'a str>,
     row: u64,
@@ -94,7 +93,10 @@ fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(u64, Vec<Entry>)> {
 
             if let (Some(timestamp), Some(message)) = (timestamp, message) {
                 rows.push(Entry {
-                    timestamp: Utc.timestamp(timestamp as i64, (timestamp.fract() * 1e9) as u32),
+                    timestamp: OffsetDateTime::from_unix_timestamp_nanos(
+                        (timestamp.fract() * 1e9) as i128,
+                    )
+                    .unwrap_or(OffsetDateTime::UNIX_EPOCH),
                     message,
                     username,
                     row: row_idx,
@@ -131,7 +133,7 @@ async fn inner(ctx: &ErisContext) -> Result<(), Error> {
                         m.content("New message from the contact form:");
                     }
                     m.embed(|embed| {
-                        embed.description(part).timestamp(message.timestamp.to_rfc3339());
+                        embed.description(part).timestamp(message.timestamp);
                         if let Some(user) = message.username {
                             embed.author(|e| e.name(shorten(user, 256)));
                         }

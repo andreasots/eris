@@ -3,7 +3,7 @@ use crate::context::ErisContext;
 use crate::desertbus::DesertBus;
 use crate::extract::Extract;
 use crate::google::calendar::{Calendar, Event, LRR};
-use crate::models::{Game, GameEntry, Show, User};
+use crate::models::{game, game_entry, show, user};
 use crate::rpc::client::HeaderInfo;
 use crate::rpc::LRRbot;
 use crate::shorten::shorten;
@@ -11,12 +11,12 @@ use crate::twitch::helix::UserId;
 use crate::twitch::Helix;
 use crate::typemap_keys::PgPool;
 use anyhow::{Context, Error};
-use chrono::{DateTime, FixedOffset, Utc};
-use diesel::OptionalExtension;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use separator::FixedPlaceSeparatable;
 use serenity::prelude::TypeMap;
 use std::fmt;
 use std::time::Duration;
+use time::OffsetDateTime;
 use tracing::error;
 
 const TOPIC_MAX_LEN: usize = 1024;
@@ -24,8 +24,8 @@ const TOPIC_MAX_LEN: usize = 1024;
 const DYNAMIC_TAIL_SEPARATOR: &str = " \u{2009}\u{200A}\u{200B}";
 // Don't update the topic if the old and new topics have a Levenshtein distance below `SIMILARITY_THRESHOLD`.
 const SIMILARITY_THRESHOLD: usize = 5;
-// But even then update the topic every `SIMILAR_MIN_UPDATE_INTERVAL_MINUTES` minutes.
-const SIMILAR_MIN_UPDATE_INTERVAL_MINUTES: i64 = 30;
+// But even then update the topic every `SIMILAR_MIN_UPDATE_INTERVAL`.
+const SIMILAR_MIN_UPDATE_INTERVAL: time::Duration = time::Duration::minutes(30);
 
 struct EventDisplay<'a> {
     event: &'a Event,
@@ -33,7 +33,7 @@ struct EventDisplay<'a> {
 
 impl<'a> fmt::Display for EventDisplay<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "<t:{}:R>: {} ", self.event.start.timestamp(), self.event.summary)?;
+        write!(f, "<t:{}:R>: {} ", self.event.start.unix_timestamp(), self.event.summary)?;
 
         if let Some(ref location) = self.event.location {
             write!(f, "({}) ", location)?;
@@ -43,7 +43,7 @@ impl<'a> fmt::Display for EventDisplay<'a> {
             // TODO: shorten to 200 characters.
             write!(f, "({}) ", Calendar::format_description(desc))?;
         }
-        write!(f, "on <t:{}:F>.", self.event.start.timestamp())?;
+        write!(f, "on <t:{}:F>.", self.event.start.unix_timestamp())?;
 
         Ok(())
     }
@@ -64,7 +64,7 @@ pub async fn autotopic(ctx: ErisContext) {
 
 #[derive(Copy, Clone)]
 struct Autotopic {
-    last_updated: Option<DateTime<Utc>>,
+    last_updated: Option<OffsetDateTime>,
 }
 
 impl Autotopic {
@@ -94,7 +94,7 @@ impl Autotopic {
         let old_topic_static_prefix =
             old_topic.rsplit_once(DYNAMIC_TAIL_SEPARATOR).unwrap_or((old_topic, "")).0;
 
-        let now = Utc::now();
+        let now = OffsetDateTime::now_utc();
 
         if !is_dynamic {
             if old_topic_static_prefix == new_topic_static_prefix {
@@ -106,10 +106,11 @@ impl Autotopic {
             if distance == 0 {
                 return Ok(());
             } else if distance < SIMILARITY_THRESHOLD {
-                // Unfortunately `chrono::Duration`'s constructors are not `const`.
-                let update_interval =
-                    chrono::Duration::minutes(SIMILAR_MIN_UPDATE_INTERVAL_MINUTES);
-                if self.last_updated.map(|t| (now - t) < update_interval).unwrap_or(false) {
+                if self
+                    .last_updated
+                    .map(|t| (now - t) < SIMILAR_MIN_UPDATE_INTERVAL)
+                    .unwrap_or(false)
+                {
                     return Ok(());
                 }
             }
@@ -148,29 +149,39 @@ impl Autotopic {
         let game_entry;
 
         {
-            let conn = data
-                .extract::<PgPool>()?
-                .get()
-                .context("failed to get a database connection from the pool")?;
+            let conn = data.extract::<PgPool>()?;
 
-            user = User::by_name(&data.extract::<Config>()?.username, &conn)
-                .context("failed to load the bot user")?;
+            user = user::Entity::find()
+                .filter(user::Column::Name.eq(&data.extract::<Config>()?.username[..]))
+                .one(conn)
+                .await
+                .context("failed to load the bot user")?
+                .context("bot user missing")?;
 
             if header.is_live {
-                game = header
-                    .current_game
-                    .map(|game| Game::find(game.id, &conn))
-                    .transpose()
-                    .context("failed to load the game")?;
-                show = header
-                    .current_show
-                    .map(|show| Show::find(show.id, &conn))
-                    .transpose()
-                    .context("failed to load the show")?;
+                game = if let Some(game) = header.current_game {
+                    game::Entity::find_by_id(game.id)
+                        .one(conn)
+                        .await
+                        .context("failed to load the game")?
+                } else {
+                    None
+                };
+
+                show = if let Some(show) = header.current_show {
+                    show::Entity::find_by_id(show.id)
+                        .one(conn)
+                        .await
+                        .context("failed to load the show")?
+                } else {
+                    None
+                };
+
                 game_entry =
                     if let (Some(game), Some(show)) = (header.current_game, header.current_show) {
-                        GameEntry::find(game.id, show.id, &conn)
-                            .optional()
+                        game_entry::Entity::find_by_id((game.id, show.id))
+                            .one(conn)
+                            .await
                             .context("failed to load the game entry")?
                     } else {
                         None
@@ -208,7 +219,7 @@ impl Autotopic {
                 Err(error) => error!(?error, "failed to generate the uptime message"),
             }
         } else {
-            let now = Utc::now();
+            let now = OffsetDateTime::now_utc();
 
             let events = data
                 .extract::<Calendar>()?
@@ -242,7 +253,12 @@ impl Autotopic {
         Ok(())
     }
 
-    async fn uptime_msg(self, data: &TypeMap, user: &User, channel: &str) -> Result<String, Error> {
+    async fn uptime_msg(
+        self,
+        data: &TypeMap,
+        user: &user::Model,
+        channel: &str,
+    ) -> Result<String, Error> {
         Ok(data
             .extract::<Helix>()?
             .get_streams(
@@ -252,26 +268,28 @@ impl Autotopic {
             .await
             .context("failed to get the stream")?
             .first()
-            .map(|stream| format!("The stream started <t:{}:R>.", stream.started_at.timestamp()))
+            .map(|stream| {
+                format!("The stream started <t:{}:R>.", stream.started_at.unix_timestamp())
+            })
             .unwrap_or_else(|| String::from("The stream is not live.")))
     }
 
     async fn desertbus(
         self,
         data: &TypeMap,
-        user: &User,
-        now: DateTime<Utc>,
+        user: &user::Model,
+        now: OffsetDateTime,
         events: &[Event],
     ) -> Result<(Vec<String>, bool), Error> {
-        let start = DesertBus::start_time().with_timezone(&Utc);
-        let announce_start = start - chrono::Duration::days(2);
-        let announce_end = start + chrono::Duration::days(9);
+        let start = DesertBus::start_time();
+        let announce_start = start - time::Duration::days(2);
+        let announce_end = start + time::Duration::days(9);
         let mut messages = vec![];
         let mut is_dynamic = false;
 
         if announce_start <= now && now <= announce_end {
             if let Some(next_event_start) = events.get(0).map(|event| event.start) {
-                if next_event_start.with_timezone(&Utc) < start {
+                if next_event_start < start {
                     return Ok((messages, is_dynamic));
                 }
             }
@@ -290,10 +308,9 @@ impl Autotopic {
                 messages.push(
                     EventDisplay {
                         event: &Event {
-                            start: start.with_timezone(&FixedOffset::east(0)),
+                            start: start,
                             summary: String::from("Desert Bus for Hope"),
-                            end: start.with_timezone(&FixedOffset::east(0))
-                                + chrono::Duration::hours(total_hours),
+                            end: start + time::Duration::hours(total_hours),
                             location: Some(String::from(
                                 "https://desertbus.org/ or https://twitch.tv/desertbus",
                             )),
@@ -307,7 +324,7 @@ impl Autotopic {
                     money_raised.separated_string_with_fixed_place(2)
                 ));
                 is_dynamic = true;
-            } else if now <= start + chrono::Duration::hours(total_hours)
+            } else if now <= start + time::Duration::hours(total_hours)
                 || self.is_desertbus_live(data, user).await?
             {
                 messages.push(String::from(
@@ -320,8 +337,8 @@ impl Autotopic {
                 let bussed = now - start;
                 messages.push(format!(
                     "{}:{:02} hours of {} so far.",
-                    bussed.num_hours(),
-                    bussed.num_minutes() % 60,
+                    bussed.whole_hours(),
+                    bussed.whole_minutes() % 60,
                     total_hours
                 ));
                 is_dynamic = true;
@@ -331,7 +348,7 @@ impl Autotopic {
         Ok((messages, is_dynamic))
     }
 
-    async fn is_desertbus_live(self, data: &TypeMap, user: &User) -> Result<bool, Error> {
+    async fn is_desertbus_live(self, data: &TypeMap, user: &user::Model) -> Result<bool, Error> {
         if let Some(token) = user.twitch_oauth.as_ref() {
             Ok(!data
                 .extract::<Helix>()?

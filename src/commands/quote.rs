@@ -1,18 +1,15 @@
 use crate::extract::Extract;
-use crate::models::{Game, GameEntry, Quote, Show};
-use crate::pg_fts::{english, plainto_tsquery, to_tsvector};
-use crate::schema::{game_per_show_data as game_entries, games, quotes, shows};
+use crate::models::{game, game_entry, quote, show};
 use crate::typemap_keys::PgPool;
-use chrono::NaiveDate;
-use diesel::expression::{AsExpression, NonAggregate};
-use diesel::pg::Pg;
-use diesel::prelude::*;
-use diesel::query_builder::QueryFragment;
-use diesel::sql_types::{Bool, Nullable, Text};
-use diesel_full_text_search::TsVectorExtensions;
+use anyhow::Context as _;
 use lalrpop_util::ParseError;
 use rand::seq::SliceRandom;
 use regex::{Captures, Regex, Replacer};
+use sea_orm::sea_query::{ConditionExpression, Expr, Func, PgFunc, SimpleExpr};
+use sea_orm::{
+    ColumnTrait, Condition, ConnectionTrait, DatabaseBackend, DatabaseConnection, EntityTrait,
+    ModelTrait, QueryFilter, QuerySelect, QueryTrait, Statement,
+};
 use serenity::framework::standard::macros::{command, group};
 use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::*;
@@ -21,6 +18,9 @@ use serenity::utils::MessageBuilder;
 use std::borrow::Cow;
 use std::convert::Infallible;
 use std::fmt::Display;
+use time::macros::format_description;
+use time::Date;
+use tokio::sync::OnceCell;
 use unicode_width::UnicodeWidthStr;
 
 // We want to register these commands and also have help texts for all* of them:
@@ -54,6 +54,9 @@ struct QuoteGroup;
 
 pub use self::QUOTEGROUP_GROUP as QUOTE_GROUP;
 
+// regconfig for `english`
+static ENGLISH: OnceCell<u32> = OnceCell::const_new();
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
 pub enum Op {
     /// The `:` operator.
@@ -70,7 +73,7 @@ pub enum Op {
     GreaterEqual,
 }
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum Column {
     Context,
     Date,
@@ -97,9 +100,9 @@ impl Column {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Expr<'input> {
-    Or { exprs: Vec<Expr<'input>> },
-    And { exprs: Vec<Expr<'input>> },
+pub enum Ast<'input> {
+    Or { exprs: Vec<Ast<'input>> },
+    And { exprs: Vec<Ast<'input>> },
     Column { column: Column, op: Op, term: Cow<'input, str> },
     Bare(Cow<'input, str>),
 }
@@ -113,62 +116,47 @@ fn as_ilike(s: &str) -> String {
     RE_BOUNDARY.replace_all(&s, "%").into_owned()
 }
 
-fn single_predicate<'a, C, T, F, P, Table>(
+fn single_predicate<C: ColumnTrait, T: Into<sea_orm::Value>>(
     column: C,
     op: Op,
     value: T,
-    fuzzy: F,
-) -> Box<dyn BoxableExpression<Table, Pg, SqlType = Bool> + 'a>
-where
-    C: AppearsOnTable<Table>
-        + SelectableExpression<Table>
-        + ExpressionMethods
-        + QueryFragment<Pg>
-        + NonAggregate
-        + 'a,
-    T: AsExpression<C::SqlType> + 'a,
-    T::Expression:
-        AppearsOnTable<Table> + SelectableExpression<Table> + QueryFragment<Pg> + NonAggregate,
-    F: FnOnce(C, T) -> P,
-    P: BoxableExpression<Table, Pg, SqlType = Bool> + 'a,
-{
+    fuzzy: impl FnOnce(C, T) -> SimpleExpr,
+) -> SimpleExpr {
     match op {
-        Op::Fuzzy => Box::new(fuzzy(column, value)),
-        Op::Equal => Box::new(column.eq(value)),
-        Op::Less => Box::new(column.lt(value)),
-        Op::LessEqual => Box::new(column.le(value)),
-        Op::Greater => Box::new(column.gt(value)),
-        Op::GreaterEqual => Box::new(column.ge(value)),
+        Op::Fuzzy => fuzzy(column, value),
+        Op::Equal => column.eq(value),
+        Op::Less => column.lt(value),
+        Op::LessEqual => column.lte(value),
+        Op::Greater => column.gt(value),
+        Op::GreaterEqual => column.gte(value),
     }
 }
 
-sql_function!(fn coalesce(x: Nullable<Text>, y: Text) -> Text);
-
-impl<'a> Expr<'a> {
-    fn and(self, right: Expr<'a>) -> Expr<'a> {
+impl<'a> Ast<'a> {
+    fn and(self, right: Ast<'a>) -> Ast<'a> {
         match (self, right) {
-            (mut left @ Expr::And { .. }, Expr::And { exprs }) => {
+            (mut left @ Ast::And { .. }, Ast::And { exprs }) => {
                 for expr in exprs {
                     left = left.and(expr);
                 }
                 left
             }
-            (right, Expr::And { mut exprs }) | (Expr::And { mut exprs }, right) => {
+            (right, Ast::And { mut exprs }) | (Ast::And { mut exprs }, right) => {
                 match right {
-                    Expr::Column { column, op: Op::Fuzzy, term } if column.fuzzy_is_fts() => {
+                    Ast::Column { column, op: Op::Fuzzy, term } if column.fuzzy_is_fts() => {
                         let mut merged = false;
                         for expr in &mut exprs {
                             *expr = match *expr {
-                                Expr::Column {
+                                Ast::Column {
                                     column: l_column,
                                     op: Op::Fuzzy,
                                     term: Cow::Borrowed(ref left),
-                                } if l_column == column => Expr::Column {
+                                } if l_column == column => Ast::Column {
                                     column,
                                     op: Op::Fuzzy,
                                     term: Cow::Owned(format!("{} {}", left, term)),
                                 },
-                                Expr::Column {
+                                Ast::Column {
                                     column: l_column,
                                     op: Op::Fuzzy,
                                     term: Cow::Owned(ref mut left),
@@ -184,17 +172,17 @@ impl<'a> Expr<'a> {
                             break;
                         }
                         if !merged {
-                            exprs.push(Expr::Column { column, op: Op::Fuzzy, term });
+                            exprs.push(Ast::Column { column, op: Op::Fuzzy, term });
                         }
                     }
-                    Expr::Bare(term) => {
+                    Ast::Bare(term) => {
                         let mut merged = false;
                         for expr in &mut exprs {
                             *expr = match expr {
-                                Expr::Bare(Cow::Borrowed(orig)) => {
-                                    Expr::Bare(Cow::Owned(format!("{} {}", orig, term)))
+                                Ast::Bare(Cow::Borrowed(orig)) => {
+                                    Ast::Bare(Cow::Owned(format!("{} {}", orig, term)))
                                 }
-                                Expr::Bare(Cow::Owned(orig)) => {
+                                Ast::Bare(Cow::Owned(orig)) => {
                                     orig.push(' ');
                                     orig.push_str(&term);
                                     merged = true;
@@ -206,111 +194,153 @@ impl<'a> Expr<'a> {
                             break;
                         }
                         if !merged {
-                            exprs.push(Expr::Bare(term));
+                            exprs.push(Ast::Bare(term));
                         }
                     }
                     right => exprs.push(right),
                 }
-                Expr::And { exprs }
+                Ast::And { exprs }
             }
             (
-                Expr::Column { column: l_column, op: Op::Fuzzy, term: ref l_term },
-                Expr::Column { column: r_column, op: Op::Fuzzy, term: ref r_term },
-            ) if l_column == r_column && l_column.fuzzy_is_fts() => Expr::Column {
+                Ast::Column { column: l_column, op: Op::Fuzzy, term: ref l_term },
+                Ast::Column { column: r_column, op: Op::Fuzzy, term: ref r_term },
+            ) if l_column == r_column && l_column.fuzzy_is_fts() => Ast::Column {
                 column: l_column,
                 op: Op::Fuzzy,
                 term: Cow::Owned(format!("{} {}", l_term, r_term)),
             },
-            (Expr::Bare(left), Expr::Bare(right)) => {
-                Expr::Bare(Cow::Owned(format!("{} {}", left, right)))
+            (Ast::Bare(left), Ast::Bare(right)) => {
+                Ast::Bare(Cow::Owned(format!("{} {}", left, right)))
             }
-            (left, right) => Expr::And { exprs: vec![left, right] },
+            (left, right) => Ast::And { exprs: vec![left, right] },
         }
     }
 
-    fn or(self, right: Expr<'a>) -> Expr<'a> {
+    fn or(self, right: Ast<'a>) -> Ast<'a> {
         match (self, right) {
-            (mut left @ Expr::Or { .. }, Expr::Or { exprs }) => {
+            (mut left @ Ast::Or { .. }, Ast::Or { exprs }) => {
                 for expr in exprs {
                     left = left.or(expr);
                 }
                 left
             }
-            (right, Expr::Or { mut exprs }) | (Expr::Or { mut exprs }, right) => {
+            (right, Ast::Or { mut exprs }) | (Ast::Or { mut exprs }, right) => {
                 exprs.push(right);
-                Expr::Or { exprs }
+                Ast::Or { exprs }
             }
-            (left, right) => Expr::Or { exprs: vec![left, right] },
+            (left, right) => Ast::Or { exprs: vec![left, right] },
         }
     }
 
-    fn to_predicate(
-        &self,
-    ) -> Result<Box<dyn BoxableExpression<quotes::table, Pg, SqlType = Bool> + '_>, String> {
+    fn to_condition(&self) -> Result<ConditionExpression, String> {
         match self {
-            Expr::Or { exprs } => {
-                let mut iter = exprs.iter();
-                let mut ast =
-                    iter.next().ok_or_else(|| "empty `Or` node".to_string())?.to_predicate()?;
-                for node in iter {
-                    ast = Box::new(ast.or(node.to_predicate()?));
+            Ast::Or { exprs } => {
+                let mut cond = Condition::any();
+                for node in exprs {
+                    cond = cond.add(node.to_condition()?);
                 }
-                Ok(ast)
+                Ok(cond.into())
             }
-            Expr::And { exprs } => {
-                let mut iter = exprs.iter();
-                let mut ast =
-                    iter.next().ok_or_else(|| "empty `And` node".to_string())?.to_predicate()?;
-                for node in iter {
-                    ast = Box::new(ast.and(node.to_predicate()?));
+            Ast::And { exprs } => {
+                let mut cond = Condition::all();
+                for node in exprs {
+                    cond = cond.add(node.to_condition()?);
                 }
-                Ok(ast)
+                Ok(cond.into())
             }
-            Expr::Column { column, op, term } => match column {
+            Ast::Column { column, op, term } => match column {
                 Column::Id => {
                     let term = term.parse::<i32>().map_err(|err| {
                         format!("failed to parse {:?} as an integer: {}", term, err)
                     })?;
 
-                    Ok(single_predicate(quotes::id, *op, term, |c, v| c.eq(v)))
+                    Ok(single_predicate(quote::Column::Id, *op, term, |c, v| c.eq(v)).into())
                 }
-                Column::Quote => Ok(single_predicate(quotes::quote, *op, term, |c, v| {
-                    to_tsvector(english(), c).matches(plainto_tsquery(english(), v))
-                })),
-                Column::Name => Ok(single_predicate(quotes::attrib_name, *op, term, |c, v| {
-                    c.ilike(as_ilike(&v))
-                })),
+                Column::Quote => {
+                    Ok(single_predicate(quote::Column::Quote, *op, &term[..], |c, v| {
+                        Expr::expr(PgFunc::to_tsvector(Expr::col(c), ENGLISH.get().copied()))
+                            .matches(PgFunc::plainto_tsquery(Expr::val(v), ENGLISH.get().copied()))
+                    })
+                    .into())
+                }
+                Column::Name => {
+                    Ok(single_predicate(quote::Column::AttribName, *op, &term[..], |c, v| {
+                        // TODO: `sea_query` has `LIKE` but not `ILIKE`
+                        Expr::expr(Func::lower(Expr::col(c))).like(as_ilike(&v).to_lowercase())
+                    })
+                    .into())
+                }
                 Column::Date => {
-                    let term = NaiveDate::parse_from_str(term, "%Y-%m-%d")
+                    let term = Date::parse(term, format_description!("[year]-[month]-[day]"))
                         .map_err(|err| format!("failed to parse {:?} as a date: {}", term, err))?;
-                    Ok(single_predicate(quotes::attrib_date, *op, term, |c, v| c.eq(v)))
+                    Ok(single_predicate(quote::Column::AttribDate, *op, term, |c, v| c.eq(v))
+                        .into())
                 }
-                Column::Context => Ok(single_predicate(quotes::context, *op, term, |c, v| {
-                    c.is_not_null().and(
-                        to_tsvector(english(), coalesce(c, ""))
-                            .matches(plainto_tsquery(english(), v)),
-                    )
-                })),
+                Column::Context => {
+                    Ok(single_predicate(quote::Column::Context, *op, &term[..], |c, v| {
+                        c.is_not_null().and(
+                            Expr::expr(PgFunc::to_tsvector(
+                                Func::coalesce([Expr::col(c), Expr::val("")]),
+                                ENGLISH.get().copied(),
+                            ))
+                            .matches(PgFunc::plainto_tsquery(Expr::val(v), ENGLISH.get().copied())),
+                        )
+                    })
+                    .into())
+                }
                 Column::Game => {
-                    let subquery = games::table.select(games::id.nullable()).filter(
-                        single_predicate(games::name, *op, term, |c, v| c.ilike(as_ilike(&v))),
-                    );
-                    Ok(Box::new(quotes::game_id.eq_any(subquery)))
+                    Ok(Expr::col(quote::Column::GameId)
+                        .in_subquery(
+                            QuerySelect::query(
+                                &mut game::Entity::find()
+                                    .filter(single_predicate(
+                                        game::Column::Name,
+                                        *op,
+                                        &term[..],
+                                        |c, v| {
+                                            // TODO: `sea_query` has `LIKE` but not `ILIKE`
+                                            Expr::expr(Func::lower(Expr::col(c)))
+                                                .like(as_ilike(&v).to_lowercase())
+                                        },
+                                    ))
+                                    .select_only()
+                                    .column(game::Column::Id),
+                            )
+                            .take(),
+                        )
+                        .into())
                 }
                 Column::Show => {
-                    let subquery = shows::table.select(shows::id.nullable()).filter(
-                        single_predicate(shows::name, *op, term, |c, v| c.ilike(as_ilike(&v))),
-                    );
-                    Ok(Box::new(quotes::show_id.eq_any(subquery)))
+                    Ok(Expr::col(quote::Column::ShowId)
+                        .in_subquery(
+                            QuerySelect::query(
+                                &mut show::Entity::find()
+                                    .filter(single_predicate(
+                                        show::Column::Name,
+                                        *op,
+                                        &term[..],
+                                        |c, v| {
+                                            // TODO: `sea_query` has `LIKE` but not `ILIKE`
+                                            Expr::expr(Func::lower(Expr::col(c)))
+                                                .like(as_ilike(&v).to_lowercase())
+                                        },
+                                    ))
+                                    .select_only()
+                                    .column(show::Column::Id),
+                            )
+                            .take(),
+                        )
+                        .into())
                 }
             },
-            Expr::Bare(term) => Ok(Box::new(
-                to_tsvector(
-                    english(),
-                    quotes::quote.concat(" ").concat(coalesce(quotes::context, "")),
-                )
-                .matches(plainto_tsquery(english(), term)),
-            )),
+            Ast::Bare(term) => Ok(Expr::expr(PgFunc::to_tsvector(
+                Expr::col(quote::Column::Quote).concatenate(Expr::val(" ")).concatenate(
+                    Func::coalesce([Expr::col(quote::Column::Context), Expr::val("")]),
+                ),
+                ENGLISH.get().copied(),
+            ))
+            .matches(PgFunc::plainto_tsquery(Expr::val(&term[..]), ENGLISH.get().copied()))
+            .into()),
         }
     }
 }
@@ -380,6 +410,24 @@ async fn report_parse_error<'a>(
     Ok(())
 }
 
+async fn load_regconfig(conn: &DatabaseConnection) -> Result<(), anyhow::Error> {
+    ENGLISH
+        .get_or_try_init::<anyhow::Error, _, _>(|| async {
+            let row = conn
+                .query_one(Statement::from_sql_and_values(
+                    DatabaseBackend::Postgres,
+                    "SELECT 'english'::REGCONFIG::OID AS english",
+                    [],
+                ))
+                .await
+                .context("failed to query the `english` regconfig")?
+                .context("`english` regconfig missing")?;
+            Ok(row.try_get("", "english").context("failed to get the column")?)
+        })
+        .await?;
+    Ok(())
+}
+
 #[command]
 #[aliases(findquote)]
 #[usage = "[ID | QUERY]"]
@@ -404,22 +452,32 @@ async fn report_parse_error<'a>(
 ///When a query matches multiple quotes a random one is picked. An empty query matches all quotes.
 async fn quote(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     let data = ctx.data.read().await;
-    let conn = data.extract::<PgPool>()?.get()?;
+    let conn = data.extract::<PgPool>()?;
+
+    load_regconfig(conn).await.context("failed to load `english` regconfig")?;
 
     let query = args.rest().trim();
     let quotes = if query.is_empty() {
-        quotes::table.filter(diesel::dsl::not(quotes::deleted)).load::<Quote>(&conn)?
+        quote::Entity::find().filter(Expr::col(quote::Column::Deleted).not()).all(conn).await?
     } else if let Ok(id) = query.parse::<i32>() {
-        quotes::table.find(id).filter(diesel::dsl::not(quotes::deleted)).load(&conn)?
+        quote::Entity::find_by_id(id)
+            .filter(Expr::col(quote::Column::Deleted).not())
+            .all(conn)
+            .await?
     } else {
         let parser = parser::QueryParser::new();
         let query = match parser.parse(query) {
             Ok(query) => query,
             Err(err) => return report_parse_error(msg, &ctx, query, err).await,
         };
-        let query =
-            quotes::table.filter(query.to_predicate()?).filter(diesel::dsl::not(quotes::deleted));
-        query.load(&conn)?
+        quote::Entity::find()
+            .filter(
+                Condition::all()
+                    .add(query.to_condition()?)
+                    .add(Expr::col(quote::Column::Deleted).not()),
+            )
+            .all(conn)
+            .await?
     };
 
     let quote = quotes.choose(&mut rand::thread_rng());
@@ -456,12 +514,19 @@ async fn query_debugger(ctx: &Context, msg: &Message, args: Args) -> CommandResu
         };
 
         let message = {
-            let predicate = query.to_predicate()?;
+            let sql = quote::Entity::find()
+                .filter(
+                    Condition::all()
+                        .add(query.to_condition()?)
+                        .add(Expr::col(quote::Column::Deleted).not()),
+                )
+                .build(DatabaseBackend::Postgres)
+                .to_string();
             MessageBuilder::new()
                 .push("AST: ")
                 .push_codeblock_safe(format!("{:#?}", query), None)
                 .push("SQL: ")
-                .push_mono_safe(diesel::debug_query(&predicate))
+                .push_mono_safe(&sql)
                 .build()
         };
         msg.reply(&ctx, message).await?;
@@ -484,91 +549,91 @@ async fn details(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
             return Ok(());
         }
     };
-    let quote = {
-        let conn = data.extract::<PgPool>()?.get()?;
 
-        quotes::table
-            .find(quote_id)
-            .filter(diesel::dsl::not(quotes::deleted))
-            .left_outer_join(games::table)
-            .left_outer_join(shows::table)
-            .left_outer_join(
-                game_entries::table.on(game_entries::game_id
-                    .nullable()
-                    .eq(quotes::game_id)
-                    .and(game_entries::show_id.nullable().eq(quotes::show_id))),
-            )
-            .first::<(Quote, Option<Game>, Option<Show>, Option<GameEntry>)>(&conn)
-            .optional()?
-    };
-    if let Some((quote, game, show, game_entry)) = quote {
-        msg.channel_id
-            .send_message(&ctx, |m| {
-                let message = MessageBuilder::new()
-                    .mention(&msg.author)
-                    .push(": Quote ")
-                    .push_safe(&quote)
-                    .build();
-                m.content(message).embed(|embed| {
-                    embed.field("ID", safe(quote.id), false).field(
-                        "Quote",
-                        safe(quote.quote),
-                        false,
-                    );
-                    if let Some(name) = quote.attrib_name {
-                        embed.field("Name", safe(name), false);
-                    }
-                    if let Some(date) = quote.attrib_date {
-                        embed.field("Date", safe(date), false);
-                    }
-                    if let Some(context) = quote.context {
-                        embed.field("Context", safe(context), false);
-                    }
-                    if let Some(game) = game {
-                        embed.field("Game ID", safe(game.id), false).field(
-                            "Game name",
-                            safe(game.name),
-                            false,
-                        );
-                    }
-                    if let Some(game_entry) = game_entry {
-                        if let Some(display_name) = game_entry.display_name {
-                            embed.field("Game display name", safe(display_name), false);
-                        }
-                    }
-                    if let Some(show) = show {
-                        embed.field("Show ID", safe(show.id), false).field(
-                            "Show name",
-                            safe(show.name),
-                            false,
-                        );
-                    }
-                    embed
-                })
-            })
-            .await?;
+    let conn = data.extract::<PgPool>()?;
+
+    let quote = quote::Entity::find_by_id(quote_id)
+        .filter(Expr::col(quote::Column::Deleted).not())
+        .one(conn)
+        .await
+        .context("failed to load the quote")?;
+    let quote = if let Some(quote) = quote {
+        quote
     } else {
         msg.reply(&ctx, format!("Could not find quote #{}", quote_id)).await?;
-    }
+        return Ok(());
+    };
+
+    let game =
+        quote.find_related(game::Entity).one(conn).await.context("failed to load the game")?;
+    let show =
+        quote.find_related(show::Entity).one(conn).await.context("failed to load the show")?;
+    let game_entry = quote
+        .find_related(game_entry::Entity)
+        .one(conn)
+        .await
+        .context("failed to load the game entry")?;
+
+    msg.channel_id
+        .send_message(&ctx, |m| {
+            let message = MessageBuilder::new()
+                .mention(&msg.author)
+                .push(": Quote ")
+                .push_safe(&quote)
+                .build();
+            m.content(message).embed(|embed| {
+                embed.field("ID", safe(quote.id), false).field("Quote", safe(quote.quote), false);
+                if let Some(name) = quote.attrib_name {
+                    embed.field("Name", safe(name), false);
+                }
+                if let Some(date) = quote.attrib_date {
+                    embed.field("Date", safe(date), false);
+                }
+                if let Some(context) = quote.context {
+                    embed.field("Context", safe(context), false);
+                }
+                if let Some(game) = game {
+                    embed.field("Game ID", safe(game.id), false).field(
+                        "Game name",
+                        safe(game.name),
+                        false,
+                    );
+                }
+                if let Some(game_entry) = game_entry {
+                    if let Some(display_name) = game_entry.display_name {
+                        embed.field("Game display name", safe(display_name), false);
+                    }
+                }
+                if let Some(show) = show {
+                    embed.field("Show ID", safe(show.id), false).field(
+                        "Show name",
+                        safe(show.name),
+                        false,
+                    );
+                }
+                embed
+            })
+        })
+        .await?;
     Ok(())
 }
 
 #[cfg(test)]
 mod test {
-    use super::{as_ilike, parser::QueryParser, unescape, Column, Expr, Op};
+    use super::{as_ilike, parser::QueryParser, unescape, Ast, Column, Op};
     use std::borrow::Cow;
 
     #[test]
     fn parsing() {
         let parser = QueryParser::new();
-        assert_eq!(parser.parse("butts").unwrap(), Expr::Bare(Cow::Borrowed("butts")));
+        assert_eq!(parser.parse("butts").unwrap(), Ast::Bare(Cow::Borrowed("butts")));
         assert_eq!(
             parser.parse("bare words get concatenated").unwrap(),
-            Expr::Bare(Cow::Borrowed("bare words get concatenated"))
+            Ast::Bare(Cow::Borrowed("bare words get concatenated"))
         );
         assert_eq!(
             parser.parse("quote:also quote:FTS quote:fields").unwrap(),
-            Expr::Column {
+            Ast::Column {
                 column: Column::Quote,
                 op: Op::Fuzzy,
                 term: Cow::Borrowed("also FTS fields"),

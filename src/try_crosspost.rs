@@ -2,7 +2,7 @@ use anyhow::Error;
 use serenity::async_trait;
 use serenity::client::Cache;
 use serenity::http::CacheHttp;
-use serenity::model::channel::{Channel, ChannelType, Message};
+use serenity::model::channel::{ChannelType, Message};
 use serenity::model::ModelError;
 use serenity::Error as SerenityError;
 
@@ -21,7 +21,7 @@ impl TryCrosspost for Message {
         &self,
         ctx: impl CacheHttp + AsRef<Cache> + 'async_trait,
     ) -> Result<(), Error> {
-        let channel = match self.channel(&ctx).await.and_then(Channel::guild) {
+        let channel = match self.channel(&ctx).await?.guild() {
             Some(channel) => channel,
             None => return Ok(()),
         };

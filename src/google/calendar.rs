@@ -1,14 +1,22 @@
 use crate::google::ServiceAccount;
 use anyhow::{Context, Error};
-use chrono::{DateTime, Duration, FixedOffset, NaiveDate, TimeZone};
-use chrono_tz::Tz;
 use reqwest::header::AUTHORIZATION;
 use reqwest::Client;
 use reqwest::Url;
+use serde::de::Unexpected;
+use serde::de::Visitor;
+use serde::Deserializer;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::cmp;
 use std::path::PathBuf;
 use std::sync::Arc;
+use time::macros::format_description;
+use time::Date;
+use time::Duration;
+use time::OffsetDateTime;
+use time_tz::PrimitiveDateTimeExt;
+use time_tz::Tz;
 
 pub const LRR: &str = "loadingreadyrun.com_72jmf1fn564cbbr84l048pv1go@group.calendar.google.com";
 pub const FANSTREAMS: &str = "caffeinatedlemur@gmail.com";
@@ -16,15 +24,15 @@ const SCOPES: &[&str] = &["https://www.googleapis.com/auth/calendar.events.reado
 
 #[derive(Debug)]
 pub struct Event {
-    pub start: DateTime<FixedOffset>,
+    pub start: OffsetDateTime,
     pub summary: String,
-    pub end: DateTime<FixedOffset>,
+    pub end: OffsetDateTime,
     pub location: Option<String>,
     pub description: Option<String>,
 }
 
 impl Event {
-    fn from_api_event(event: ApiEvent, timezone: Tz) -> Option<Self> {
+    fn from_api_event(event: ApiEvent, timezone: &Tz) -> Option<Self> {
         Some(Self {
             start: event.start.resolve_datetime(timezone)?,
             summary: event.summary,
@@ -37,22 +45,22 @@ impl Event {
 
 #[derive(Serialize)]
 #[serde(bound = "")]
-struct ListEventsRequest<'a, Tz: TimeZone> {
+struct ListEventsRequest<'a> {
     #[serde(rename = "maxResults")]
     max_results: usize,
     #[serde(rename = "orderBy")]
     order_by: &'a str,
     #[serde(rename = "singleEvents")]
     single_events: bool,
-    #[serde(rename = "timeMin")]
-    time_min: DateTime<Tz>,
+    #[serde(rename = "timeMin", with = "time::serde::rfc3339")]
+    time_min: OffsetDateTime,
 }
 
 #[derive(Deserialize)]
 struct ListEventsResponse {
     items: Vec<ApiEvent>,
-    #[serde(rename = "timeZone")]
-    timezone: Tz,
+    #[serde(rename = "timeZone", deserialize_with = "deserialize_timezone")]
+    timezone: &'static Tz,
 }
 
 #[derive(Deserialize)]
@@ -66,24 +74,79 @@ struct ApiEvent {
 
 #[derive(Deserialize)]
 pub struct Time {
-    #[serde(rename = "dateTime")]
-    date_time: Option<DateTime<FixedOffset>>,
-    date: Option<NaiveDate>,
-    #[serde(rename = "timeZone")]
-    timezone: Option<Tz>,
+    #[serde(default, rename = "dateTime", with = "time::serde::rfc3339::option")]
+    date_time: Option<OffsetDateTime>,
+    #[serde(default, deserialize_with = "deserialize_option_date")]
+    date: Option<Date>,
+    #[serde(rename = "timeZone", deserialize_with = "deserialize_optional_timezone")]
+    timezone: Option<&'static Tz>,
+}
+
+struct Timezone(&'static Tz);
+
+impl<'de> Deserialize<'de> for Timezone {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct TzVisitor;
+
+        impl<'de> Visitor<'de> for TzVisitor {
+            type Value = &'static Tz;
+
+            fn expecting(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(fmt, "an IANA timezone name")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<Self::Value, E> {
+                time_tz::timezones::get_by_name(value).ok_or_else(|| {
+                    E::invalid_value(Unexpected::Str(value), &"an IANA timezone name")
+                })
+            }
+        }
+
+        deserializer.deserialize_any(TzVisitor).map(Self)
+    }
+}
+
+fn deserialize_timezone<'de, D>(deserializer: D) -> Result<&'static Tz, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Timezone::deserialize(deserializer).map(|Timezone(tz)| tz)
+}
+
+fn deserialize_optional_timezone<'de, D>(deserializer: D) -> Result<Option<&'static Tz>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Option::<Timezone>::deserialize(deserializer).map(|opt| opt.map(|Timezone(tz)| tz))
+}
+
+fn deserialize_option_date<'de, D>(deserializer: D) -> Result<Option<Date>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    match Option::<Cow<'de, str>>::deserialize(deserializer)? {
+        Some(date) => match Date::parse(&date, format_description!("[year]-[month]-[day]")) {
+            Ok(date) => Ok(Some(date)),
+            Err(err) => Err(D::Error::custom(err)),
+        },
+        None => Ok(None),
+    }
 }
 
 impl Time {
-    fn resolve_datetime(&self, calendar_tz: Tz) -> Option<DateTime<FixedOffset>> {
+    fn resolve_datetime(&self, calendar_tz: &Tz) -> Option<OffsetDateTime> {
         if let Some(datetime) = self.date_time {
-            return Some(datetime);
+            Some(datetime)
         } else if let Some(date) = self.date {
-            self.timezone
-                .unwrap_or(calendar_tz)
-                .from_local_date(&date)
-                .and_hms_opt(0, 0, 0)
-                .earliest()
-                .map(|datetime| datetime.with_timezone(&FixedOffset::east(0)))
+            date.with_hms(0, 0, 0)
+                .unwrap()
+                .assume_timezone(self.timezone.unwrap_or(calendar_tz))
+                .take_first()
         } else {
             None
         }
@@ -104,10 +167,10 @@ impl Calendar {
         }
     }
 
-    pub async fn get_upcoming_events<'a, Tz: TimeZone + 'a>(
+    pub async fn get_upcoming_events<'a>(
         &'a self,
         calendar: &'a str,
-        after: DateTime<Tz>,
+        after: OffsetDateTime,
     ) -> Result<Vec<Event>, Error> {
         let url = {
             let mut url = Url::parse("https://www.googleapis.com/calendar/v3/calendars")
@@ -151,12 +214,7 @@ impl Calendar {
         Ok(res.items.into_iter().flat_map(|event| Event::from_api_event(event, timezone)).collect())
     }
 
-    pub fn get_next_event<Tz: TimeZone>(
-        events: &[Event],
-        at: DateTime<Tz>,
-        include_current: bool,
-    ) -> &[Event] {
-        let at = at.with_timezone(&FixedOffset::west(0));
+    pub fn get_next_event(events: &[Event], at: OffsetDateTime, include_current: bool) -> &[Event] {
         let mut first_future_event = None;
 
         for (i, event) in events.iter().enumerate() {

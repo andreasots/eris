@@ -2,9 +2,8 @@ use crate::config::Config;
 use crate::extract::Extract;
 use crate::google::calendar::{Calendar as GoogleCalendar, Event, FANSTREAMS, LRR};
 use crate::time::HumanReadable;
-use anyhow::Error;
-use chrono::{DateTime, Utc};
-use chrono_tz::Tz;
+use anyhow::{Context as _, Error};
+use regex::Regex;
 use serenity::framework::standard::macros::{command, group};
 use serenity::framework::standard::{ArgError, Args, CommandResult};
 use serenity::model::prelude::*;
@@ -12,6 +11,9 @@ use serenity::prelude::*;
 use serenity::utils::MessageBuilder;
 use std::fmt::Display;
 use std::str::FromStr;
+use time::macros::format_description;
+use time::OffsetDateTime;
+use time_tz::{OffsetDateTimeExt, TimeZone, Tz};
 use url::Url;
 
 #[group("Calendar")]
@@ -41,19 +43,30 @@ pub async fn nextfan(ctx: &Context, msg: &Message, args: Args) -> CommandResult 
     Next::fan().execute(ctx, msg, args).await
 }
 
-struct Timezone(Tz);
+struct Timezone(&'static Tz);
 
 impl FromStr for Timezone {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Timezone(Tz::from_str_insensitive(s).map_err(Error::msg)?))
+        let regex = Regex::new(&format!("(?i)^{}$", regex::escape(s)))?;
+        for tz in time_tz::timezones::iter() {
+            if regex.is_match(tz.name()) {
+                return Ok(Timezone(tz));
+            }
+        }
+        Err(Error::msg(format!("unknown timezone: {s}")))
     }
 }
 
 trait PushEvent {
     fn push_safer<S: Display>(&mut self, text: S) -> &mut Self;
-    fn push_event(&mut self, event: &Event, now: DateTime<Utc>, timezone: Tz) -> &mut Self;
+    fn push_event(
+        &mut self,
+        event: &Event,
+        now: OffsetDateTime,
+        timezone: &Tz,
+    ) -> Result<&mut Self, Error>;
 }
 
 fn url_normalise(url: &str) -> String {
@@ -79,7 +92,12 @@ impl PushEvent for MessageBuilder {
         self.push_safe(&text[last_index..])
     }
 
-    fn push_event(&mut self, event: &Event, now: DateTime<Utc>, tz: Tz) -> &mut Self {
+    fn push_event(
+        &mut self,
+        event: &Event,
+        now: OffsetDateTime,
+        tz: &Tz,
+    ) -> Result<&mut Self, Error> {
         self.push_safer(&event.summary);
 
         if let Some(ref location) = event.location {
@@ -90,17 +108,25 @@ impl PushEvent for MessageBuilder {
             // TODO: shorten to 200 characters.
             self.push(" (").push_safer(GoogleCalendar::format_description(desc)).push(")");
         }
-        self.push(" on ").push(event.start.with_timezone(&tz).format("%a %e %b at %I:%M %p %Z"));
+        self.push(" on ").push(
+            event
+                .start
+                .to_timezone(tz)
+                .format(format_description!(
+                    // TODO: timezone short name
+                    "[weekday repr:short] [day padding:space] [month repr:short] at [hour repr:12]:[minute] [period]"
+                ))
+                .context("failed to format the event start")?,
+        );
 
-        let start = event.start.with_timezone(&Utc);
         self.push(" (");
-        if start > now {
-            self.push(HumanReadable::new(start - now)).push(" from now)");
+        if event.start > now {
+            self.push(HumanReadable::new(event.start - now)).push(" from now)");
         } else {
-            self.push(HumanReadable::new(now - start)).push(" ago)");
+            self.push(HumanReadable::new(now - event.start)).push(" ago)");
         }
 
-        self
+        Ok(self)
     }
 }
 
@@ -133,7 +159,7 @@ impl Next {
             Err(err) => return Err(err.into()),
         };
 
-        let now = Utc::now();
+        let now = OffsetDateTime::now_utc();
 
         let events = google_calendar.get_upcoming_events(self.calendar, now).await?;
         let events = GoogleCalendar::get_next_event(&events, now, self.include_current);
@@ -145,7 +171,7 @@ impl Next {
             if i != 0 {
                 builder.push(", ");
             }
-            builder.push_event(event, now, tz);
+            builder.push_event(event, now, tz)?;
         }
 
         msg.reply(&ctx, &builder.build()).await?;

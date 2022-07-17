@@ -2,10 +2,11 @@ use crate::config::Config;
 use crate::context::ErisContext;
 use crate::extract::Extract;
 use anyhow::Error;
-use chrono::Utc;
-use serenity::model::prelude::*;
+use serenity::model::channel::{Channel, ChannelType, GuildChannel};
+use serenity::model::id::ChannelId;
 use std::collections::HashMap;
 use std::time::Duration;
+use time::OffsetDateTime;
 use tracing::{error, info};
 
 const STARTUP_DELAY: Duration = Duration::from_secs(5);
@@ -15,11 +16,8 @@ const MIN_CHANNEL_AGE: Duration = Duration::from_secs(15 * 60);
 async fn reap_channels(ctx: &ErisContext) -> Result<(), Error> {
     let data = ctx.data.read().await;
     let config = data.extract::<Config>()?;
-    let guild = config
-        .guild
-        .to_guild_cached(&ctx)
-        .await
-        .ok_or_else(|| Error::msg("failed to get the guild"))?;
+    let guild =
+        config.guild.to_guild_cached(&ctx).ok_or_else(|| Error::msg("failed to get the guild"))?;
 
     let mut voice_users = HashMap::<ChannelId, u64>::new();
     for voice_state in guild.voice_states.values() {
@@ -28,20 +26,23 @@ async fn reap_channels(ctx: &ErisContext) -> Result<(), Error> {
         }
     }
 
-    let now = Utc::now();
+    let now = OffsetDateTime::now_utc();
 
     let mut unused_channels = vec![];
 
     for channel in guild.channels.values() {
-        if channel.kind != ChannelType::Voice
-            || !channel.name.starts_with(&config.temp_channel_prefix)
-        {
-            continue;
-        }
+        let channel = match channel {
+            Channel::Guild(channel @ GuildChannel { kind: ChannelType::Voice, .. })
+                if channel.name.starts_with(&config.temp_channel_prefix) =>
+            {
+                channel
+            }
+            _ => continue,
+        };
 
-        let created_at = channel.id.created_at().with_timezone(&Utc);
+        let created_at = channel.id.created_at();
 
-        if (now - created_at).to_std()? > MIN_CHANNEL_AGE
+        if (now - *created_at) > MIN_CHANNEL_AGE
             && voice_users.get(&channel.id).copied().unwrap_or(0) == 0
         {
             info!(

@@ -1,10 +1,11 @@
 use crate::config::Config;
 use crate::extract::Extract;
-use crate::models::User;
+use crate::models::user;
 use crate::twitch::helix::{Game, GameId, Stream, User as TwitchUser, UserId};
 use crate::twitch::Helix;
 use crate::typemap_keys::PgPool;
 use anyhow::Context as _;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serenity::framework::standard::macros::{command, group};
 use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::*;
@@ -42,10 +43,14 @@ fn push_stream(
 async fn live(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
     let data = ctx.data.read().await;
     let user = {
-        let conn = data.extract::<PgPool>()?.get()?;
+        let conn = data.extract::<PgPool>()?;
 
-        User::by_name(&data.extract::<Config>()?.username, &conn)
+        user::Entity::find()
+            .filter(user::Column::Name.eq(&data.extract::<Config>()?.username[..]))
+            .one(conn)
+            .await
             .context("failed to load the bot user")?
+            .context("bot user missing")?
     };
 
     let helix = data.extract::<Helix>()?;
@@ -96,9 +101,10 @@ async fn live(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
 mod test {
     use super::push_stream;
     use crate::twitch::helix::{Game, Stream, User};
-    use chrono::DateTime;
     use serenity::utils::MessageBuilder;
     use std::collections::HashMap;
+    use time::format_description::well_known::Rfc3339;
+    use time::OffsetDateTime;
 
     #[test]
     fn formatting() {
@@ -127,7 +133,7 @@ mod test {
             &games,
             &Stream {
                 game_id: "3681".to_string(),
-                started_at: DateTime::parse_from_rfc3339("2020-04-07T11:45:20Z").unwrap(),
+                started_at: OffsetDateTime::parse("2020-04-07T11:45:20Z", &Rfc3339).unwrap(),
                 title: "Let's explode || Minesweeper".to_string(),
                 user_id: "29801300".to_string(),
                 user_name: "qrpth".to_string(),

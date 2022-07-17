@@ -26,7 +26,7 @@ impl Access {
             Access::Any => true,
             Access::Sub => {
                 // A user is a "subscriber" if they have a coloured role
-                if let Some(guild) = msg.guild(ctx).await {
+                if let Some(guild) = msg.guild(ctx) {
                     if let Ok(member) = guild.member(ctx, msg.author.id).await {
                         for role_id in &member.roles {
                             if let Some(role) = guild.roles.get(role_id) {
@@ -41,9 +41,9 @@ impl Access {
                 false
             }
             Access::Mod => {
-                if let Some(guild) = msg.guild(ctx).await {
+                if let Some(guild) = msg.guild(ctx) {
                     if let Ok(member) = guild.member(&ctx, &msg.author.id).await {
-                        if let Ok(permissions) = member.permissions(ctx).await {
+                        if let Ok(permissions) = member.permissions(ctx) {
                             return permissions.administrator();
                         }
                     }

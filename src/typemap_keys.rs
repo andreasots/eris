@@ -47,7 +47,7 @@ impl TypeMapKey for Twitter {
 pub enum PgPool {}
 
 impl TypeMapKey for PgPool {
-    type Value = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<diesel::pg::PgConnection>>;
+    type Value = sea_orm::DatabaseConnection;
 }
 
 pub enum ReloadHandle {}

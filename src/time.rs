@@ -1,5 +1,6 @@
-use chrono::Duration;
 use std::fmt::{Display, Formatter, Result as FmtResult};
+
+use time::Duration;
 
 pub struct HumanReadable(Duration);
 
@@ -14,32 +15,32 @@ impl Display for HumanReadable {
         let mut d = self.0;
         let mut started = false;
 
-        if d < Duration::zero() {
+        if d < Duration::ZERO {
             d = -d;
             f.write_str("-")?;
         }
 
-        if d.num_days() > 0 {
-            write!(f, "{}d", d.num_days())?;
-            d = d - Duration::days(d.num_days());
+        if d.whole_days() > 0 {
+            write!(f, "{}d", d.whole_days())?;
+            d = d - Duration::days(d.whole_days());
             started = true;
         }
 
-        if started || d.num_hours() > 0 {
-            write!(f, "{}h", d.num_hours())?;
-            d = d - Duration::hours(d.num_hours());
+        if started || d.whole_hours() > 0 {
+            write!(f, "{}h", d.whole_hours())?;
+            d = d - Duration::hours(d.whole_hours());
             started = true;
         }
 
-        if started || d.num_minutes() > 0 {
-            write!(f, "{}m", d.num_minutes())?;
-            d = d - Duration::minutes(d.num_minutes());
+        if started || d.whole_minutes() > 0 {
+            write!(f, "{}m", d.whole_minutes())?;
+            d = d - Duration::minutes(d.whole_minutes());
             started = true;
         }
 
         // skip seconds if longer than a minute
         if !started {
-            write!(f, "{}s", d.num_seconds())?;
+            write!(f, "{}s", d.whole_seconds())?;
         }
 
         Ok(())

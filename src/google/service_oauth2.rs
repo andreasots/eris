@@ -1,12 +1,12 @@
 //! Creating OAuth2 bearer tokens for Google service accounts
 
 use anyhow::{bail, Context, Error};
-use chrono::{DateTime, Duration, TimeZone, Utc};
 use futures::lock::Mutex;
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use time::{Duration, OffsetDateTime};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 
@@ -37,7 +37,7 @@ struct NewToken {
 
 struct Token {
     token: String,
-    expires: DateTime<Utc>,
+    expires: OffsetDateTime,
 }
 
 pub struct ServiceAccount {
@@ -53,13 +53,13 @@ impl ServiceAccount {
             key_path,
             client,
             scopes: scopes.join(" "),
-            token: Mutex::new(Token { token: String::new(), expires: Utc.timestamp(0, 0) }),
+            token: Mutex::new(Token { token: String::new(), expires: OffsetDateTime::UNIX_EPOCH }),
         }
     }
 
     pub async fn get_token(&self) -> Result<String, Error> {
         let mut token = self.token.lock().await;
-        let now = Utc::now();
+        let now = OffsetDateTime::now_utc();
 
         if token.expires <= now {
             let mut file = File::open(&self.key_path)
@@ -80,8 +80,8 @@ impl ServiceAccount {
                     iss: &key.client_email,
                     scope: &self.scopes,
                     aud: TOKEN_URI,
-                    iat: now.timestamp(),
-                    exp: (now + Duration::seconds(3600)).timestamp(),
+                    iat: now.unix_timestamp(),
+                    exp: (now + Duration::seconds(3600)).unix_timestamp(),
                 },
                 &private_key,
             )
@@ -107,7 +107,7 @@ impl ServiceAccount {
             }
             *token = Token {
                 token: new_token.access_token,
-                expires: Utc::now() + Duration::seconds(new_token.expires_in),
+                expires: OffsetDateTime::now_utc() + Duration::seconds(new_token.expires_in),
             }
         }
 

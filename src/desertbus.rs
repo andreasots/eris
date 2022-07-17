@@ -1,9 +1,9 @@
 use anyhow::{Context, Error};
-use chrono::{DateTime, TimeZone};
-use chrono_tz::America::Vancouver as TIMEZONE;
-use chrono_tz::Tz;
 use reqwest::Client;
 use serde::Deserialize;
+use time::macros::datetime;
+use time::OffsetDateTime;
+use time_tz::PrimitiveDateTimeExt;
 
 #[derive(Deserialize)]
 struct Init {
@@ -23,8 +23,10 @@ impl DesertBus {
         DesertBus { client }
     }
 
-    pub fn start_time() -> DateTime<Tz> {
-        TIMEZONE.ymd(2021, 11, 12).and_hms(18, 0, 0)
+    pub fn start_time() -> OffsetDateTime {
+        datetime!(2022-11-12 14:00:00)
+            .assume_timezone(time_tz::timezones::db::america::VANCOUVER)
+            .unwrap_first()
     }
 
     pub fn hours_raised(money_raised: f64) -> f64 {

@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use super::{Column, Expr, Op, unescape};
+use super::{Column, Ast, Op, unescape};
 use serenity::utils::parse_emoji;
 
 grammar;
@@ -8,23 +8,23 @@ extern {
     type Error = std::convert::Infallible;
 }
 
-pub Query: Expr<'input> = {
+pub Query: Ast<'input> = {
     Disjunction,
 }
 
-Disjunction: Expr<'input> = {
+Disjunction: Ast<'input> = {
     <left:Disjunction> "|" <right:Conjunction> => left.or(right),
     Conjunction,
 }
 
-Conjunction: Expr<'input> = {
+Conjunction: Ast<'input> = {
     <left:Conjunction> <right:Term> => left.and(right),
     Term,
 }
 
-Term: Expr<'input> = {
-    <column:Column> <op:Op> <term:String> => Expr::Column {<>},
-    String => Expr::Bare(<>),
+Term: Ast<'input> = {
+    <column:Column> <op:Op> <term:String> => Ast::Column {<>},
+    String => Ast::Bare(<>),
     "(" <Disjunction> ")",
 }
 

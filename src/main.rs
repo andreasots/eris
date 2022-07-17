@@ -1,12 +1,9 @@
-#![recursion_limit = "256"]
-
-#[macro_use]
-extern crate diesel;
-
 use anyhow::{Context, Error};
-use serenity::client::bridge::gateway::GatewayIntents;
+use serenity::client::ClientBuilder;
+use serenity::model::gateway::GatewayIntents;
 use serenity::model::id::UserId;
 use std::borrow::Cow;
+use std::collections::HashSet;
 use tracing_subscriber::EnvFilter;
 
 use crate::context::ErisContext;
@@ -28,9 +25,7 @@ mod google;
 mod influxdb;
 mod inventory;
 mod models;
-mod pg_fts;
 mod rpc;
-mod schema;
 mod service;
 mod shorten;
 mod time;
@@ -44,7 +39,7 @@ trait ClientBuilderExt {
         -> Self;
 }
 
-impl ClientBuilderExt for serenity::client::ClientBuilder<'_> {
+impl ClientBuilderExt for ClientBuilder {
     fn maybe_type_map_insert<T: serenity::prelude::TypeMapKey>(
         self,
         opt: Option<T::Value>,
@@ -57,7 +52,7 @@ impl ClientBuilderExt for serenity::client::ClientBuilder<'_> {
     }
 }
 
-const DEFAULT_TRACING_FILTER: &'static str = "info";
+const DEFAULT_TRACING_FILTER: &'static str = "info,sqlx::query=warn";
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -106,10 +101,9 @@ async fn main() -> Result<(), Error> {
     let config = config::Config::load_from_file(matches.value_of_os("conf").unwrap())
         .context("failed to load the config file")?;
 
-    let pg_pool = diesel::r2d2::Pool::new(diesel::r2d2::ConnectionManager::<
-        diesel::pg::PgConnection,
-    >::new(&config.database_url[..]))
-    .context("failed to create the database pool")?;
+    let pg_pool = sea_orm::Database::connect(&config.database_url)
+        .await
+        .context("failed to create the database pool")?;
 
     let http_client = reqwest::ClientBuilder::new()
         .user_agent(concat!(
@@ -127,10 +121,10 @@ async fn main() -> Result<(), Error> {
 
     let google_keys_json_path = matches.value_of_os("google-service-account").unwrap();
 
-    let calendar = google::Calendar::new(http_client.clone(), &google_keys_json_path);
-    let spreadsheets = google::Sheets::new(http_client.clone(), &google_keys_json_path);
+    let calendar = crate::google::Calendar::new(http_client.clone(), &google_keys_json_path);
+    let spreadsheets = crate::google::Sheets::new(http_client.clone(), &google_keys_json_path);
 
-    let desertbus = desertbus::DesertBus::new(http_client.clone());
+    let desertbus = crate::desertbus::DesertBus::new(http_client.clone());
 
     let twitter = crate::twitter::Twitter::new(
         http_client.clone(),
@@ -149,103 +143,105 @@ async fn main() -> Result<(), Error> {
         }
     }
 
-    let http = serenity::http::Http::new_with_token(&config.discord_botsecret);
-    let current_application_info = http
+    let mut owners = HashSet::new();
+    owners.insert(UserId(101919755132227584)); // Defrost#0001
+    owners.insert(UserId(153674140019064832)); // phlip#6324
+    owners.insert(UserId(144128240389324800)); // qrpth#6704
+
+    let http = serenity::http::Http::new(&config.discord_botsecret);
+    let app_info = http
         .get_current_application_info()
         .await
         .context("failed to get the current application info")?;
+    owners.insert(app_info.owner.id);
+    if let Some(team) = app_info.team {
+        owners.insert(team.owner_user_id);
+        for member in &team.members {
+            owners.insert(member.user.id);
+        }
+    }
 
-    let mut client = serenity::Client::builder(&config.discord_botsecret)
-        .intents(
-            GatewayIntents::GUILDS
-                | GatewayIntents::GUILD_MEMBERS
-                | GatewayIntents::GUILD_EMOJIS
-                | GatewayIntents::GUILD_VOICE_STATES
-                | GatewayIntents::GUILD_MESSAGES
-                | GatewayIntents::DIRECT_MESSAGES,
-        )
-        .event_handler(crate::discord_events::DiscordEvents::new())
-        .framework(
-            serenity::framework::StandardFramework::new()
-                .configure(|c| {
-                    c.prefix(&config.command_prefix)
-                        .with_whitespace((true, true, true))
-                        .on_mention(Some(current_application_info.id))
-                        .case_insensitivity(true)
-                        .owners(
-                            [
-                                // Defrost#0001
-                                UserId(101919755132227584),
-                                // phlip#6324
-                                UserId(153674140019064832),
-                                // qrpth#6704
-                                UserId(144128240389324800),
-                            ]
-                            .iter()
-                            .copied()
-                            .collect(),
-                        )
+    let current_user =
+        http.get_current_user().await.context("failed to get the current user info")?;
+
+    let mut client = serenity::client::ClientBuilder::new_with_http(
+        http,
+        GatewayIntents::GUILDS
+            | GatewayIntents::GUILD_MEMBERS
+            | GatewayIntents::GUILD_EMOJIS_AND_STICKERS
+            | GatewayIntents::GUILD_VOICE_STATES
+            | GatewayIntents::GUILD_MESSAGES
+            | GatewayIntents::DIRECT_MESSAGES
+            | GatewayIntents::MESSAGE_CONTENT,
+    )
+    .event_handler(crate::discord_events::DiscordEvents::new())
+    .framework(
+        serenity::framework::StandardFramework::new()
+            .configure(|c| {
+                c.prefix(&config.command_prefix)
+                    .with_whitespace((true, true, true))
+                    .on_mention(Some(current_user.id))
+                    .case_insensitivity(true)
+                    .owners(owners)
+            })
+            .before(|_, message, command_name| {
+                Box::pin(async move {
+                    info!(
+                        command_name = command_name,
+                        message = message.content.as_str(),
+                        message.id = message.id.0,
+                        from.id = message.author.id.0,
+                        from.name = message.author.name.as_str(),
+                        from.discriminator = message.author.discriminator,
+                        "Command received",
+                    );
+                    true
                 })
-                .before(|_, message, command_name| {
-                    Box::pin(async move {
-                        info!(
-                            command_name = command_name,
-                            message = message.content.as_str(),
+            })
+            .after(|ctx, message, _command_name, result| {
+                Box::pin(async move {
+                    if let Err(error) = result {
+                        error!(
                             message.id = message.id.0,
-                            from.id = message.author.id.0,
-                            from.name = message.author.name.as_str(),
-                            from.discriminator = message.author.discriminator,
-                            "Command received",
+                            ?error,
+                            "Command resulted in an unexpected error"
                         );
-                        true
-                    })
-                })
-                .after(|ctx, message, _command_name, result| {
-                    Box::pin(async move {
-                        if let Err(error) = result {
-                            error!(
-                                message.id = message.id.0,
-                                ?error,
-                                "Command resulted in an unexpected error"
-                            );
 
-                            let _ = message.reply(
-                                ctx,
-                                &format!("Command resulted in an unexpected error: {}.", error),
-                            );
-                        } else {
-                            info!(message.id = message.id.0, "Command processed successfully",);
-                        }
-                    })
+                        let _ = message.reply(
+                            ctx,
+                            &format!("Command resulted in an unexpected error: {}.", error),
+                        );
+                    } else {
+                        info!(message.id = message.id.0, "Command processed successfully",);
+                    }
                 })
-                .unrecognised_command(commands::static_response::static_response)
-                .help(&crate::commands::help::HELP)
-                .group(&crate::commands::calendar::CALENDAR_GROUP)
-                .group(&crate::commands::live::FANSTREAMS_GROUP)
-                .group(&crate::commands::quote::QUOTE_GROUP)
-                .group(&crate::commands::time::TIME_GROUP)
-                .group(&crate::commands::tracing::TRACING_GROUP)
-                .group(&crate::commands::voice::VOICE_GROUP),
-        )
-        .type_map_insert::<crate::rpc::LRRbot>(std::sync::Arc::new(crate::rpc::LRRbot::new(
-            &config,
-        )))
-        .maybe_type_map_insert::<crate::influxdb::InfluxDB>(
-            config
-                .influxdb
-                .as_ref()
-                .map(|url| crate::influxdb::InfluxDB::new(http_client.clone(), url.clone())),
-        )
-        .type_map_insert::<crate::config::Config>(config)
-        .type_map_insert::<crate::typemap_keys::PgPool>(pg_pool)
-        .type_map_insert::<crate::twitch::Helix>(helix)
-        .type_map_insert::<crate::google::Calendar>(calendar)
-        .type_map_insert::<crate::google::Sheets>(spreadsheets)
-        .type_map_insert::<crate::desertbus::DesertBus>(desertbus)
-        .type_map_insert::<crate::twitter::Twitter>(twitter)
-        .type_map_insert::<crate::typemap_keys::ReloadHandle>(reload_handle)
-        .await
-        .context("failed to create the Discord client")?;
+            })
+            .unrecognised_command(commands::static_response::static_response)
+            .help(&crate::commands::help::HELP)
+            .group(&crate::commands::calendar::CALENDAR_GROUP)
+            .group(&crate::commands::live::FANSTREAMS_GROUP)
+            .group(&crate::commands::quote::QUOTE_GROUP)
+            .group(&crate::commands::time::TIME_GROUP)
+            .group(&crate::commands::tracing::TRACING_GROUP)
+            .group(&crate::commands::voice::VOICE_GROUP),
+    )
+    .type_map_insert::<crate::rpc::LRRbot>(std::sync::Arc::new(crate::rpc::LRRbot::new(&config)))
+    .maybe_type_map_insert::<crate::influxdb::InfluxDB>(
+        config
+            .influxdb
+            .as_ref()
+            .map(|url| crate::influxdb::InfluxDB::new(http_client.clone(), url.clone())),
+    )
+    .type_map_insert::<crate::config::Config>(config)
+    .type_map_insert::<crate::typemap_keys::PgPool>(pg_pool)
+    .type_map_insert::<crate::twitch::Helix>(helix)
+    .type_map_insert::<crate::google::Calendar>(calendar)
+    .type_map_insert::<crate::google::Sheets>(spreadsheets)
+    .type_map_insert::<crate::desertbus::DesertBus>(desertbus)
+    .type_map_insert::<crate::twitter::Twitter>(twitter)
+    .type_map_insert::<crate::typemap_keys::ReloadHandle>(reload_handle)
+    .await
+    .context("failed to create the Discord client")?;
 
     let ctx = ErisContext::from_client(&client);
 
@@ -267,10 +263,10 @@ async fn main() -> Result<(), Error> {
     }
 
     tokio::spawn(rpc_server.serve());
-    tokio::spawn(channel_reaper::channel_reaper(ctx.clone()));
-    tokio::spawn(announcements::post_tweets(ctx.clone()));
-    tokio::spawn(autotopic::autotopic(ctx.clone()));
-    tokio::spawn(contact::post_messages(ctx));
+    tokio::spawn(crate::channel_reaper::channel_reaper(ctx.clone()));
+    tokio::spawn(crate::announcements::post_tweets(ctx.clone()));
+    tokio::spawn(crate::autotopic::autotopic(ctx.clone()));
+    tokio::spawn(crate::contact::post_messages(ctx));
 
     client.start().await.context("error while running the Discord client")
 }

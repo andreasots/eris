@@ -1,13 +1,13 @@
 #![allow(clippy::unreadable_literal)]
 
 use anyhow::{anyhow, Context, Error};
-use chrono_tz::Tz;
 use ini::Ini;
 use serenity::model::prelude::*;
 use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use time_tz::Tz;
 use url::Url;
 
 #[derive(Debug)]
@@ -21,7 +21,7 @@ pub struct Config {
 
     pub site_url: Url,
 
-    pub timezone: Tz,
+    pub timezone: &'static Tz,
 
     #[cfg(unix)]
     pub lrrbot_socket: PathBuf,
@@ -82,12 +82,12 @@ impl Config {
             )
             .context("failed to parse `siteurl`")?,
 
-            timezone: ini
-                .get_from(Some("lrrbot"), "timezone")
-                .unwrap_or("America/Vancouver")
-                .parse::<Tz>()
-                .map_err(Error::msg)
-                .context("failed to parse the timezone")?,
+            timezone: {
+                let timezone =
+                    ini.get_from(Some("lrrbot"), "timezone").unwrap_or("America/Vancouver");
+                time_tz::timezones::get_by_name(timezone)
+                    .ok_or_else(|| Error::msg(format!("unknown timezone: {timezone}")))?
+            },
 
             #[cfg(unix)]
             lrrbot_socket: ini

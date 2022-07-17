@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::context::ErisContext;
 use crate::extract::Extract;
-use crate::models::State;
+use crate::models::state;
 use crate::try_crosspost::TryCrosspost;
 use crate::twitter::Twitter;
 use crate::typemap_keys::PgPool;
@@ -39,17 +39,12 @@ async fn inner<'a>(
     users: &'a HashMap<u64, Vec<ChannelId>>,
 ) -> Result<(), Error> {
     let data = ctx.data.read().await;
+    let conn = data.extract::<PgPool>()?;
 
     for (&user_id, channels) in users {
-        let state_key = &format!("eris.announcements.twitter.{}.last_tweet_id", user_id);
-        let last_tweet_id = {
-            let conn = data
-                .extract::<PgPool>()?
-                .get()
-                .context("failed to get a DB connection from the connection pool")?;
-
-            State::get::<u64, _>(&state_key, &conn).context("failed to get the last tweet ID")?
-        };
+        let state_key = format!("eris.announcements.twitter.{}.last_tweet_id", user_id);
+        let last_tweet_id =
+            state::get::<u64>(&state_key, conn).await.context("failed to get the last tweet ID")?;
 
         let twitter = data.extract::<Twitter>()?;
 
@@ -102,24 +97,15 @@ async fn inner<'a>(
                             .context("failed to crosspost the announcement message")?;
                     }
 
-                    {
-                        let conn = data
-                            .extract::<PgPool>()?
-                            .get()
-                            .context("failed to get a DB connection from the connection pool")?;
-                        State::set(&state_key, tweet.id, &conn)
-                            .context("failed to set the new last tweet ID")?;
-                    }
+                    state::set(state_key.clone(), tweet.id, conn)
+                        .await
+                        .context("failed to set the new last tweet ID")?;
                 }
             }
         } else {
-            let conn = data
-                .extract::<PgPool>()?
-                .get()
-                .context("failed to get a DB connection from the connection pool")?;
-
             let last_tweet_id = tweets.iter().map(|tweet| tweet.id).max().unwrap_or(1);
-            State::set(&state_key, last_tweet_id, &conn)
+            state::set(state_key, last_tweet_id, conn)
+                .await
                 .context("failed to set the new last tweet ID")?;
         }
     }
