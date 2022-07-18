@@ -97,9 +97,6 @@ impl DiscordEvents {
 
         // message sent in a guild but not a channel, thread then?
         let thread = guild.threads.iter().find(|thread| thread.id == message.channel_id).cloned();
-        let thread = thread.or_else(|| {
-            guild.threads.iter().find(|thread| thread.id == message.channel_id).cloned()
-        })?;
         let channel = guild.channels.get(&thread.parent_id?)?.clone().guild().unwrap();
 
         Some((channel, Some(thread)))
