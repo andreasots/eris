@@ -13,7 +13,7 @@ lalrpop = { version = "0.19.8", default-features = false, features = ["lexer"] }
 [dependencies]
 anyhow = { version = "1.0.58", default-features = false, features = ["std"] }
 bytes = { version = "1.1.0", default-features = false }
-clap = { version = "3.2.12", default-features = false, features = ["std"] }
+clap = { version = "3.2.15", default-features = false, features = ["std"] }
 egg-mode-text = { version = "1.15.0", default-features = false }
 eris-macros = { path = "eris-macros" }
 futures = { version = "0.3.21", default-features = false, features = ["std", "async-await"] }
