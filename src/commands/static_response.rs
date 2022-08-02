@@ -8,7 +8,6 @@ use serenity::framework::standard::{Args, Delimiter};
 use serenity::model::channel::Message;
 use serenity::prelude::*;
 use serenity::utils::Colour;
-use std::borrow::Cow;
 use std::collections::HashMap;
 use tracing::{error, info};
 
@@ -121,17 +120,19 @@ async fn static_response_impl(ctx: &Context, msg: &Message, command: &str) -> Re
         if access.user_has_access(ctx, msg).await {
             let response = response.choose(&mut rand::thread_rng());
             if let Some(response) = response {
-                let mut vars = HashMap::<String, Cow<str>>::new();
+                let name;
+                let mut vars = HashMap::<String, &str>::new();
                 vars.insert(
                     "user".into(),
                     if let Some(guild_id) = msg.guild_id {
-                        msg.author
-                            .nick_in(&ctx, guild_id)
-                            .await
-                            .map(Cow::Owned)
-                            .unwrap_or_else(|| msg.author.name.as_str().into())
+                        if let Some(nick) = msg.author.nick_in(&ctx, guild_id).await {
+                            name = nick;
+                            name.as_str()
+                        } else {
+                            msg.author.name.as_str()
+                        }
                     } else {
-                        msg.author.name.as_str().into()
+                        msg.author.name.as_str()
                     },
                 );
                 let response =
