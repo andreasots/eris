@@ -156,6 +156,7 @@ pub mod show {
     pub struct Model {
         #[sea_orm(primary_key)]
         pub id: i32,
+        #[sea_orm(column_name = "string_id")]
         pub key: String,
         pub name: String,
     }
