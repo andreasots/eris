@@ -18,7 +18,7 @@ egg-mode-text = { version = "1.15.0", default-features = false }
 eris-macros = { path = "eris-macros" }
 futures = { version = "0.3.21", default-features = false, features = ["std", "async-await"] }
 inventory = { version = "0.3.0", default-features = false }
-joinery = "2.1.0"
+joinery = "3.0.0"
 jsonwebtoken = { version = "8.1.1", default-features = false, features = ["use_pem"] }
 lalrpop-util = { version = "0.19.8", default-features = false }
 lazy_static = { version = "1.4.0", default-features = false }
