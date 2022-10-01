@@ -16,7 +16,7 @@ bytes = { version = "1.2.1", default-features = false }
 clap = { version = "3.2.16", default-features = false, features = ["std"] }
 egg-mode-text = { version = "1.15.0", default-features = false }
 eris-macros = { path = "eris-macros" }
-futures = { version = "0.3.21", default-features = false, features = ["std", "async-await"] }
+futures = { version = "0.3.24", default-features = false, features = ["std", "async-await"] }
 inventory = { version = "0.3.1", default-features = false }
 joinery = "3.0.0"
 jsonwebtoken = { version = "8.1.1", default-features = false, features = ["use_pem"] }
