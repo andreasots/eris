@@ -45,7 +45,7 @@ impl LRRbot {
         #[cfg(unix)]
         let client = NewClient::new(&config.lrrbot_socket);
         #[cfg(not(unix))]
-        let client = NewClient::new(&config.lrrbot_port);
+        let client = NewClient::new(config.lrrbot_port);
 
         LRRbot { service: Retry::new(Reconnect::new(client), 3) }
     }

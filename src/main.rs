@@ -253,7 +253,7 @@ async fn main() -> Result<(), Error> {
         let server = crate::aiomas::Server::new(&config.eris_socket, ctx.clone());
 
         #[cfg(not(unix))]
-        let server = crate::aiomas::Server::new(config.eris_port, ctx.clone());
+        let server = crate::aiomas::Server::new(config.eris_port, ctx.clone()).await;
 
         server
     }

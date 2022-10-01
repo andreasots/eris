@@ -5,12 +5,13 @@ use futures::future::BoxFuture;
 use futures::prelude::*;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::path::Path;
 use std::sync::Arc;
 use tracing::error;
 
 #[cfg(unix)]
 use tokio::net::UnixListener;
+#[cfg(unix)]
+use std::path::Path;
 
 #[cfg(not(unix))]
 use tokio::net::TcpListener;
@@ -59,11 +60,11 @@ impl<C: Clone + Send + 'static> Server<C> {
     }
 
     #[cfg(not(unix))]
-    pub fn new(port: u16, context: C) -> Result<Server<C>, Error> {
+    pub async fn new(port: u16, context: C) -> Result<Server<C>, Error> {
         use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 
         let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port);
-        let listener = TcpListener::bind(&addr).context("failed to create a listening socket")?;
+        let listener = TcpListener::bind(&addr).await.context("failed to create a listening socket")?;
 
         Ok(Server { listener, methods: HashMap::new(), context })
     }

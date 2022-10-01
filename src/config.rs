@@ -5,10 +5,13 @@ use ini::Ini;
 use serenity::model::prelude::*;
 use std::collections::HashMap;
 use std::error::Error as StdError;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::str::FromStr;
 use time_tz::Tz;
 use url::Url;
+
+#[cfg(unix)]
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct Config {

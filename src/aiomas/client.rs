@@ -5,11 +5,12 @@ use futures::prelude::*;
 use futures::select;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use tracing::error;
 
 #[cfg(unix)]
 use tokio::net::UnixStream;
+#[cfg(unix)]
+use std::path::PathBuf;
 
 #[cfg(not(unix))]
 use tokio::net::TcpStream;
@@ -39,7 +40,7 @@ impl NewClient {
         NewClient { port }
     }
 
-    pub async fn new_service(&self) -> Result<Client, Error> {
+    pub async fn new_client(&self) -> Result<Client, Error> {
         use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 
         let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), self.port);
