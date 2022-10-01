@@ -13,10 +13,10 @@ lalrpop = { version = "0.19.8", default-features = false, features = ["lexer"] }
 [dependencies]
 anyhow = { version = "1.0.65", default-features = false, features = ["std"] }
 bytes = { version = "1.2.1", default-features = false }
-clap = { version = "3.2.16", default-features = false, features = ["std"] }
+clap = { version = "4.0.7", default-features = false, features = ["std"] }
 egg-mode-text = { version = "1.15.0", default-features = false }
 eris-macros = { path = "eris-macros" }
-futures = { version = "0.3.21", default-features = false, features = ["std", "async-await"] }
+futures = { version = "0.3.24", default-features = false, features = ["std", "async-await"] }
 inventory = { version = "0.3.1", default-features = false }
 joinery = "3.0.0"
 jsonwebtoken = { version = "8.1.1", default-features = false, features = ["use_pem"] }
@@ -27,7 +27,7 @@ log = { version = "0.4.17", default-features = false, features = ["max_level_inf
 ordinal = "0.3.2"
 rand = { version = "0.8.5", default-features = false, features = ["std", "std_rng"] }
 regex = { version = "1.6.0", default-features = false, features = ["perf", "std", "unicode"] }
-reqwest = { version = "0.11.11", default-features = false, features = ["rustls-tls", "json"] }
+reqwest = { version = "0.11.12", default-features = false, features = ["rustls-tls", "json"] }
 rust-ini = { version = "0.18.0", default-features = false }
 sea-orm = { version = "0.9.3", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-json"] }
 separator = { version = "0.4.1", default-features = false }
