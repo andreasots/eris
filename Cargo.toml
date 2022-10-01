@@ -34,13 +34,13 @@ separator = { version = "0.4.1", default-features = false }
 serde = { version = "1.0.145", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.85", default-features = false }
 serenity = { version = "0.11.5", default-features = false, features = ["gateway", "cache", "rustls_backend", "standard_framework", "time"] }
-strfmt = { version = "0.2.1", default-features = false }
+strfmt = { version = "0.2.2", default-features = false }
 time = { version = "0.3.14", default-features = false, features = ["formatting", "parsing", "macros", "serde", "serde-well-known"] }
 time-tz = { version = "1.0.2", default-features = false, features = ["db"] }
 tokio = { version = "1.20.1", default-features = false, features = ["net", "fs", "io-util", "rt-multi-thread", "macros", "time", "parking_lot"] }
 tokio-util = { version = "0.7.4", default-features = false, features = ["codec"] }
 tracing = { version = "0.1.36", default-features = false, features = ["std", "attributes", "max_level_trace", "release_max_level_debug"] }
 tracing-subscriber = { version = "0.3.15", default-features = false, features = ["fmt", "std", "time", "env-filter", "json", "tracing-log"] }
-unicode-segmentation = "1.9.0"
+unicode-segmentation = "1.10.0"
 unicode-width = { version = "0.1.10", default-features = false }
-url = { version = "2.2.2", default-features = false }
+url = { version = "2.3.1", default-features = false }
