@@ -3,6 +3,7 @@ use serenity::client::ClientBuilder;
 use serenity::model::gateway::GatewayIntents;
 use serenity::model::id::UserId;
 use std::borrow::Cow;
+use std::path::PathBuf;
 use std::collections::HashSet;
 use tracing_subscriber::EnvFilter;
 
@@ -85,7 +86,7 @@ async fn main() -> Result<(), Error> {
                 .short('c')
                 .value_name("FILE")
                 .help("Config file")
-                .allow_invalid_utf8(true)
+                .value_parser(clap::value_parser!(PathBuf))
                 .default_value("lrrbot.conf"),
         )
         .arg(
@@ -93,12 +94,12 @@ async fn main() -> Result<(), Error> {
                 .short('k')
                 .value_name("FILE")
                 .help("JSON file containing the Google service account key")
-                .allow_invalid_utf8(true)
+                .value_parser(clap::value_parser!(PathBuf))
                 .default_value("keys.json"),
         )
         .get_matches();
 
-    let config = config::Config::load_from_file(matches.value_of_os("conf").unwrap())
+    let config = config::Config::load_from_file(matches.get_one::<PathBuf>("conf").unwrap())
         .context("failed to load the config file")?;
 
     let pg_pool = sea_orm::Database::connect(&config.database_url)
@@ -119,7 +120,7 @@ async fn main() -> Result<(), Error> {
     let helix = twitch::Helix::new(http_client.clone(), &config)
         .context("failed to create the New Twitch API client")?;
 
-    let google_keys_json_path = matches.value_of_os("google-service-account").unwrap();
+    let google_keys_json_path = matches.get_one::<PathBuf>("google-service-account").unwrap();
 
     let calendar = crate::google::Calendar::new(http_client.clone(), &google_keys_json_path);
     let spreadsheets = crate::google::Sheets::new(http_client.clone(), &google_keys_json_path);
