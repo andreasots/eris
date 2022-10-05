@@ -17,7 +17,7 @@ clap = { version = "4.0.7", default-features = false, features = ["std"] }
 egg-mode-text = { version = "1.15.0", default-features = false }
 eris-macros = { path = "eris-macros" }
 futures = { version = "0.3.24", default-features = false, features = ["std", "async-await"] }
-inventory = { version = "0.3.1", default-features = false }
+inventory = { version = "0.3.2", default-features = false }
 joinery = "3.1.0"
 jsonwebtoken = { version = "8.1.1", default-features = false, features = ["use_pem"] }
 lalrpop-util = { version = "0.19.8", default-features = false }
