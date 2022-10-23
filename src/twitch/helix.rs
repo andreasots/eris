@@ -181,7 +181,7 @@ impl Helix {
         let mut futures = FuturesOrdered::new();
 
         for chunk in ids.chunks(100) {
-            futures.push(self.paginated(url, token, chunk));
+            futures.push_back(self.paginated(url, token, chunk));
         }
 
         while let Some(res) = futures.next().await {
