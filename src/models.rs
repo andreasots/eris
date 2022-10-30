@@ -1,4 +1,6 @@
 pub mod game_entry {
+    use std::convert::TryInto;
+
     use sea_orm::entity::prelude::*;
 
     #[derive(Debug, Clone, DeriveEntityModel)]
@@ -44,6 +46,8 @@ pub mod game_entry {
 }
 
 pub mod game {
+    use std::convert::TryInto;
+
     use sea_orm::entity::prelude::*;
 
     #[derive(Debug, Clone, DeriveEntityModel)]
@@ -70,6 +74,7 @@ pub mod game {
 }
 
 pub mod quote {
+    use std::convert::TryInto;
     use std::fmt::{Display, Formatter};
 
     use sea_orm::entity::prelude::*;
@@ -149,6 +154,8 @@ pub mod quote {
 }
 
 pub mod show {
+    use std::convert::TryInto;
+
     use sea_orm::entity::prelude::*;
 
     #[derive(Clone, Debug, DeriveEntityModel)]
@@ -185,6 +192,8 @@ pub mod show {
 }
 
 pub mod state {
+    use std::convert::TryInto;
+
     use anyhow::{Context, Error};
     use sea_orm::entity::prelude::*;
     use sea_orm::sea_query::OnConflict;
@@ -242,6 +251,8 @@ pub mod state {
 }
 
 pub mod user {
+    use std::convert::TryInto;
+
     use sea_orm::entity::prelude::*;
 
     #[derive(Debug, Clone, DeriveEntityModel)]
