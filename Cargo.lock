@@ -1712,9 +1712,9 @@ dependencies = [
 
 [[package]]
 name = "sea-query-binder"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dddc5c3889bbc63b7e3374d3a7494551eb801c45f2f9cb460bfa4921653563d"
+checksum = "9c2585b89c985cfacfe0ec9fc9e7bb055b776c1a2581c4e3c6185af2b8bf8865"
 dependencies = [
  "sea-query",
  "serde_json",
