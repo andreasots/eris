@@ -10,11 +10,3 @@ updates:
   allow:
   - dependency-type: direct
   - dependency-type: indirect
-- package-ecosystem: cargo
-  directory: "/eris-macros"
-  schedule:
-    interval: daily
-  open-pull-requests-limit: 100
-  allow:
-  - dependency-type: direct
-  - dependency-type: indirect

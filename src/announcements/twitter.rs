@@ -1,57 +1,56 @@
-use crate::config::Config;
-use crate::context::ErisContext;
-use crate::extract::Extract;
-use crate::models::state;
-use crate::try_crosspost::TryCrosspost;
-use crate::twitter::Twitter;
-use crate::typemap_keys::PgPool;
-use anyhow::{Context, Error};
-use serenity::model::id::ChannelId;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
+
+use anyhow::{Context, Error};
+use egg_mode::Token;
+use sea_orm::DatabaseConnection;
 use tracing::{error, info};
+use twilight_http::Client as DiscordClient;
+use twilight_model::id::marker::ChannelMarker;
+use twilight_model::id::Id;
 
-async fn init(ctx: &ErisContext) -> Result<HashMap<u64, Vec<ChannelId>>, Error> {
-    let data = ctx.data.read().await;
-    let twitter = data.extract::<Twitter>()?;
-    let twitter_users = &data.extract::<Config>()?.twitter_users;
+use crate::config::Config;
+use crate::models::state;
 
-    let usernames = twitter_users.keys().map(|s| &s[..]).collect::<Vec<&str>>();
-    let user_ids = twitter
-        .users_lookup(&usernames)
+async fn init(config: &Config) -> Result<(Token, HashMap<u64, Vec<Id<ChannelMarker>>>), Error> {
+    let token = egg_mode::auth::bearer_token(&config.twitter_api)
         .await
-        .context("failed to fetch the Twitter IDs for watched users")?
-        .into_iter()
-        .map(|user| (user.screen_name.to_lowercase(), user.id))
-        .collect::<HashMap<_, _>>();
+        .context("failed to get the application token")?;
+
+    let user_ids =
+        egg_mode::user::lookup(config.twitter_users.keys().cloned().collect::<Vec<_>>(), &token)
+            .await
+            .context("failed to fetch the Twitter IDs for watched users")?
+            .into_iter()
+            .map(|user| (user.screen_name.to_lowercase(), user.id))
+            .collect::<HashMap<_, _>>();
 
     let mut users = HashMap::new();
 
-    for (user, channels) in twitter_users {
+    for (user, channels) in &config.twitter_users {
         users.insert(user_ids[user], channels.clone());
     }
 
-    Ok(users)
+    Ok((token, users))
 }
 
 async fn inner<'a>(
-    ctx: &'a ErisContext,
-    users: &'a HashMap<u64, Vec<ChannelId>>,
+    db: &'a DatabaseConnection,
+    discord: &'a DiscordClient,
+    token: &'a Token,
+    users: &'a HashMap<u64, Vec<Id<ChannelMarker>>>,
 ) -> Result<(), Error> {
-    let data = ctx.data.read().await;
-    let conn = data.extract::<PgPool>()?;
-
     for (&user_id, channels) in users {
         let state_key = format!("eris.announcements.twitter.{}.last_tweet_id", user_id);
         let last_tweet_id =
-            state::get::<u64>(&state_key, conn).await.context("failed to get the last tweet ID")?;
+            state::get::<u64>(&state_key, db).await.context("failed to get the last tweet ID")?;
 
-        let twitter = data.extract::<Twitter>()?;
-
-        let mut tweets = twitter
-            .user_timeline(user_id, true, true, 200, last_tweet_id)
+        let mut tweets = egg_mode::tweet::user_timeline(user_id, true, true, &token)
+            .call(last_tweet_id, None)
             .await
-            .context("failed to fetch new tweets")?;
+            .context("failed to fetch new tweets")?
+            .response;
 
         // Don't send an avalanche of tweets when first activated.
         if last_tweet_id.is_some() {
@@ -63,24 +62,28 @@ async fn inner<'a>(
                     .map(|user_id| users.contains_key(&user_id))
                     .unwrap_or(true)
                     && (tweet.retweeted_status.is_some()
-                        || tweet
-                            .entities
-                            .user_mentions
-                            .iter()
-                            .all(|mention| mention.indices.0 != 0))
+                        || tweet.entities.user_mentions.iter().all(|mention| mention.range.0 != 0))
                 {
-                    let message = format!(
-                        "New tweet from {}: https://twitter.com/{}/status/{}",
-                        tweet.user.name, tweet.user.screen_name, tweet.id,
-                    );
-                    for channel in channels {
-                        if let Some(retweeted_user_id) =
-                            tweet.retweeted_status.as_ref().map(|tweet| tweet.user.id)
+                    let message = if let Some(ref user) = tweet.user {
+                        format!(
+                            "New tweet from {}: https://twitter.com/{}/status/{}",
+                            user.name, user.screen_name, tweet.id,
+                        )
+                    } else {
+                        format!("New tweet: https://twitter.com/i/status/{}", tweet.id)
+                    };
+
+                    for channel in channels.iter().copied() {
+                        if let Some(retweeted_user_id) = tweet
+                            .retweeted_status
+                            .as_ref()
+                            .and_then(|tweet| tweet.user.as_ref())
+                            .map(|user| user.id)
                         {
                             if let Some(channels) = users.get(&retweeted_user_id) {
-                                if channels.contains(channel) {
+                                if channels.contains(&channel) {
                                     info!(
-                                        channel = channel.0,
+                                        ?channel,
                                         msg = message.as_str(),
                                         "Skipping posting a retweet because the target already gets posted to this channel"
                                     );
@@ -88,23 +91,29 @@ async fn inner<'a>(
                                 }
                             }
                         }
-                        channel
-                            .say(ctx, &message)
+
+                        let message = discord
+                            .create_message(channel)
+                            .content(&message)
+                            .context("announcement message is invalid")?
                             .await
                             .context("failed to send the announcement message")?
-                            .try_crosspost(ctx)
+                            .model()
                             .await
-                            .context("failed to crosspost the announcement message")?;
+                            .context("failed to parse the announcement message")?;
+                        if let Err(error) = discord.crosspost_message(channel, message.id).await {
+                            error!(?error, "failed to crosspost the announcement message");
+                        }
                     }
 
-                    state::set(state_key.clone(), tweet.id, conn)
+                    state::set(state_key.clone(), tweet.id, db)
                         .await
                         .context("failed to set the new last tweet ID")?;
                 }
             }
         } else {
             let last_tweet_id = tweets.iter().map(|tweet| tweet.id).max().unwrap_or(1);
-            state::set(state_key, last_tweet_id, conn)
+            state::set(state_key, last_tweet_id, db)
                 .await
                 .context("failed to set the new last tweet ID")?;
         }
@@ -113,9 +122,9 @@ async fn inner<'a>(
     Ok(())
 }
 
-pub async fn post_tweets(ctx: ErisContext) {
-    let users = match init(&ctx).await {
-        Ok(users) => users,
+pub async fn post_tweets(config: Arc<Config>, db: DatabaseConnection, discord: Arc<DiscordClient>) {
+    let (token, users) = match init(&config).await {
+        Ok(res) => res,
         Err(error) => {
             error!(?error, "failed to initialize the tweet announcer");
             return;
@@ -127,7 +136,7 @@ pub async fn post_tweets(ctx: ErisContext) {
     loop {
         timer.tick().await;
 
-        if let Err(error) = inner(&ctx, &users).await {
+        if let Err(error) = inner(&db, &discord, &token, &users).await {
             error!(?error, "Failed to announce new tweets");
         }
     }

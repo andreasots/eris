@@ -1,17 +1,19 @@
 #![allow(clippy::unreadable_literal)]
 
-use anyhow::{anyhow, Context, Error};
-use ini::Ini;
-use serenity::model::prelude::*;
 use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::path::Path;
-use std::str::FromStr;
-use time_tz::Tz;
-use url::Url;
-
 #[cfg(unix)]
 use std::path::PathBuf;
+use std::str::FromStr;
+
+use anyhow::{anyhow, Error};
+use egg_mode::KeyPair;
+use ini::Ini;
+use time_tz::Tz;
+use twilight_model::id::marker::{ChannelMarker, GuildMarker};
+use twilight_model::id::Id;
+use twitch_api::twitch_oauth2::{ClientId, ClientSecret};
 
 #[derive(Debug)]
 pub struct Config {
@@ -21,8 +23,6 @@ pub struct Config {
     pub database_url: String,
 
     pub command_prefix: String,
-
-    pub site_url: Url,
 
     pub timezone: &'static Tz,
 
@@ -42,24 +42,23 @@ pub struct Config {
 
     pub google_key: String,
 
-    pub twitch_client_id: String,
+    pub twitch_client_id: ClientId,
+    pub twitch_client_secret: ClientSecret,
 
     pub discord_botsecret: String,
     pub temp_channel_prefix: String,
-    pub announcements: ChannelId,
-    pub voice_category: ChannelId,
-    pub mods_channel: ChannelId,
-    pub general_channel: ChannelId,
-    pub guild: GuildId,
+    pub announcements: Id<ChannelMarker>,
+    pub voice_category: Id<ChannelMarker>,
+    pub mods_channel: Id<ChannelMarker>,
+    pub general_channel: Id<ChannelMarker>,
+    pub guild: Id<GuildMarker>,
 
-    pub twitter_api_key: String,
-    pub twitter_api_secret: String,
-    pub twitter_users: HashMap<String, Vec<ChannelId>>,
+    pub twitter_api: KeyPair,
+    pub twitter_users: HashMap<String, Vec<Id<ChannelMarker>>>,
 
     pub contact_spreadsheet: Option<String>,
 
-    /// URL for the InfluxDB's write endpoint.
-    pub influxdb: Option<Url>,
+    pub influxdb: Option<(String, String)>,
 }
 
 impl Config {
@@ -79,11 +78,6 @@ impl Config {
                 .unwrap_or("!")
                 .trim()
                 .into(),
-
-            site_url: Url::parse(
-                ini.get_from(Some("lrrbot"), "siteurl").unwrap_or("https://lrrbot.com/"),
-            )
-            .context("failed to parse `siteurl`")?,
 
             timezone: {
                 let timezone =
@@ -114,7 +108,11 @@ impl Config {
 
             google_key: Config::get_option_required(&ini, "google_key")?,
 
-            twitch_client_id: Config::get_option_required(&ini, "twitch_clientid")?,
+            twitch_client_id: ClientId::new(Config::get_option_required(&ini, "twitch_clientid")?),
+            twitch_client_secret: ClientSecret::new(Config::get_option_required(
+                &ini,
+                "twitch_clientsecret",
+            )?),
 
             discord_botsecret: Config::get_option_required(&ini, "discord_botsecret")?,
 
@@ -123,33 +121,26 @@ impl Config {
                 .unwrap_or("[TEMP]")
                 .trim()
                 .into(),
-            announcements: ChannelId(
-                Config::get_option_parsed(&ini, "discord_channel_announcements")?
-                    .unwrap_or(322643668831961088),
+            announcements: Config::get_option_parsed(&ini, "discord_channel_announcements")?
+                .unwrap_or(Id::new(322643668831961088)),
+            voice_category: Config::get_option_parsed(&ini, "discord_category_voice")?
+                .unwrap_or(Id::new(360796352357072896)),
+            mods_channel: Config::get_option_parsed(&ini, "discord_channel_mods")?
+                .unwrap_or(Id::new(289166968307712000u64)),
+            general_channel: if let Some(channel_id) =
+                Config::get_option_parsed(&ini, "discord_channel_general")?
+            {
+                channel_id
+            } else {
+                Config::get_option_parsed(&ini, "discord_serverid")?
+                    .unwrap_or(Id::new(288920509272555520))
+            },
+            guild: Config::get_option_parsed(&ini, "discord_serverid")?
+                .unwrap_or(Id::new(288920509272555520)),
+            twitter_api: KeyPair::new(
+                Config::get_option_required(&ini, "twitter_api_key")?,
+                Config::get_option_required(&ini, "twitter_api_secret")?,
             ),
-            voice_category: ChannelId(
-                Config::get_option_parsed(&ini, "discord_category_voice")?
-                    .unwrap_or(360796352357072896),
-            ),
-            mods_channel: ChannelId(
-                Config::get_option_parsed(&ini, "discord_channel_mods")?
-                    .unwrap_or(289166968307712000),
-            ),
-            general_channel: ChannelId(
-                if let Some(channel_id) =
-                    Config::get_option_parsed(&ini, "discord_channel_general")?
-                {
-                    channel_id
-                } else {
-                    Config::get_option_parsed(&ini, "discord_serverid")?
-                        .unwrap_or(288920509272555520)
-                },
-            ),
-            guild: GuildId(
-                Config::get_option_parsed(&ini, "discord_serverid")?.unwrap_or(288920509272555520),
-            ),
-            twitter_api_key: Config::get_option_required(&ini, "twitter_api_key")?,
-            twitter_api_secret: Config::get_option_required(&ini, "twitter_api_secret")?,
             twitter_users: ini
                 .section(Some("eris.twitter"))
                 .map(|section| {
@@ -160,19 +151,17 @@ impl Config {
                                 name.to_lowercase(),
                                 channels
                                     .split(',')
-                                    .map(|id| Ok(ChannelId(str::parse(id)?)))
-                                    .collect::<Result<Vec<ChannelId>, Error>>()?,
+                                    .map(|id| Ok(str::parse(id)?))
+                                    .collect::<Result<Vec<Id<ChannelMarker>>, Error>>()?,
                             ))
                         })
-                        .collect::<Result<HashMap<String, Vec<ChannelId>>, Error>>()
+                        .collect::<Result<HashMap<String, Vec<Id<ChannelMarker>>>, Error>>()
                 })
                 .unwrap_or_else(|| {
                     let mut twitter = HashMap::new();
-                    twitter.insert(
-                        String::from("loadingreadyrun"),
-                        vec![ChannelId(322643668831961088)],
-                    );
-                    twitter.insert(String::from("desertbus"), vec![ChannelId(370211226564689921)]);
+                    twitter
+                        .insert(String::from("loadingreadyrun"), vec![Id::new(322643668831961088)]);
+                    twitter.insert(String::from("desertbus"), vec![Id::new(370211226564689921)]);
                     Ok(twitter)
                 })?,
 
@@ -180,11 +169,12 @@ impl Config {
                 .get_from(Some("lrrbot"), "discord_contact_spreadsheet")
                 .map(String::from),
 
-            influxdb: ini
-                .get_from(Some("eris"), "influxdb")
-                .map(Url::parse)
-                .transpose()
-                .context("failed to parse `[eris].influxdb`")?,
+            influxdb: {
+                let url = ini.get_from(Some("eris"), "influxdb").map(String::from);
+                let db = ini.get_from(Some("eris"), "influxdb_database").map(String::from);
+
+                url.and_then(|url| db.map(|db| (url, db)))
+            },
         })
     }
 

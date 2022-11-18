@@ -4,4 +4,4 @@ mod server;
 
 pub use self::client::{Client, NewClient};
 pub use self::codec::{Exception, Request};
-pub use self::server::{Handler, Server};
+pub use self::server::{Route, Server};

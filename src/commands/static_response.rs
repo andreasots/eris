@@ -1,55 +1,123 @@
-use crate::extract::Extract;
-use crate::rpc::LRRbot;
+use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+
 use anyhow::{Context as _, Error};
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Deserializer};
-use serenity::framework::standard::macros::hook;
-use serenity::framework::standard::{Args, Delimiter};
-use serenity::model::channel::Message;
-use serenity::prelude::*;
-use serenity::utils::Colour;
-use std::collections::HashMap;
-use tracing::{error, info};
+use tracing::info;
+use twilight_cache_inmemory::model::CachedMember;
+use twilight_cache_inmemory::InMemoryCache;
+use twilight_http::Client as DiscordClient;
+use twilight_model::channel::message::MessageFlags;
+use twilight_model::channel::Message;
+
+use crate::command_parser::{Access, Args, CommandHandler, Commands};
+use crate::config::Config;
+use crate::rpc::LRRbot;
+
+pub struct Static {
+    lrrbot: Arc<LRRbot>,
+}
+
+impl Static {
+    pub fn new(lrrbot: Arc<LRRbot>) -> Self {
+        Self { lrrbot }
+    }
+}
+
+impl CommandHandler for Static {
+    fn pattern(&self) -> &str {
+        r"(.*)"
+    }
+
+    fn help(&self) -> Option<crate::command_parser::Help> {
+        None
+    }
+
+    fn handle<'a>(
+        &'a self,
+        cache: &'a InMemoryCache,
+        config: &'a Config,
+        discord: &'a DiscordClient,
+        _: Commands<'a>,
+        message: &'a Message,
+        args: &'a Args,
+    ) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send + 'a>> {
+        Box::pin(async move {
+            let Some(command) = args.get(0) else {
+                return Ok(())
+            };
+            let command = extract_command(command);
+
+            let response = self
+                .lrrbot
+                .get_data::<Response>(vec![String::from("responses"), command])
+                .await
+                .context("failed to fetch the command")?;
+
+            if let Response::Some { access, response } = response {
+                let access = Access::from(access);
+                let guild_id = message.guild_id.unwrap_or(config.guild);
+                if access.user_has_access(message.author.id, guild_id, cache) {
+                    let response = response.choose(&mut rand::thread_rng());
+                    if let Some(response) = response {
+                        let mut vars = HashMap::new();
+                        vars.insert(
+                            "user".to_string(),
+                            message
+                                .guild_id
+                                .and_then(|guild_id| cache.member(guild_id, message.author.id))
+                                .as_deref()
+                                .and_then(CachedMember::nick)
+                                .unwrap_or(&message.author.name)
+                                .to_string(),
+                        );
+
+                        let response = strfmt::strfmt(response, &vars)
+                            .context("failed to format the reply")?;
+
+                        discord
+                            .create_message(message.channel_id)
+                            .reply(message.id)
+                            .flags(MessageFlags::SUPPRESS_EMBEDS)
+                            .content(&response)
+                            .context("reply message invalid")?
+                            .await
+                            .context("failed to reply to command")?;
+                    }
+                } else {
+                    info!(?access, "Refusing to reply because user lacks access");
+                    crate::command_parser::refuse_access(
+                        discord,
+                        message.channel_id,
+                        message.id,
+                        access,
+                    )
+                    .await?;
+                }
+            }
+
+            Ok(())
+        })
+    }
+}
 
 #[derive(Deserialize, Debug, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "lowercase")]
-enum Access {
+enum StoredAccess {
     Any,
     Sub,
     Mod,
 }
 
-impl Access {
-    async fn user_has_access(self, ctx: &Context, msg: &Message) -> bool {
-        match self {
-            Access::Any => true,
-            Access::Sub => {
-                // A user is a "subscriber" if they have a coloured role
-                if let Some(guild) = msg.guild(ctx) {
-                    if let Ok(member) = guild.member(ctx, msg.author.id).await {
-                        for role_id in &member.roles {
-                            if let Some(role) = guild.roles.get(role_id) {
-                                if role.colour != Colour::default() {
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                false
-            }
-            Access::Mod => {
-                if let Some(guild) = msg.guild(ctx) {
-                    if let Ok(member) = guild.member(&ctx, &msg.author.id).await {
-                        if let Ok(permissions) = member.permissions(ctx) {
-                            return permissions.administrator();
-                        }
-                    }
-                }
-
-                false
-            }
+impl From<StoredAccess> for Access {
+    fn from(access: StoredAccess) -> Self {
+        match access {
+            StoredAccess::Any => Access::All,
+            StoredAccess::Sub => Access::SubOnly,
+            StoredAccess::Mod => Access::ModOnly,
         }
     }
 }
@@ -58,7 +126,7 @@ impl Access {
 #[serde(untagged)]
 enum Response {
     Some {
-        access: Access,
+        access: StoredAccess,
         #[serde(deserialize_with = "string_or_seq_string")]
         response: Vec<String>,
     },
@@ -96,101 +164,20 @@ where
     deserializer.deserialize_any(StringOrVec)
 }
 
-async fn static_response_impl(ctx: &Context, msg: &Message, command: &str) -> Result<(), Error> {
-    info!(
-        command_name = command,
-        message = msg.content.as_str(),
-        message.id = msg.id.0,
-        from.id = msg.author.id.0,
-        from.name = msg.author.name.as_str(),
-        from.discriminator = msg.author.discriminator,
-        "Static command received"
-    );
-
-    let response = ctx
-        .data
-        .read()
-        .await
-        .extract::<LRRbot>()?
-        .get_data::<Response>(vec![String::from("responses"), String::from(command)])
-        .await
-        .context("failed to fetch the command")?;
-
-    if let Response::Some { access, response } = response {
-        if access.user_has_access(ctx, msg).await {
-            let response = response.choose(&mut rand::thread_rng());
-            if let Some(response) = response {
-                let name;
-                let mut vars = HashMap::<String, &str>::new();
-                vars.insert(
-                    "user".into(),
-                    if let Some(guild_id) = msg.guild_id {
-                        if let Some(nick) = msg.author.nick_in(&ctx, guild_id).await {
-                            name = nick;
-                            name.as_str()
-                        } else {
-                            msg.author.name.as_str()
-                        }
-                    } else {
-                        msg.author.name.as_str()
-                    },
-                );
-                let response =
-                    strfmt::strfmt(response, &vars).context("failed to format the reply")?;
-                msg.reply(ctx, &response).await.context("failed to send a reply")?;
-            }
-        } else {
-            info!(
-                message.id = msg.id.0,
-                access_required = ?access,
-                "Refusing to reply because user lacks access"
-            );
+fn extract_command(cmd: &str) -> String {
+    let mut command = String::new();
+    for (i, part) in cmd.split_whitespace().enumerate() {
+        if i != 0 {
+            command.push_str(" ");
         }
+        command.push_str(part);
     }
-
-    Ok(())
-}
-
-#[hook]
-pub async fn static_response(ctx: &Context, msg: &Message, command: &str) {
-    match static_response_impl(ctx, msg, &extract_command(&msg.content, command)).await {
-        Ok(()) => (),
-        Err(error) => {
-            error!(message.id = msg.id.0, ?error, "Static command resulted in an unexpected error");
-
-            let _ = msg
-                .reply(
-                    ctx,
-                    &format!(
-                        "Simple text response command resulted in an unexpected error: {}.",
-                        error
-                    ),
-                )
-                .await;
-        }
-    }
-}
-
-fn extract_command(msg: &str, command: &str) -> String {
-    let index = msg.find(command).unwrap();
-    // FIXME: extract the delimiter from the framework configuration
-    let mut args = Args::new(&msg[index + command.len()..], &[Delimiter::Single(' ')]);
-
-    let mut command = String::from(command);
-    while let Some(arg) = args.trimmed().current() {
-        if !arg.is_empty() {
-            command.push(' ');
-            command.push_str(arg);
-        }
-        args.advance();
-    }
-
     command
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Access, Response};
+    use super::{Response, StoredAccess};
 
     #[test]
     fn test_deserialize_single_response() {
@@ -201,7 +188,7 @@ mod tests {
         assert_eq!(
             res,
             Response::Some {
-                access: Access::Any,
+                access: StoredAccess::Any,
                 response: vec!["Help: https://lrrbot.com/help".into()]
             }
         );
@@ -214,7 +201,10 @@ mod tests {
                 .unwrap();
         assert_eq!(
             res,
-            Response::Some { access: Access::Sub, response: vec!["peach".into(), "barf".into()] }
+            Response::Some {
+                access: StoredAccess::Sub,
+                response: vec!["peach".into(), "barf".into()]
+            }
         );
     }
 
@@ -226,8 +216,8 @@ mod tests {
 
     #[test]
     fn extract_command() {
-        assert_eq!(super::extract_command(" \t ! \t some \t command \t ", "some"), "some command");
-        assert_eq!(super::extract_command("!command", "command"), "command");
-        assert_eq!(super::extract_command("<@!1234> some command", "some"), "some command");
+        assert_eq!(super::extract_command(" \t  \t some \t command \t "), "some command");
+        assert_eq!(super::extract_command("command"), "command");
+        assert_eq!(super::extract_command("some command"), "some command");
     }
 }

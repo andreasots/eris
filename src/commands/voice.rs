@@ -1,34 +1,92 @@
+use std::borrow::Cow;
+use std::future::Future;
+use std::pin::Pin;
+
+use anyhow::{Context, Error};
+use twilight_cache_inmemory::InMemoryCache;
+use twilight_http::Client as DiscordClient;
+use twilight_model::channel::message::MessageFlags;
+use twilight_model::channel::{Channel, ChannelType, Message};
+
+use crate::command_parser::{Args, CommandHandler, Commands, Help};
 use crate::config::Config;
-use crate::extract::Extract;
-use serenity::framework::standard::macros::{command, group};
-use serenity::framework::standard::{Args, CommandResult};
-use serenity::model::prelude::*;
-use serenity::prelude::*;
 
-#[group("Voice")]
-#[description = "Voice channel commands"]
-#[commands(voice)]
-struct Voice;
+pub struct Voice;
 
-#[command]
-#[description = "Create a temporary voice channel. Unused temporary voice channels will be automatically deleted if they're older than 15 minutes."]
-#[usage = "CHANNEL NAME"]
-#[example = "PUBG #15"]
-pub async fn voice(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-    let data = ctx.data.read().await;
-    let config = data.extract::<Config>()?;
+impl Voice {
+    pub fn new() -> Self {
+        Self
+    }
 
-    let name = format!("{} {}", config.temp_channel_prefix, args.rest().trim());
-    let reply = match config
-        .guild
-        .create_channel(&ctx, |c| {
-            c.name(name).category(config.voice_category).kind(ChannelType::Voice)
+    pub async fn exec(
+        &self,
+        config: &Config,
+        discord: &DiscordClient,
+        name: &str,
+    ) -> Result<Channel, Error> {
+        let name = format!("{} {name}", config.temp_channel_prefix);
+        let channel = discord
+            .create_guild_channel(config.guild, &name)
+            .context("invalid channel name")?
+            .kind(ChannelType::GuildVoice)
+            .parent_id(config.voice_category)
+            .await
+            .context("failed to create the temporary voice channel")?
+            .model()
+            .await
+            .context("failed to parse the response")?;
+        Ok(channel)
+    }
+}
+
+impl CommandHandler for Voice {
+    fn pattern(&self) -> &str {
+        "voice (.+)"
+    }
+
+    fn help(&self) -> Option<Help> {
+        Some(Help {
+            name: "voice".into(),
+            usage: "voice <CHANNEL NAME>".into(),
+            summary: "Create a temporary voice channel".into(),
+            description: concat!(
+                "Create a temporary voice channel.\n\n",
+                "Unused temporary voice channels will be automatically deleted if they're older ",
+                "than 15 minutes.",
+            )
+            .into(),
+            examples: Cow::Borrowed(&[Cow::Borrowed("voice PUBG #15")]),
         })
-        .await
-    {
-        Ok(channel) => format!("Created a temporary voice channel {:?}", channel.name),
-        Err(err) => format!("Failed to create a temporary voice channel: {}", err),
-    };
-    msg.reply(&ctx, &reply).await?;
-    Ok(())
+    }
+
+    fn handle<'a>(
+        &'a self,
+        _: &'a InMemoryCache,
+        config: &'a Config,
+        discord: &'a DiscordClient,
+        _: Commands<'a>,
+        message: &'a Message,
+        args: &'a Args,
+    ) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send + 'a>> {
+        Box::pin(async move {
+            let content = match self.exec(config, discord, args.get(0).unwrap()).await {
+                Ok(channel) => format!(
+                    "Created a temporary voice channel \"{}\"",
+                    channel.name.as_deref().map(crate::markdown::escape).as_deref().unwrap_or("")
+                ),
+                Err(error) => format!("Failed to create a temporary voice channel: {}", error),
+            };
+
+            discord
+                .create_message(message.channel_id)
+                .reply(message.id)
+                .flags(MessageFlags::SUPPRESS_EMBEDS)
+                .content(&content)
+                .context("invalid response message")?
+                .await
+                .context("failed to respond to command")?;
+
+            Ok(())
+        })
+    }
 }

@@ -1,10 +1,10 @@
 [package]
 name = "eris"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Andreas Ots <qrpth@qrpth.eu>"]
 license = "Apache-2.0"
 readme = "README.md"
-edition = "2018"
+edition = "2021"
 build = "build.rs"
 
 [build-dependencies]
@@ -14,17 +14,15 @@ lalrpop = { version = "0.19.8", default-features = false, features = ["lexer"] }
 anyhow = { version = "1.0.66", default-features = false, features = ["std"] }
 bytes = { version = "1.2.1", default-features = false }
 clap = { version = "4.0.22", default-features = false, features = ["std"] }
-egg-mode-text = { version = "1.15.0", default-features = false }
-eris-macros = { path = "eris-macros" }
+egg-mode = { version = "0.16.0", default-features = false, features = ["rustls"] }
 futures = { version = "0.3.25", default-features = false, features = ["std", "async-await"] }
-inventory = { version = "0.3.2", default-features = false }
-joinery = "3.1.0"
-jsonwebtoken = { version = "8.1.1", default-features = false, features = ["use_pem"] }
-lalrpop-util = { version = "0.19.8", default-features = false }
+google-calendar3 = "4.0.1"
+google-sheets4 = "4.0.1"
+influxdb = { version = "0.5.2", default-features = false, features = ["derive", "reqwest-client-rustls"] }
+lalrpop-util = { version = "0.19.8", features = ["std", "lexer"], default-features = false }
 lazy_static = { version = "1.4.0", default-features = false }
 levenshtein = "1.0.5"
 log = { version = "0.4.17", default-features = false, features = ["max_level_info", "release_max_level_info", "std"] }
-ordinal = "0.3.2"
 rand = { version = "0.8.5", default-features = false, features = ["std", "std_rng"] }
 regex = { version = "1.7.0", default-features = false, features = ["perf", "std", "unicode"] }
 reqwest = { version = "0.11.12", default-features = false, features = ["rustls-tls", "json"] }
@@ -33,7 +31,6 @@ sea-orm = { version = "0.10.2", default-features = false, features = ["sqlx-post
 separator = { version = "0.4.1", default-features = false }
 serde = { version = "1.0.147", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.87", default-features = false }
-serenity = { version = "0.11.5", default-features = false, features = ["gateway", "cache", "rustls_backend", "standard_framework", "time"] }
 strfmt = { version = "0.2.2", default-features = false }
 time = { version = "0.3.17", default-features = false, features = ["formatting", "parsing", "macros", "serde", "serde-well-known"] }
 time-tz = { version = "1.0.2", default-features = false, features = ["db"] }
@@ -41,6 +38,13 @@ tokio = { version = "1.20.1", default-features = false, features = ["net", "fs",
 tokio-util = { version = "0.7.4", default-features = false, features = ["codec"] }
 tracing = { version = "0.1.37", default-features = false, features = ["std", "attributes", "max_level_trace", "release_max_level_debug"] }
 tracing-subscriber = { version = "0.3.16", default-features = false, features = ["fmt", "std", "time", "env-filter", "json", "tracing-log"] }
+twilight-cache-inmemory = { version = "0.14.0", default-features = false, features = ["permission-calculator"] }
+twilight-gateway = { version = "0.14.0", default-features = false, features = ["rustls-native-roots", "zlib-stock"] }
+twilight-http = { version = "0.14.0", default-features = false, features = ["decompression", "rustls-native-roots"] }
+twilight-model = "0.14.0"
+twilight-util = { version = "0.14.0", default-features = false, features = ["builder", "snowflake"] }
+twilight-validate = "0.14.0"
+twitch_api = { version = "0.7.0-rc.2", features = ["all", "reqwest"] }
 unicode-segmentation = "1.10.0"
 unicode-width = { version = "0.1.10", default-features = false }
 url = { version = "2.3.1", default-features = false }

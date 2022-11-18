@@ -1,144 +1,145 @@
+use std::borrow::Cow;
+use std::future::Future;
+use std::pin::Pin;
+
+use anyhow::{Context as _, Error};
+use futures::TryStreamExt;
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use twilight_cache_inmemory::InMemoryCache;
+use twilight_http::Client as DiscordClient;
+use twilight_model::channel::message::MessageFlags;
+use twilight_model::channel::Message;
+use twitch_api::helix::streams::Stream;
+use twitch_api::twitch_oauth2::{AccessToken, UserToken};
+use twitch_api::HelixClient;
+
+use crate::command_parser::{Args, CommandHandler, Commands, Help};
 use crate::config::Config;
-use crate::extract::Extract;
 use crate::models::user;
-use crate::twitch::helix::{Game, GameId, Stream, User as TwitchUser, UserId};
-use crate::twitch::Helix;
-use crate::typemap_keys::PgPool;
-use anyhow::Context as _;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-use serenity::framework::standard::macros::{command, group};
-use serenity::framework::standard::{Args, CommandResult};
-use serenity::model::prelude::*;
-use serenity::prelude::*;
-use serenity::utils::MessageBuilder;
-use std::collections::HashMap;
 
-#[group("Fanstreams")]
-#[description = "Fanstream commands"]
-#[commands(live)]
-struct Fanstreams;
-
-fn push_stream(
-    builder: &mut MessageBuilder,
-    users: &HashMap<&str, &TwitchUser>,
-    games: &HashMap<&str, &Game>,
-    stream: &Stream,
-) {
-    // FIXME: the MessageBuilder doesn't escape spoilers
-    builder.push_safe(&stream.user_name.replace('|', "\\|"));
-    builder.push(" (<https://twitch.tv/");
-    builder.push(&users[stream.user_id.as_str()].login);
-    builder.push(">)");
-    builder.push(" is playing ");
-    builder.push_safe(&games[stream.game_id.as_str()].name.replace('|', "\\|"));
-    builder.push(" (");
-    builder.push_safe(&stream.title.replace('|', "\\|"));
-    builder.push(")");
+pub struct Live {
+    db: DatabaseConnection,
+    helix: HelixClient<'static, reqwest::Client>,
 }
 
-#[command]
-#[help_available]
-#[description = "Post the currently live fanstreamers."]
-#[num_args(0)]
-async fn live(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
-    let data = ctx.data.read().await;
-    let user = {
-        let conn = data.extract::<PgPool>()?;
+impl Live {
+    pub fn new(db: DatabaseConnection, helix: HelixClient<'static, reqwest::Client>) -> Self {
+        Self { db, helix }
+    }
+}
 
-        user::Entity::find()
-            .filter(user::Column::Name.eq(&data.extract::<Config>()?.username[..]))
-            .one(conn)
+impl CommandHandler for Live {
+    fn pattern(&self) -> &str {
+        "live"
+    }
+
+    fn help(&self) -> Option<Help> {
+        Some(Help {
+            name: "live".into(),
+            usage: "live".into(),
+            summary: "Post the currently live fanstreamers".into(),
+            description: "Post the currently live fanstreamers.".into(),
+            examples: Cow::Borrowed(&[]),
+        })
+    }
+
+    fn handle<'a>(
+        &'a self,
+        _: &'a InMemoryCache,
+        config: &'a Config,
+        discord: &'a DiscordClient,
+        _: Commands<'a>,
+        message: &'a Message,
+        _: &'a Args,
+    ) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send + 'a>> {
+        Box::pin(async move {
+            let user = {
+                user::Entity::find()
+                    .filter(user::Column::Name.eq(&config.username[..]))
+                    .one(&self.db)
+                    .await
+                    .context("failed to load the bot user")?
+                    .context("bot user missing")?
+            };
+
+            let token = AccessToken::new(user.twitch_oauth.context("bot user token missing")?);
+            let token = UserToken::from_existing(
+                self.helix.get_client(),
+                token,
+                None,
+                Some(config.twitch_client_secret.clone()),
+            )
             .await
-            .context("failed to load the bot user")?
-            .context("bot user missing")?
-    };
+            .context("failed to validate the bot user token")?;
 
-    let helix = data.extract::<Helix>()?;
+            let mut streams = get_followed_streams(&self.helix, &token)
+                .try_collect::<Vec<_>>()
+                .await
+                .context("failed to fetch the streams")?;
+            let mut content;
 
-    let token = user.twitch_oauth.as_ref().map(String::as_str).context("token missing")?;
+            discord
+                .create_message(message.channel_id)
+                .reply(message.id)
+                .content(if streams.is_empty() {
+                    "No fanstreamers currently live."
+                } else {
+                    streams.sort_by(|a, b| a.user_name.cmp(&b.user_name));
+                    content = String::from("Currently live fanstreamers: ");
 
-    let follows = helix
-        .get_user_follows(token, Some(&user.id.to_string()), None)
-        .await
-        .context("failed to get the follows")?;
+                    for (i, stream) in streams.iter().enumerate() {
+                        if i != 0 {
+                            content.push_str(", ");
+                        }
+                        content.push_str(&crate::markdown::escape(&stream.user_name.as_str()));
+                        content.push_str(" (https://twitch.tv/");
+                        content.push_str(&stream.user_login.as_str());
+                        content.push_str(") is playing ");
+                        content.push_str(&crate::markdown::escape(&stream.game_name));
+                        content.push_str(" (");
+                        content.push_str(&crate::markdown::escape(&stream.title));
+                        content.push_str(")");
+                    }
+                    &content
+                })
+                .context("response message content invalid")?
+                .flags(MessageFlags::SUPPRESS_EMBEDS)
+                .await
+                .context("failed to reply to command")?;
 
-    let users = follows.iter().map(|follow| UserId::Id(&follow.to_id)).collect::<Vec<_>>();
-
-    let mut streams =
-        helix.get_streams(token, &users).await.context("failed to get the streams")?;
-
-    let users = streams.iter().map(|stream| UserId::Id(&stream.user_id)).collect::<Vec<_>>();
-
-    let users = helix.get_users(token, &users).await.context("failed to get the streamers")?;
-
-    let games = streams.iter().map(|stream| GameId::Id(&stream.game_id)).collect::<Vec<_>>();
-
-    let games = helix.get_games(token, &games).await.context("failed to get the games")?;
-
-    let games = games.iter().map(|game| (game.id.as_str(), game)).collect::<HashMap<_, _>>();
-    let users = users.iter().map(|user| (user.id.as_str(), user)).collect::<HashMap<_, _>>();
-
-    if streams.is_empty() {
-        msg.reply(&ctx, "No fanstreamers currently live.").await?;
-    } else {
-        streams.sort_by(|a, b| a.user_name.cmp(&b.user_name));
-        let mut builder = MessageBuilder::new();
-        builder.push("Currently live fanstreamers: ");
-
-        for (i, stream) in streams.iter().enumerate() {
-            if i != 0 {
-                builder.push(", ");
-            }
-            push_stream(&mut builder, &users, &games, &stream);
-        }
-        msg.reply(&ctx, builder.build()).await?;
+            Ok(())
+        })
     }
-
-    Ok(())
 }
 
-#[cfg(test)]
-mod test {
-    use super::push_stream;
-    use crate::twitch::helix::{Game, Stream, User};
-    use serenity::utils::MessageBuilder;
-    use std::collections::HashMap;
-    use time::format_description::well_known::Rfc3339;
-    use time::OffsetDateTime;
+// Literally just `HelixClient::get_followed_streams` but the returned stream is `Send`.
+// The returned stream is already send but not defined as such in the interface.
+fn get_followed_streams<'a, T, C>(
+    client: &'a HelixClient<'a, C>,
+    token: &'a T,
+) -> std::pin::Pin<
+    Box<
+        dyn futures::Stream<
+                Item = Result<
+                    Stream,
+                    twitch_api::helix::ClientRequestError<<C as twitch_api::HttpClient<'a>>::Error>,
+                >,
+            > + Send
+            + 'a,
+    >,
+>
+where
+    T: twitch_api::twitch_oauth2::TwitchToken + Send + Sync + ?Sized,
+    C: twitch_api::HttpClient<'a> + Sync,
+{
+    use futures::StreamExt;
 
-    #[test]
-    fn formatting() {
-        let qrpth = User {
-            id: "29801300".to_string(),
-            login: "qrpth".to_string(),
-            display_name: "qrpth".to_string(),
-        };
-
-        let mut users = HashMap::new();
-        users.insert(qrpth.id.as_str(), &qrpth);
-
-        let minesweeper = Game {
-            id: "3681".to_string(),
-            name: "Minesweeper".to_string(),
-            box_art_url: "https://".to_string(),
-        };
-
-        let mut games = HashMap::new();
-        games.insert(minesweeper.id.as_str(), &minesweeper);
-
-        let mut builder = MessageBuilder::new();
-        push_stream(
-            &mut builder,
-            &users,
-            &games,
-            &Stream {
-                game_id: "3681".to_string(),
-                started_at: OffsetDateTime::parse("2020-04-07T11:45:20Z", &Rfc3339).unwrap(),
-                title: "Let's explode || Minesweeper".to_string(),
-                user_id: "29801300".to_string(),
-                user_name: "qrpth".to_string(),
-            },
-        );
-        assert_eq!(builder.build(), "qrpth (<https://twitch.tv/qrpth>) is playing Minesweeper (Let\'s explode \\|\\| Minesweeper)");
-    }
+    let user_id = match token.user_id().ok_or_else(|| {
+        twitch_api::helix::ClientRequestError::Custom("no user_id found on token".into())
+    }) {
+        Ok(t) => t,
+        Err(e) => return futures::stream::once(async { Err(e) }).boxed(),
+    };
+    let req = twitch_api::helix::streams::GetFollowedStreamsRequest::user_id(user_id);
+    twitch_api::helix::make_stream(req, token, client, std::collections::VecDeque::from)
 }

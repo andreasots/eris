@@ -1,8 +1,9 @@
-use crate::aiomas::{Client, Exception, NewClient, Request};
 use anyhow::{Context, Error};
 use futures::channel::oneshot;
 use futures::lock::Mutex;
 use serde_json::Value;
+
+use crate::aiomas::{Client, Exception, NewClient, Request};
 
 // FIXME: this should be generic over the factory but that requires generic associated types and
 //  existential types.

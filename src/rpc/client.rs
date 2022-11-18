@@ -1,11 +1,13 @@
-use crate::aiomas::NewClient;
-use crate::config::Config;
-use crate::service::{Reconnect, Retry};
+use std::collections::HashMap;
+
 use anyhow::{Context, Error};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
-use std::collections::HashMap;
+
+use crate::aiomas::NewClient;
+use crate::config::Config;
+use crate::service::{Reconnect, Retry};
 
 #[derive(Copy, Clone, Debug, Deserialize)]
 pub struct GameId {

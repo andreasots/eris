@@ -1,69 +1,44 @@
-use crate::config::Config;
-use crate::context::ErisContext;
-use crate::extract::Extract;
-use crate::models::game;
-use crate::models::game_entry;
-use crate::models::show;
-use crate::rpc::LRRbot;
-use crate::try_crosspost::TryCrosspost;
-use crate::typemap_keys::PgPool;
-use anyhow::{Context, Error};
-use eris_macros::rpc_handler;
-use sea_orm::EntityTrait;
+use std::sync::Arc;
+
+use anyhow::{Context as _, Error};
+use sea_orm::{DatabaseConnection, EntityTrait};
 use serde::Deserialize;
-use std::fmt::{self, Display};
 use tracing::error;
+use twilight_http::Client as DiscordClient;
+use twilight_model::channel::message::MessageFlags;
+
+use crate::aiomas::Route;
+use crate::config::Config;
+use crate::models::{game, game_entry, show};
+use crate::rpc::LRRbot;
 
 #[derive(Deserialize)]
 pub struct Channel {
-    pub display_name: Option<String>,
-    pub login: String,
-    pub status: Option<String>,
-    pub live: bool,
+    display_name: Option<String>,
+    login: String,
+    status: Option<String>,
 }
 
-struct StreamUp {
+async fn stream_up_inner(
+    config: &Config,
+    db: &DatabaseConnection,
+    discord: &DiscordClient,
+    lrrbot: &LRRbot,
+
     channel: Channel,
-    what: String,
-}
-
-impl Display for StreamUp {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.channel.display_name.as_ref().unwrap_or(&self.channel.login))?;
-        f.write_str(" is live with ")?;
-        f.write_str(&self.what)?;
-        if let Some(ref status) = self.channel.status {
-            f.write_str(" (")?;
-            f.write_str(&status)?;
-            f.write_str(")")?;
-        }
-        f.write_str("! <https://twitch.tv/")?;
-        f.write_str(&self.channel.login)?;
-        f.write_str(">")?;
-        Ok(())
-    }
-}
-
-async fn stream_up_inner(ctx: &ErisContext, channel: Channel) -> Result<(), Error> {
-    let data = ctx.data.read().await;
-    let lrrbot = data.extract::<LRRbot>()?;
-    let announcements_channel = data.extract::<Config>()?.announcements;
-
+) -> Result<(), Error> {
     let game_id = lrrbot.get_game_id().await.context("failed to get the game ID")?;
     let show_id = lrrbot.get_show_id().await.context("failed to get the show ID")?;
 
     let (game, show, game_entry) = {
-        let data = ctx.data.read().await;
-        let conn = data.extract::<PgPool>()?;
-
         let (game, game_entry) = if let Some(game_id) = game_id {
             (
                 game::Entity::find_by_id(game_id)
-                    .one(conn)
+                    .one(db)
                     .await
                     .context("failed to load the game")?,
                 game_entry::Entity::find_by_id((game_id, show_id))
-                    .one(conn)
+                    .one(db)
                     .await
                     .context("failed to load the game entry")?,
             )
@@ -71,7 +46,7 @@ async fn stream_up_inner(ctx: &ErisContext, channel: Channel) -> Result<(), Erro
             (None, None)
         };
         let show =
-            show::Entity::find_by_id(show_id).one(conn).await.context("failed to load the show")?;
+            show::Entity::find_by_id(show_id).one(db).await.context("failed to load the show")?;
 
         (game, show, game_entry)
     };
@@ -90,24 +65,56 @@ async fn stream_up_inner(ctx: &ErisContext, channel: Channel) -> Result<(), Erro
         }
     };
 
-    announcements_channel
-        .say(ctx, format!("{}", StreamUp { channel, what }))
+    let mut message = String::new();
+    message.push_str(&channel.display_name.as_ref().unwrap_or(&channel.login));
+    message.push_str(" is live with ");
+    message.push_str(&what);
+    if let Some(ref status) = channel.status {
+        message.push_str(" (");
+        message.push_str(&crate::markdown::escape(&status));
+        message.push_str(")");
+    }
+    message.push_str("! <https://twitch.tv/");
+    message.push_str(&channel.login);
+    message.push_str(">");
+
+    let message = discord
+        .create_message(config.announcements)
+        .flags(MessageFlags::SUPPRESS_EMBEDS)
+        .content(&message)
+        .context("stream up message is invalid")?
         .await
-        .context("failed to send the announcement message")?
-        .try_crosspost(ctx)
+        .context("failed to send the announcement message request")?
+        .model()
         .await
-        .context("failed to crosspost the announcement message")?;
+        .context("failed to parse the annoucement message response")?;
+
+    if let Err(error) = discord.crosspost_message(message.channel_id, message.id).await {
+        error!(?error, "failed to crosspost the stream up announcement");
+    }
 
     Ok(())
 }
 
-#[rpc_handler("announcements/stream_up")]
-pub async fn stream_up(ctx: ErisContext, data: Channel) -> Result<(), Error> {
-    let res = stream_up_inner(&ctx, data).await;
+pub fn stream_up(
+    config: Arc<Config>,
+    db: DatabaseConnection,
+    discord: Arc<DiscordClient>,
+    lrrbot: Arc<LRRbot>,
+) -> impl Route<(Channel,)> {
+    move |data| {
+        let config = config.clone();
+        let db = db.clone();
+        let discord = discord.clone();
+        let lrrbot = lrrbot.clone();
 
-    if let Err(ref error) = res {
-        error!(?error, "Failed to post a stream up announcement");
+        async move {
+            let ret = stream_up_inner(&config, &db, &discord, &lrrbot, data).await;
+            // `Result::inspect_err` is unstable :(
+            if let Err(ref error) = ret {
+                error!(?error, "Failed to post a stream up announcement");
+            }
+            ret
+        }
     }
-
-    res
 }

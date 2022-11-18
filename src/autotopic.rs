@@ -1,23 +1,27 @@
+use std::fmt;
+use std::sync::Arc;
+use std::time::Duration;
+
+use anyhow::{Context, Error};
+use sea_orm::{DatabaseConnection, EntityTrait};
+use separator::FixedPlaceSeparatable;
+use time::OffsetDateTime;
+use tokio::sync::RwLock;
+use tracing::error;
+use twilight_cache_inmemory::InMemoryCache;
+use twilight_http::Client as DiscordClient;
+use twitch_api::helix::streams::GetStreamsRequest;
+use twitch_api::twitch_oauth2::AppAccessToken;
+use twitch_api::types::UserNameRef;
+use twitch_api::HelixClient;
+
+use crate::calendar::{CalendarHub, Event};
 use crate::config::Config;
-use crate::context::ErisContext;
 use crate::desertbus::DesertBus;
-use crate::extract::Extract;
-use crate::google::calendar::{Calendar, Event, LRR};
-use crate::models::{game, game_entry, show, user};
+use crate::models::{game, game_entry, show};
 use crate::rpc::client::HeaderInfo;
 use crate::rpc::LRRbot;
 use crate::shorten::shorten;
-use crate::twitch::helix::UserId;
-use crate::twitch::Helix;
-use crate::typemap_keys::PgPool;
-use anyhow::{Context, Error};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-use separator::FixedPlaceSeparatable;
-use serenity::prelude::TypeMap;
-use std::fmt;
-use std::time::Duration;
-use time::OffsetDateTime;
-use tracing::error;
 
 const TOPIC_MAX_LEN: usize = 1024;
 // Hopefully normal messages don't contain this sequence.
@@ -36,12 +40,12 @@ impl<'a> fmt::Display for EventDisplay<'a> {
         write!(f, "<t:{}:R>: {} ", self.event.start.unix_timestamp(), self.event.summary)?;
 
         if let Some(ref location) = self.event.location {
-            write!(f, "({}) ", location)?;
+            write!(f, "({}) ", crate::markdown::escape(location))?;
         }
 
         if let Some(ref desc) = self.event.description {
-            // TODO: shorten to 200 characters.
-            write!(f, "({}) ", Calendar::format_description(desc))?;
+            let desc = crate::calendar::format_description(desc);
+            write!(f, "({}) ", crate::markdown::escape(&crate::shorten::shorten(&desc, 200)))?;
         }
         write!(f, "on <t:{}:F>.", self.event.start.unix_timestamp())?;
 
@@ -49,43 +53,78 @@ impl<'a> fmt::Display for EventDisplay<'a> {
     }
 }
 
-pub async fn autotopic(ctx: ErisContext) {
+pub async fn autotopic(
+    cache: Arc<InMemoryCache>,
+    calendar: CalendarHub,
+    config: Arc<Config>,
+    db: DatabaseConnection,
+    desertbus: DesertBus,
+    discord: Arc<DiscordClient>,
+    helix: HelixClient<'static, reqwest::Client>,
+    helix_token: Arc<RwLock<AppAccessToken>>,
+    lrrbot: Arc<LRRbot>,
+) {
     let mut timer = tokio::time::interval(Duration::from_secs(60));
-    let mut autotopic = Autotopic { last_updated: None };
+    let mut autotopic =
+        Autotopic::new(cache, calendar, config, db, desertbus, discord, helix, helix_token, lrrbot);
 
     loop {
         timer.tick().await;
 
-        if let Err(error) = autotopic.update_topic(&ctx).await {
+        if let Err(error) = autotopic.update_topic().await {
             error!(?error, "Failed to update the topic");
         }
     }
 }
 
-#[derive(Copy, Clone)]
 struct Autotopic {
     last_updated: Option<OffsetDateTime>,
+
+    cache: Arc<InMemoryCache>,
+    calendar: CalendarHub,
+    config: Arc<Config>,
+    db: DatabaseConnection,
+    desertbus: DesertBus,
+    discord: Arc<DiscordClient>,
+    helix: HelixClient<'static, reqwest::Client>,
+    helix_token: Arc<RwLock<AppAccessToken>>,
+    lrrbot: Arc<LRRbot>,
 }
 
 impl Autotopic {
-    async fn set_topic(
-        &mut self,
-        new_topic: &str,
-        is_dynamic: bool,
-        ctx: &ErisContext,
-        data: &TypeMap,
-    ) -> Result<(), Error> {
+    fn new(
+        cache: Arc<InMemoryCache>,
+        calendar: CalendarHub,
+        config: Arc<Config>,
+        db: DatabaseConnection,
+        desertbus: DesertBus,
+        discord: Arc<DiscordClient>,
+        helix: HelixClient<'static, reqwest::Client>,
+        helix_token: Arc<RwLock<AppAccessToken>>,
+        lrrbot: Arc<LRRbot>,
+    ) -> Self {
+        Self {
+            last_updated: None,
+            cache,
+            calendar,
+            config,
+            db,
+            desertbus,
+            discord,
+            helix,
+            helix_token,
+            lrrbot,
+        }
+    }
+
+    async fn set_topic(&mut self, new_topic: &str, is_dynamic: bool) -> Result<(), Error> {
         let new_topic = shorten(new_topic, TOPIC_MAX_LEN);
         let new_topic = new_topic.as_ref();
 
-        let mut channel = data
-            .extract::<Config>()?
-            .general_channel
-            .to_channel(&ctx)
-            .await
-            .context("failed to get the #general channel")?
-            .guild()
-            .context("#general is not a guild channel?")?;
+        let channel = self
+            .cache
+            .channel(self.config.general_channel)
+            .context("announcement channel not in cache")?;
 
         let old_topic = channel.topic.as_deref().unwrap_or_default();
 
@@ -116,23 +155,26 @@ impl Autotopic {
             }
         }
 
-        channel.edit(ctx, |c| c.topic(new_topic)).await.context("failed to update the topic")?;
+        self.discord
+            .update_channel(self.config.general_channel)
+            .topic(new_topic)
+            .context("new topic is invalid")?
+            .await
+            .context("failed to update the topic")?;
         self.last_updated = Some(now);
 
         Ok(())
     }
 
-    async fn update_topic(&mut self, ctx: &ErisContext) -> Result<(), Error> {
-        let data = ctx.data.read().await;
-
-        let header = match data.extract::<LRRbot>()?.get_header_info().await {
+    async fn update_topic(&mut self) -> Result<(), Error> {
+        let header = match self.lrrbot.get_header_info().await {
             Ok(header) => header,
             Err(error) => {
                 error!(?error, "failed to fetch header info");
 
                 HeaderInfo {
                     is_live: false,
-                    channel: data.extract::<Config>()?.channel.clone(),
+                    channel: self.config.channel.clone(),
                     current_game: None,
                     current_show: None,
                     advice: None,
@@ -143,55 +185,33 @@ impl Autotopic {
         let mut messages = vec![];
         let mut is_dynamic = false;
 
-        let user;
-        let game;
-        let show;
-        let game_entry;
-
-        {
-            let conn = data.extract::<PgPool>()?;
-
-            user = user::Entity::find()
-                .filter(user::Column::Name.eq(&data.extract::<Config>()?.username[..]))
-                .one(conn)
+        let game = if let Some(game) = header.current_game {
+            game::Entity::find_by_id(game.id)
+                .one(&self.db)
                 .await
-                .context("failed to load the bot user")?
-                .context("bot user missing")?;
+                .context("failed to load the game")?
+        } else {
+            None
+        };
 
-            if header.is_live {
-                game = if let Some(game) = header.current_game {
-                    game::Entity::find_by_id(game.id)
-                        .one(conn)
-                        .await
-                        .context("failed to load the game")?
-                } else {
-                    None
-                };
+        let show = if let Some(show) = header.current_show {
+            show::Entity::find_by_id(show.id)
+                .one(&self.db)
+                .await
+                .context("failed to load the show")?
+        } else {
+            None
+        };
 
-                show = if let Some(show) = header.current_show {
-                    show::Entity::find_by_id(show.id)
-                        .one(conn)
-                        .await
-                        .context("failed to load the show")?
-                } else {
-                    None
-                };
-
-                game_entry =
-                    if let (Some(game), Some(show)) = (header.current_game, header.current_show) {
-                        game_entry::Entity::find_by_id((game.id, show.id))
-                            .one(conn)
-                            .await
-                            .context("failed to load the game entry")?
-                    } else {
-                        None
-                    };
+        let game_entry =
+            if let (Some(game), Some(show)) = (header.current_game, header.current_show) {
+                game_entry::Entity::find_by_id((game.id, show.id))
+                    .one(&self.db)
+                    .await
+                    .context("failed to load the game entry")?
             } else {
-                game = None;
-                show = None;
-                game_entry = None;
-            }
-        }
+                None
+            };
 
         if header.is_live {
             match (game, show) {
@@ -214,22 +234,19 @@ impl Autotopic {
                 (None, None) => messages.push(String::from("Now live: something?")),
             }
 
-            match self.uptime_msg(&data, &user, &header.channel).await {
+            match self.uptime_msg(&header.channel).await {
                 Ok(msg) => messages.push(msg),
                 Err(error) => error!(?error, "failed to generate the uptime message"),
             }
         } else {
             let now = OffsetDateTime::now_utc();
 
-            let events = data
-                .extract::<Calendar>()?
-                .get_upcoming_events(LRR, now)
-                .await
-                .context("failed to get the next scheduled stream")?;
-            let events = Calendar::get_next_event(&events, now, false);
+            let events =
+                crate::calendar::get_next_event(&self.calendar, crate::calendar::LRR, now, false)
+                    .await
+                    .context("failed to get the next scheduled stream")?;
 
-            let (desertbus, desertbus_is_dynamic) =
-                self.desertbus(&data, &user, now, &events).await?;
+            let (desertbus, desertbus_is_dynamic) = self.desertbus(now, &events).await?;
             if !desertbus.is_empty() {
                 messages.extend(desertbus);
                 is_dynamic |= desertbus_is_dynamic;
@@ -246,38 +263,33 @@ impl Autotopic {
             topic.push_str(&advice);
         }
 
-        self.set_topic(&topic, is_dynamic, ctx, &data)
-            .await
-            .context("failed to update the topic")?;
+        self.set_topic(&topic, is_dynamic).await.context("failed to update the topic")?;
 
         Ok(())
     }
 
-    async fn uptime_msg(
-        self,
-        data: &TypeMap,
-        user: &user::Model,
-        channel: &str,
-    ) -> Result<String, Error> {
-        Ok(data
-            .extract::<Helix>()?
-            .get_streams(
-                &user.twitch_oauth.as_ref().context("token missing")?,
-                &[UserId::Login(channel)],
+    async fn uptime_msg(&self, channel: &str) -> Result<String, Error> {
+        Ok(self
+            .helix
+            .req_get(
+                GetStreamsRequest::user_logins([UserNameRef::from_str(channel)].as_ref()),
+                &*self.helix_token.read().await,
             )
             .await
             .context("failed to get the stream")?
+            .data
             .first()
             .map(|stream| {
-                format!("The stream started <t:{}:R>.", stream.started_at.unix_timestamp())
+                format!(
+                    "The stream started <t:{}:R>.",
+                    stream.started_at.to_fixed_offset().unix_timestamp()
+                )
             })
             .unwrap_or_else(|| String::from("The stream is not live.")))
     }
 
     async fn desertbus(
-        self,
-        data: &TypeMap,
-        user: &user::Model,
+        &self,
         now: OffsetDateTime,
         events: &[Event],
     ) -> Result<(Vec<String>, bool), Error> {
@@ -293,9 +305,8 @@ impl Autotopic {
                     return Ok((messages, is_dynamic));
                 }
             }
-            let desertbus = data.extract::<DesertBus>()?;
 
-            let money_raised = match desertbus.money_raised().await {
+            let money_raised = match self.desertbus.money_raised().await {
                 Ok(money_raised) => money_raised,
                 Err(error) => {
                     error!(?error, "Failed to fetch the current Desert Bus total");
@@ -325,7 +336,7 @@ impl Autotopic {
                 ));
                 is_dynamic = true;
             } else if now <= start + time::Duration::hours(total_hours)
-                || self.is_desertbus_live(data, user).await?
+                || self.is_desertbus_live().await?
             {
                 messages.push(String::from(
                     "DESERT BUS! (https://desertbus.org/ or https://twitch.tv/desertbus)",
@@ -348,17 +359,16 @@ impl Autotopic {
         Ok((messages, is_dynamic))
     }
 
-    async fn is_desertbus_live(self, data: &TypeMap, user: &user::Model) -> Result<bool, Error> {
-        if let Some(token) = user.twitch_oauth.as_ref() {
-            Ok(!data
-                .extract::<Helix>()?
-                .get_streams(&token, &[UserId::Login("desertbus")])
-                .await
-                .ok()
-                .unwrap_or_else(Vec::new)
-                .is_empty())
-        } else {
-            Ok(false)
-        }
+    async fn is_desertbus_live(&self) -> Result<bool, Error> {
+        Ok(!self
+            .helix
+            .req_get(
+                GetStreamsRequest::user_logins([UserNameRef::from_str("desertbus")].as_ref()),
+                &*self.helix_token.read().await,
+            )
+            .await
+            .context("failed to get the stream")?
+            .data
+            .is_empty())
     }
 }

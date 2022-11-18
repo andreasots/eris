@@ -1,19 +1,19 @@
-use super::codec::{self, Exception, Request};
+use std::collections::HashMap;
+#[cfg(unix)]
+use std::path::PathBuf;
+
 use anyhow::{Context, Error};
 use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
 use futures::select;
 use serde_json::Value;
-use std::collections::HashMap;
-use tracing::error;
-
-#[cfg(unix)]
-use tokio::net::UnixStream;
-#[cfg(unix)]
-use std::path::PathBuf;
-
 #[cfg(not(unix))]
 use tokio::net::TcpStream;
+#[cfg(unix)]
+use tokio::net::UnixStream;
+use tracing::error;
+
+use super::codec::{self, Exception, Request};
 
 pub struct NewClient {
     #[cfg(unix)]
@@ -126,11 +126,13 @@ impl Client {
 // TODO: #[cfg(not(unix))]
 #[cfg(all(test, unix))]
 mod tests {
-    use super::Client;
-    use serde_json::Value;
     use std::collections::HashMap;
+
+    use serde_json::Value;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::UnixStream;
+
+    use super::Client;
 
     #[tokio::test]
     async fn smoke_test() {

@@ -1,59 +1,79 @@
-use anyhow::{Context, Error};
-use serenity::client::ClientBuilder;
-use serenity::model::gateway::GatewayIntents;
-use serenity::model::id::UserId;
 use std::borrow::Cow;
-use std::path::PathBuf;
-use std::collections::HashSet;
-use tracing_subscriber::EnvFilter;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::Duration;
 
-use crate::context::ErisContext;
-use crate::extract::Extract;
-use tracing::{error, info};
+use anyhow::{Context as _, Error};
+use futures::StreamExt;
+use google_calendar3::hyper::client::{Client as HyperClient, HttpConnector};
+use google_calendar3::hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
+use google_calendar3::oauth2::authenticator::{Authenticator, ServiceAccountAuthenticator};
+use google_calendar3::CalendarHub;
+use google_sheets4::Sheets;
+use tokio::sync::RwLock;
+use tracing::error;
+use tracing_subscriber::EnvFilter;
+use twilight_cache_inmemory::InMemoryCache;
+use twilight_gateway::{Cluster, Intents};
+use twilight_http::Client as DiscordClient;
+use twilight_model::channel::message::AllowedMentions;
+use twilight_model::gateway::payload::outgoing::update_presence::UpdatePresencePayload;
+use twilight_model::gateway::presence::{ActivityType, MinimalActivity, Status as PresenceStatus};
+use twitch_api::twitch_oauth2::TwitchToken;
 
 mod aiomas;
 mod announcements;
 mod autotopic;
+mod calendar;
 mod channel_reaper;
+mod command_parser;
 mod commands;
 mod config;
 mod contact;
-mod context;
 mod desertbus;
-mod discord_events;
-mod extract;
-mod google;
-mod influxdb;
-mod inventory;
+mod disconnect_afk;
+mod markdown;
+mod metrics;
 mod models;
 mod rpc;
 mod service;
 mod shorten;
 mod time;
-mod try_crosspost;
-mod twitch;
-mod twitter;
-mod typemap_keys;
-
-trait ClientBuilderExt {
-    fn maybe_type_map_insert<T: serenity::prelude::TypeMapKey>(self, val: Option<T::Value>)
-        -> Self;
-}
-
-impl ClientBuilderExt for ClientBuilder {
-    fn maybe_type_map_insert<T: serenity::prelude::TypeMapKey>(
-        self,
-        opt: Option<T::Value>,
-    ) -> Self {
-        if let Some(val) = opt {
-            self.type_map_insert::<T>(val)
-        } else {
-            self
-        }
-    }
-}
 
 const DEFAULT_TRACING_FILTER: &'static str = "info,sqlx::query=warn";
+const USER_AGENT: &'static str = concat!(
+    "LRRbot/2.0 ",
+    env!("CARGO_PKG_NAME"),
+    "/",
+    env!("CARGO_PKG_VERSION"),
+    " (https://lrrbot.com)"
+);
+
+async fn create_google_client(
+    service_account_path: impl AsRef<Path>,
+) -> Result<
+    (HyperClient<HttpsConnector<HttpConnector>>, Authenticator<HttpsConnector<HttpConnector>>),
+    Error,
+> {
+    let connector = HttpsConnectorBuilder::new()
+        .with_native_roots()
+        .https_or_http()
+        .enable_http1()
+        .enable_http2()
+        .build();
+
+    let client = HyperClient::builder().build(connector);
+
+    let auth = google_calendar3::oauth2::read_service_account_key(service_account_path)
+        .await
+        .context("failed to read the Google service account key")?;
+    let auth = ServiceAccountAuthenticator::with_client(auth, client.clone())
+        .build()
+        .await
+        .context("failed to create the Google service account authenticator")?;
+
+    Ok((client, auth))
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -99,175 +119,193 @@ async fn main() -> Result<(), Error> {
         )
         .get_matches();
 
-    let config = config::Config::load_from_file(matches.get_one::<PathBuf>("conf").unwrap())
+    let config = crate::config::Config::load_from_file(matches.get_one::<PathBuf>("conf").unwrap())
         .context("failed to load the config file")?;
+    let config = Arc::new(config);
 
-    let pg_pool = sea_orm::Database::connect(&config.database_url)
+    let db = sea_orm::Database::connect(&config.database_url)
         .await
         .context("failed to create the database pool")?;
 
     let http_client = reqwest::ClientBuilder::new()
-        .user_agent(concat!(
-            "LRRbot/2.0 ",
-            env!("CARGO_PKG_NAME"),
-            "/",
-            env!("CARGO_PKG_VERSION"),
-            " (https://lrrbot.com)"
-        ))
+        .user_agent(USER_AGENT)
         .build()
         .context("failed to create the HTTP client")?;
 
-    let helix = twitch::Helix::new(http_client.clone(), &config)
-        .context("failed to create the New Twitch API client")?;
+    let helix = twitch_api::HelixClient::with_client(http_client.clone());
+    let helix_token = twitch_api::twitch_oauth2::AppAccessToken::get_app_access_token(
+        &http_client,
+        config.twitch_client_id.clone(),
+        config.twitch_client_secret.clone(),
+        vec![],
+    )
+    .await
+    .context("failed to request the Twitch app access token")?;
+    let helix_token = Arc::new(RwLock::new(helix_token));
 
-    let google_keys_json_path = matches.get_one::<PathBuf>("google-service-account").unwrap();
+    let (google_client, google_auth) =
+        create_google_client(matches.get_one::<PathBuf>("google-service-account").unwrap())
+            .await
+            .context("failed to create the Google API client")?;
 
-    let calendar = crate::google::Calendar::new(http_client.clone(), &google_keys_json_path);
-    let spreadsheets = crate::google::Sheets::new(http_client.clone(), &google_keys_json_path);
+    let mut calendar = CalendarHub::new(google_client.clone(), google_auth.clone());
+    calendar.user_agent(USER_AGENT.into());
+    let mut sheets = Sheets::new(google_client, google_auth);
+    sheets.user_agent(USER_AGENT.into());
+
+    let influxdb = config.influxdb.as_ref().map(|(url, database)| {
+        influxdb::Client::new(url, database).with_http_client(http_client.clone())
+    });
 
     let desertbus = crate::desertbus::DesertBus::new(http_client.clone());
 
-    let twitter = crate::twitter::Twitter::new(
-        http_client.clone(),
-        config.twitter_api_key.clone(),
-        config.twitter_api_secret.clone(),
-    )
-    .await
-    .context("failed to initialise the Twitter client")?;
+    let discord = DiscordClient::builder()
+        .token(config.discord_botsecret.clone())
+        // prevent any mentions by default
+        .default_allowed_mentions(AllowedMentions::default())
+        .build();
+    let discord = Arc::new(discord);
 
-    #[cfg(unix)]
-    {
-        if let Err(err) = tokio::fs::remove_file(&config.eris_socket).await {
-            if err.kind() != std::io::ErrorKind::NotFound {
-                return Err(err).context("failed to remove the socket file")?;
-            }
-        }
-    }
-
-    let mut owners = HashSet::new();
-    owners.insert(UserId(101919755132227584)); // Defrost#0001
-    owners.insert(UserId(153674140019064832)); // phlip#6324
-    owners.insert(UserId(144128240389324800)); // qrpth#6704
-
-    let http = serenity::http::Http::new(&config.discord_botsecret);
-    let app_info = http
-        .get_current_application_info()
+    let intents = Intents::GUILDS
+        | Intents::GUILD_MEMBERS
+        | Intents::GUILD_EMOJIS_AND_STICKERS
+        | Intents::GUILD_VOICE_STATES
+        | Intents::GUILD_MESSAGES
+        | Intents::DIRECT_MESSAGES
+        | Intents::MESSAGE_CONTENT;
+    let (cluster, mut events) = Cluster::builder(config.discord_botsecret.clone(), intents)
+        .http_client(discord.clone())
+        .presence(
+            UpdatePresencePayload::new(
+                vec![MinimalActivity {
+                    kind: ActivityType::Listening,
+                    name: format!(
+                        "{}help || v{}",
+                        config.command_prefix,
+                        env!("CARGO_PKG_VERSION")
+                    ),
+                    url: Some("https://lrrbot.com/".into()),
+                }
+                .into()],
+                false,
+                None,
+                PresenceStatus::Online,
+            )
+            .context("failed to construct the presence")?,
+        )
+        .build()
         .await
-        .context("failed to get the current application info")?;
-    owners.insert(app_info.owner.id);
-    if let Some(team) = app_info.team {
-        owners.insert(team.owner_user_id);
-        for member in &team.members {
-            owners.insert(member.user.id);
-        }
+        .context("failed to create the cluster")?;
+    let cluster = Arc::new(cluster);
+
+    {
+        let cluster = cluster.clone();
+        tokio::spawn(async move {
+            cluster.up().await;
+        });
     }
 
-    let current_user =
-        http.get_current_user().await.context("failed to get the current user info")?;
-
-    let mut client = serenity::client::ClientBuilder::new_with_http(
-        http,
-        GatewayIntents::GUILDS
-            | GatewayIntents::GUILD_MEMBERS
-            | GatewayIntents::GUILD_EMOJIS_AND_STICKERS
-            | GatewayIntents::GUILD_VOICE_STATES
-            | GatewayIntents::GUILD_MESSAGES
-            | GatewayIntents::DIRECT_MESSAGES
-            | GatewayIntents::MESSAGE_CONTENT,
-    )
-    .event_handler(crate::discord_events::DiscordEvents::new())
-    .framework(
-        serenity::framework::StandardFramework::new()
-            .configure(|c| {
-                c.prefix(&config.command_prefix)
-                    .with_whitespace((true, true, true))
-                    .on_mention(Some(current_user.id))
-                    .case_insensitivity(true)
-                    .owners(owners)
-            })
-            .before(|_, message, command_name| {
-                Box::pin(async move {
-                    info!(
-                        command_name = command_name,
-                        message = message.content.as_str(),
-                        message.id = message.id.0,
-                        from.id = message.author.id.0,
-                        from.name = message.author.name.as_str(),
-                        from.discriminator = message.author.discriminator,
-                        "Command received",
-                    );
-                    true
-                })
-            })
-            .after(|ctx, message, _command_name, result| {
-                Box::pin(async move {
-                    if let Err(error) = result {
-                        error!(
-                            message.id = message.id.0,
-                            ?error,
-                            "Command resulted in an unexpected error"
-                        );
-
-                        let _ = message.reply(
-                            ctx,
-                            &format!("Command resulted in an unexpected error: {}.", error),
-                        );
-                    } else {
-                        info!(message.id = message.id.0, "Command processed successfully",);
-                    }
-                })
-            })
-            .unrecognised_command(commands::static_response::static_response)
-            .help(&crate::commands::help::HELP)
-            .group(&crate::commands::calendar::CALENDAR_GROUP)
-            .group(&crate::commands::live::FANSTREAMS_GROUP)
-            .group(&crate::commands::quote::QUOTE_GROUP)
-            .group(&crate::commands::time::TIME_GROUP)
-            .group(&crate::commands::tracing::TRACING_GROUP)
-            .group(&crate::commands::voice::VOICE_GROUP),
-    )
-    .type_map_insert::<crate::rpc::LRRbot>(std::sync::Arc::new(crate::rpc::LRRbot::new(&config)))
-    .maybe_type_map_insert::<crate::influxdb::InfluxDB>(
-        config
-            .influxdb
-            .as_ref()
-            .map(|url| crate::influxdb::InfluxDB::new(http_client.clone(), url.clone())),
-    )
-    .type_map_insert::<crate::config::Config>(config)
-    .type_map_insert::<crate::typemap_keys::PgPool>(pg_pool)
-    .type_map_insert::<crate::twitch::Helix>(helix)
-    .type_map_insert::<crate::google::Calendar>(calendar)
-    .type_map_insert::<crate::google::Sheets>(spreadsheets)
-    .type_map_insert::<crate::desertbus::DesertBus>(desertbus)
-    .type_map_insert::<crate::twitter::Twitter>(twitter)
-    .type_map_insert::<crate::typemap_keys::ReloadHandle>(reload_handle)
-    .await
-    .context("failed to create the Discord client")?;
-
-    let ctx = ErisContext::from_client(&client);
+    let cache = Arc::new(InMemoryCache::new());
+    let lrrbot = Arc::new(crate::rpc::LRRbot::new(&config));
 
     let mut rpc_server = {
-        let data = ctx.data.read().await;
-        let config = data.extract::<crate::config::Config>()?;
-
         #[cfg(unix)]
-        let server = crate::aiomas::Server::new(&config.eris_socket, ctx.clone());
+        let server = {
+            if let Err(err) = tokio::fs::remove_file(&config.eris_socket).await {
+                if err.kind() != std::io::ErrorKind::NotFound {
+                    return Err(err).context("failed to remove the socket file")?;
+                }
+            }
+
+            crate::aiomas::Server::new(&config.eris_socket)
+        };
 
         #[cfg(not(unix))]
-        let server = crate::aiomas::Server::new(config.eris_port, ctx.clone()).await;
+        let server = crate::aiomas::Server::new(config.eris_port).await;
 
         server
     }
     .context("failed to create the RPC server")?;
-    for handler in ::inventory::iter::<crate::inventory::AiomasHandler> {
-        rpc_server.register(handler.method, handler.handler);
-    }
+
+    rpc_server.register(
+        "announcements/stream_up",
+        crate::announcements::stream_up(
+            config.clone(),
+            db.clone(),
+            discord.clone(),
+            lrrbot.clone(),
+        ),
+    );
 
     tokio::spawn(rpc_server.serve());
-    tokio::spawn(crate::channel_reaper::channel_reaper(ctx.clone()));
-    tokio::spawn(crate::announcements::post_tweets(ctx.clone()));
-    tokio::spawn(crate::autotopic::autotopic(ctx.clone()));
-    tokio::spawn(crate::contact::post_messages(ctx));
+    tokio::spawn(crate::announcements::post_tweets(config.clone(), db.clone(), discord.clone()));
+    tokio::spawn(crate::autotopic::autotopic(
+        cache.clone(),
+        calendar.clone(),
+        config.clone(),
+        db.clone(),
+        desertbus.clone(),
+        discord.clone(),
+        helix.clone(),
+        helix_token.clone(),
+        lrrbot.clone(),
+    ));
+    tokio::spawn(crate::channel_reaper::channel_reaper(
+        cache.clone(),
+        config.clone(),
+        discord.clone(),
+    ));
+    tokio::spawn(crate::contact::post_messages(config.clone(), discord.clone(), sheets.clone()));
+    tokio::spawn({
+        let token = helix_token.clone();
+        let client = http_client.clone();
 
-    client.start().await.context("error while running the Discord client")
+        async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(15 * 60));
+
+            loop {
+                interval.tick().await;
+
+                if helix_token.read().await.expires_in() < Duration::from_secs(60 * 60) {
+                    if let Err(error) = token.write().await.refresh_token(&client).await {
+                        error!(?error, "failed to refresh the Twitch app token");
+                    }
+                }
+            }
+        }
+    });
+
+    let command_parser = crate::command_parser::CommandParser::builder()
+        .command(crate::commands::calendar::Next::fan(calendar.clone()))
+        .command(crate::commands::calendar::Next::lrr(calendar.clone()))
+        .command(crate::commands::help::Help::new())
+        .command(crate::commands::live::Live::new(db.clone(), helix.clone()))
+        .command(crate::commands::quote::Details::new(db.clone()))
+        .command(crate::commands::quote::QueryDebugger::new())
+        .command(crate::commands::time::Time::new_12())
+        .command(crate::commands::time::Time::new_24())
+        .command(crate::commands::tracing::TracingFilter::new(reload_handle.clone()))
+        .command(crate::commands::voice::Voice::new())
+        // this command is after all other quote commands to avoid conflicts
+        .command(crate::commands::quote::Find::new(db.clone()))
+        // this is the last command on purpose to avoid conflicts
+        .command(crate::commands::static_response::Static::new(lrrbot.clone()))
+        .build(cache.clone(), config.clone(), discord.clone())
+        .context("failed to build the command parser")?;
+
+    while let Some((_, event)) = events.next().await {
+        if let Some(ref influxdb) = influxdb {
+            if let Err(error) = crate::metrics::on_event(&cache, &influxdb, &event).await {
+                error!(?error, "failed to collect metrics");
+            }
+        }
+
+        cache.update(&event);
+
+        crate::disconnect_afk::on_event(&cache, &discord, &event).await;
+
+        command_parser.on_event(&event);
+    }
+
+    Ok(())
 }

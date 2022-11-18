@@ -1,76 +1,70 @@
-use crate::config::Config;
-use crate::context::ErisContext;
-use crate::extract::Extract;
-use anyhow::Error;
-use serenity::model::channel::{Channel, ChannelType, GuildChannel};
-use serenity::model::id::ChannelId;
-use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
+
 use time::OffsetDateTime;
 use tracing::{error, info};
+use twilight_cache_inmemory::InMemoryCache;
+use twilight_http::Client;
+use twilight_model::channel::ChannelType;
+use twilight_util::snowflake::Snowflake;
 
-const STARTUP_DELAY: Duration = Duration::from_secs(5);
+use crate::config::Config;
+
 const REAP_INTERVAL: Duration = Duration::from_secs(60);
 const MIN_CHANNEL_AGE: Duration = Duration::from_secs(15 * 60);
 
-async fn reap_channels(ctx: &ErisContext) -> Result<(), Error> {
-    let data = ctx.data.read().await;
-    let config = data.extract::<Config>()?;
-    let guild =
-        config.guild.to_guild_cached(&ctx).ok_or_else(|| Error::msg("failed to get the guild"))?;
-
-    let mut voice_users = HashMap::<ChannelId, u64>::new();
-    for voice_state in guild.voice_states.values() {
-        if let Some(channel) = voice_state.channel_id {
-            *voice_users.entry(channel).or_insert(0) += 1;
-        }
-    }
-
-    let now = OffsetDateTime::now_utc();
-
-    let mut unused_channels = vec![];
-
-    for channel in guild.channels.values() {
-        let channel = match channel {
-            Channel::Guild(channel @ GuildChannel { kind: ChannelType::Voice, .. })
-                if channel.name.starts_with(&config.temp_channel_prefix) =>
-            {
-                channel
-            }
-            _ => continue,
-        };
-
-        let created_at = channel.id.created_at();
-
-        if (now - *created_at) > MIN_CHANNEL_AGE
-            && voice_users.get(&channel.id).copied().unwrap_or(0) == 0
-        {
-            info!(
-                channel.id = channel.id.0,
-                channel.name = channel.name.as_str(),
-                "Scheduling a temporary channel for deletion"
-            );
-            unused_channels.push(channel.id);
-        }
-    }
-
-    for channel_id in unused_channels {
-        if let Err(error) = channel_id.delete(&ctx).await {
-            error!(?error, channel.id = channel_id.0, "Failed to delete a temporary channel");
-        }
-    }
-
-    Ok(())
-}
-
-pub async fn channel_reaper(ctx: ErisContext) {
-    // Delay the first reap so that it doesn't happen before the Discord connection is ready.
-    tokio::time::sleep(STARTUP_DELAY).await;
+pub async fn channel_reaper(cache: Arc<InMemoryCache>, config: Arc<Config>, discord: Arc<Client>) {
+    let mut interval = tokio::time::interval(REAP_INTERVAL);
 
     loop {
-        if let Err(error) = reap_channels(&ctx).await {
-            error!(?error, "Failed to reap channels");
+        interval.tick().await;
+
+        let now = OffsetDateTime::now_utc();
+
+        let Some(channels) = cache
+            .guild_channels(config.guild) else { continue };
+
+        for channel_id in channels.iter().copied() {
+            let Some(channel) = cache.channel(channel_id) else {
+                info!(channel.id = channel_id.get(), "Channel not in cache");
+                continue
+            };
+
+            let created_at = channel_id.timestamp();
+            let created_at_fraction = Duration::from_millis((created_at % 1000) as u64);
+            let created_at = match OffsetDateTime::from_unix_timestamp(created_at / 1000) {
+                Ok(created_at) => created_at + created_at_fraction,
+                Err(error) => {
+                    info!(channel.id = channel_id.get(), ?error, "timestamp out of range");
+                    continue;
+                }
+            };
+
+            if channel.kind != ChannelType::GuildVoice {
+                continue;
+            }
+
+            if !channel.name.as_deref().unwrap_or("").starts_with(&config.temp_channel_prefix) {
+                continue;
+            }
+
+            if (now - created_at) < MIN_CHANNEL_AGE {
+                continue;
+            }
+
+            let member_count =
+                cache.voice_channel_states(channel_id).map(|states| states.count()).unwrap_or(0);
+            if member_count > 0 {
+                continue;
+            }
+
+            if let Err(error) = discord.delete_channel(channel_id).await {
+                error!(
+                    ?error,
+                    channel.id = channel_id.get(),
+                    "failed to delete a temporary channel"
+                );
+            }
         }
-        tokio::time::sleep(REAP_INTERVAL).await;
     }
 }

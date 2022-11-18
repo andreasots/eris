@@ -1,3 +1,0 @@
-[print_schema]
-file = "src/schema.rs"
-filter = { only_tables = ["game_per_show_data", "games", "quotes", "shows", "state", "users"] }

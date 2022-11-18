@@ -1,6 +1,6 @@
 use std::borrow::Cow;
-use super::{Column, Ast, Op, unescape};
-use serenity::utils::parse_emoji;
+
+use super::{Column, Ast, Op, unescape, parse_emoji, parse_emoji_name};
 
 grammar;
 
@@ -52,8 +52,8 @@ Column: Column = {
 String: Cow<'input, str> = {
     QuotedString => unescape(<>),
     UnquotedWord => Cow::Borrowed(<>),
-    EmojiName => Cow::Borrowed(<>.trim_matches(':')),
-    FullEmoji => Cow::Owned(parse_emoji(<>).expect("invalid emoji?").name),
+    EmojiName => Cow::Borrowed(parse_emoji_name(<>)),
+    FullEmoji => Cow::Borrowed(parse_emoji(<>)),
 
     // Copied from the `Column` rule as otherwise you get a parse error when a column name is used
     // as a bare word.

@@ -1,7 +1,8 @@
-use crate::aiomas::{Exception, Request};
-use crate::service::Reconnect;
 use anyhow::Error;
 use serde_json::Value;
+
+use crate::aiomas::{Exception, Request};
+use crate::service::Reconnect;
 
 // FIXME: this should be generic over the service but that requires generic associated types and
 // existential types.
