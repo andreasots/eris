@@ -31,13 +31,20 @@ impl Help {
             "command. Simple text response commands (like `!advice`) are not listed here, ",
             "for those see [LRRbot's website](https://lrrbot.com/help#help-section-text).",
         ));
+
+        let mut fields = vec![];
         for cmd in commands.help() {
-            embed = embed.field(EmbedField {
+            fields.push(EmbedField {
                 inline: true,
                 name: format!("{}{}", config.command_prefix, cmd.name),
                 value: cmd.summary.into(),
             });
         }
+        fields.sort_by(|a, b| a.name.cmp(&b.name));
+        for field in fields {
+            embed = embed.field(field);
+        }
+
         discord
             .create_message(message.channel_id)
             .reply(message.id)

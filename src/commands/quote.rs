@@ -26,8 +26,6 @@ use crate::command_parser::{Access, Args, CommandHandler, Commands, Help};
 use crate::config::Config;
 use crate::models::{game, game_entry, quote, show};
 
-// "Commands for querying the quote database.\n\nPlease keep in mind that many of the quotes are taken out of context, be it for comedic effect or out of necessity. Take all of them with a grain of salt and bear in mind they don't necessarily reflect their originators' views and opinions. That being said, if you find any quote to be particularly awful, please notify the moderator of your choice to have its removal evaluated."]
-
 // regconfig for `english`
 static ENGLISH: OnceCell<u32> = OnceCell::const_new();
 
@@ -432,7 +430,7 @@ impl Find {
 
 impl CommandHandler for Find {
     fn pattern(&self) -> &str {
-        "(?:find)quote(?: (.+))?"
+        "(?:find)?quote(?: (.+))?"
     }
 
     fn help(&self) -> Option<crate::command_parser::Help> {
@@ -461,6 +459,12 @@ impl CommandHandler for Find {
                 "\n",
                 "When a query matches multiple quotes a random one is picked. An empty query ",
                 "matches all quotes.\n",
+                "\n",
+                "Please keep in mind that many of the quotes are taken out of context, be it for ",
+                "comedic effect or out of necessity. Take all of them with a grain of salt and ",
+                "bear in mind they don't necessarily reflect their originators' views and ",
+                "opinions. That being said, if you find any quote to be particularly awful, ",
+                "please notify the moderator of your choice to have its removal evaluated.",
             ).into(),
             examples: Cow::Borrowed(&[
                 Cow::Borrowed("quote "),

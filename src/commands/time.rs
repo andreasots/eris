@@ -39,8 +39,8 @@ impl Time {
         Self {
             pattern: "time 24",
             help: Help {
-                name: "time".into(),
-                usage: "time".into(),
+                name: "time 24".into(),
+                usage: "time 24".into(),
                 summary: "Post the current moonbase time using a 24-hour clock".into(),
                 description: "Post the current moonbase time using a 24-hour clock.".into(),
                 examples: Cow::Borrowed(&[]),

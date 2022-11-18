@@ -24,7 +24,7 @@ impl<S> TracingFilter<S> {
 
 impl<S> CommandHandler for TracingFilter<S> {
     fn pattern(&self) -> &str {
-        "tracing-filter (.*)"
+        "tracing-filter(?: (.*))?"
     }
 
     fn help(&self) -> Option<crate::command_parser::Help> {
