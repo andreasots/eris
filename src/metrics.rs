@@ -36,7 +36,7 @@ struct Measurement<'a> {
     #[influxdb(tag)]
     user_id: Option<u64>,
 
-    count: u64,
+    count: f64,
     users: Option<String>,
 }
 
@@ -56,7 +56,7 @@ impl<'a> Measurement<'a> {
             category_id: channel.and_then(|c| c.parent_id.map(Id::get)),
             thread_id: thread.map(|t| t.id.get()),
             thread_name: thread.and_then(|t| t.name.as_deref()),
-            count: count as u64,
+            count: count as f64,
             users: None,
             user_id: None,
         }
