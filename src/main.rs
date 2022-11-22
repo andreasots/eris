@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
 
 use anyhow::{Context as _, Error};
 use futures::StreamExt;
@@ -10,6 +9,7 @@ use google_calendar3::hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use google_calendar3::oauth2::authenticator::{Authenticator, ServiceAccountAuthenticator};
 use google_calendar3::CalendarHub;
 use google_sheets4::Sheets;
+use google_youtube3::YouTube;
 use tokio::sync::RwLock;
 use tracing::error;
 use tracing_subscriber::EnvFilter;
@@ -19,7 +19,6 @@ use twilight_http::Client as DiscordClient;
 use twilight_model::channel::message::AllowedMentions;
 use twilight_model::gateway::payload::outgoing::update_presence::UpdatePresencePayload;
 use twilight_model::gateway::presence::{ActivityType, MinimalActivity, Status as PresenceStatus};
-use twitch_api::twitch_oauth2::TwitchToken;
 
 mod aiomas;
 mod announcements;
@@ -39,6 +38,7 @@ mod rpc;
 mod service;
 mod shorten;
 mod time;
+mod token_renewal;
 
 const DEFAULT_TRACING_FILTER: &'static str = "info,sqlx::query=warn";
 const USER_AGENT: &'static str = concat!(
@@ -150,8 +150,10 @@ async fn main() -> Result<(), Error> {
 
     let mut calendar = CalendarHub::new(google_client.clone(), google_auth.clone());
     calendar.user_agent(USER_AGENT.into());
-    let mut sheets = Sheets::new(google_client, google_auth);
+    let mut sheets = Sheets::new(google_client.clone(), google_auth.clone());
     sheets.user_agent(USER_AGENT.into());
+    let mut youtube = YouTube::new(google_client.clone(), google_auth.clone());
+    youtube.user_agent(USER_AGENT.into());
 
     let influxdb = config.influxdb.as_ref().map(|(url, database)| {
         influxdb::Client::new(url, database).with_http_client(http_client.clone())
@@ -239,6 +241,13 @@ async fn main() -> Result<(), Error> {
 
     tokio::spawn(rpc_server.serve());
     tokio::spawn(crate::announcements::post_tweets(config.clone(), db.clone(), discord.clone()));
+    tokio::spawn(crate::announcements::post_videos(
+        db.clone(),
+        cache.clone(),
+        config.clone(),
+        discord.clone(),
+        youtube.clone(),
+    ));
     tokio::spawn(crate::autotopic::autotopic(
         cache.clone(),
         calendar.clone(),
@@ -256,24 +265,7 @@ async fn main() -> Result<(), Error> {
         discord.clone(),
     ));
     tokio::spawn(crate::contact::post_messages(config.clone(), discord.clone(), sheets.clone()));
-    tokio::spawn({
-        let token = helix_token.clone();
-        let client = http_client.clone();
-
-        async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(15 * 60));
-
-            loop {
-                interval.tick().await;
-
-                if helix_token.read().await.expires_in() < Duration::from_secs(60 * 60) {
-                    if let Err(error) = token.write().await.refresh_token(&client).await {
-                        error!(?error, "failed to refresh the Twitch app token");
-                    }
-                }
-            }
-        }
-    });
+    tokio::spawn(crate::token_renewal::renew_helix(helix_token.clone(), http_client.clone()));
 
     let command_parser = crate::command_parser::CommandParser::builder()
         .command(crate::commands::calendar::Next::fan(calendar.clone()))

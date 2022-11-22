@@ -51,6 +51,7 @@ pub struct Config {
     pub voice_category: Id<ChannelMarker>,
     pub mods_channel: Id<ChannelMarker>,
     pub general_channel: Id<ChannelMarker>,
+    pub lrr_videos_channel: Option<Id<ChannelMarker>>,
     pub guild: Id<GuildMarker>,
 
     pub twitter_api: KeyPair,
@@ -59,6 +60,8 @@ pub struct Config {
     pub contact_spreadsheet: Option<String>,
 
     pub influxdb: Option<(String, String)>,
+
+    pub youtube_channels: Vec<String>,
 }
 
 impl Config {
@@ -135,6 +138,7 @@ impl Config {
                 Config::get_option_parsed(&ini, "discord_serverid")?
                     .unwrap_or(Id::new(288920509272555520))
             },
+            lrr_videos_channel: Config::get_option_parsed(&ini, "discord_channel_lrr_videos")?,
             guild: Config::get_option_parsed(&ini, "discord_serverid")?
                 .unwrap_or(Id::new(288920509272555520)),
             twitter_api: KeyPair::new(
@@ -175,6 +179,16 @@ impl Config {
 
                 url.and_then(|url| db.map(|db| (url, db)))
             },
+
+            youtube_channels: ini
+                .get_from(Some("lrrbot"), "youtube_channels")
+                .map(str::trim)
+                .filter(|opt| !opt.is_empty())
+                .into_iter()
+                .flat_map(|opt| opt.split(','))
+                .map(str::trim)
+                .map(String::from)
+                .collect(),
         })
     }
 

@@ -641,6 +641,7 @@ dependencies = [
  "futures",
  "google-calendar3",
  "google-sheets4",
+ "google-youtube3",
  "influxdb",
  "lalrpop",
  "lalrpop-util",
@@ -858,6 +859,26 @@ name = "google-sheets4"
 version = "4.0.1+20220221"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c28b8b66c9b20f30e098e77e3d7d7d561f5d1ac0b60efcaea12dfcd5e0932e52"
+dependencies = [
+ "http",
+ "hyper",
+ "hyper-rustls 0.23.1",
+ "itertools",
+ "mime 0.2.6",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "tokio",
+ "tower-service",
+ "url 1.7.2",
+ "yup-oauth2",
+]
+
+[[package]]
+name = "google-youtube3"
+version = "4.0.1+20220303"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad11ec571fb6bff0e4ffa3e4ea3a85d84dadf774422dc3cbb92d2a6a3c386ead"
 dependencies = [
  "http",
  "hyper",
