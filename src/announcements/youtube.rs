@@ -145,8 +145,12 @@ impl VideoPoster {
                 message.push_str(&crate::markdown::suppress_embeds(line));
                 message.push_str("\n");
             }
-            message.push_str("https://youtu.be/");
+            if !message.is_empty() {
+                message.push_str("\n");
+            }
+            message.push_str("Video: https://youtu.be/");
             message.push_str(&video.id);
+            message.push_str("\n\u{200B}");
 
             if channel.kind == ChannelType::GuildForum {
                 let tags = channel
