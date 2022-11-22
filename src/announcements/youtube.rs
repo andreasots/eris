@@ -133,7 +133,7 @@ impl VideoPoster {
                 .context("failed to parse the last video published timestamp")?
                 .unwrap_or(OffsetDateTime::UNIX_EPOCH);
 
-            if last_published_at > video.published_at {
+            if last_published_at >= video.published_at {
                 continue;
             }
 
