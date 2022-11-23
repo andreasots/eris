@@ -5,4 +5,5 @@ pub mod quote;
 pub mod static_response;
 pub mod time;
 pub mod tracing;
+pub mod video;
 pub mod voice;

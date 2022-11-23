@@ -277,6 +277,8 @@ async fn main() -> Result<(), Error> {
         .command(crate::commands::time::Time::new_12())
         .command(crate::commands::time::Time::new_24())
         .command(crate::commands::tracing::TracingFilter::new(reload_handle.clone()))
+        .command_opt(crate::commands::video::New::new(&config, youtube.clone()))
+        .command_opt(crate::commands::video::Refresh::new(&config, youtube.clone()))
         .command(crate::commands::voice::Voice::new())
         // this command is after all other quote commands to avoid conflicts
         .command(crate::commands::quote::Find::new(db.clone()))

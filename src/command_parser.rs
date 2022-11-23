@@ -268,6 +268,13 @@ impl Builder {
         self
     }
 
+    pub fn command_opt(mut self, command: Option<impl CommandHandler + 'static>) -> Self {
+        if let Some(command) = command {
+            self.handlers.push(Box::new(command));
+        }
+        self
+    }
+
     fn expand_pattern(prefix: &str, pattern: &str) -> Result<Regex, Error> {
         let prefix = regex::escape(prefix);
         let expanded = pattern.replace(" ", r"(?:\s+)");

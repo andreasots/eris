@@ -666,6 +666,7 @@ dependencies = [
  "twilight-cache-inmemory",
  "twilight-gateway",
  "twilight-http",
+ "twilight-mention",
  "twilight-model",
  "twilight-util",
  "twilight-validate",
@@ -2838,6 +2839,15 @@ dependencies = [
  "http",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "twilight-mention"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e11a444fc7fa4940200e3cc0b574fa92621254e19944087dde929a60996ddc9"
+dependencies = [
+ "twilight-model",
 ]
 
 [[package]]

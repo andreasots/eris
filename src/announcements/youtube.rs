@@ -6,15 +6,17 @@ use google_youtube3::api::PlaylistItem;
 use google_youtube3::hyper::client::HttpConnector;
 use google_youtube3::hyper_rustls::HttpsConnector;
 use google_youtube3::YouTube;
+use regex::Regex;
 use sea_orm::DatabaseConnection;
 use time::format_description::well_known::{Iso8601, Rfc3339};
 use time::OffsetDateTime;
 use tracing::{error, info};
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client as DiscordClient;
-use twilight_model::channel::ChannelType;
-use twilight_model::id::marker::ChannelMarker;
+use twilight_model::channel::{Channel, ChannelType, Message};
+use twilight_model::id::marker::{ChannelMarker, TagMarker};
 use twilight_model::id::Id;
+use twilight_validate::channel::CHANNEL_NAME_LENGTH_MAX;
 
 use crate::config::Config;
 use crate::models::state;
@@ -137,49 +139,7 @@ impl VideoPoster {
                 continue;
             }
 
-            let description = video.description.split("Support LRR:").next().unwrap_or("").trim();
-
-            let mut message = String::new();
-            for line in description.lines() {
-                message.push_str("> ");
-                message.push_str(&crate::markdown::suppress_embeds(line));
-                message.push_str("\n");
-            }
-            if !message.is_empty() {
-                message.push_str("\n");
-            }
-            message.push_str("Video: https://youtu.be/");
-            message.push_str(&video.id);
-            message.push_str("\n\u{200B}");
-
-            if channel.kind == ChannelType::GuildForum {
-                let tags = channel
-                    .available_tags
-                    .as_deref()
-                    .into_iter()
-                    .flatten()
-                    .filter_map(|tag| {
-                        (video.title.contains(&tag.name) || video.channel_title == tag.name)
-                            .then_some(tag.id)
-                    })
-                    .collect::<Vec<_>>();
-
-                self.discord
-                    .create_forum_thread(channel.id, &video.title)
-                    .applied_tags(&tags)
-                    .message()
-                    .content(&message)
-                    .context("video announcement invalid")?
-                    .await
-                    .context("failed to create the video thread")?;
-            } else {
-                self.discord
-                    .create_message(self.channel_id)
-                    .content(&format!("**{}**\n{}", crate::markdown::escape(&video.title), message))
-                    .context("video announcement invalid")?
-                    .await
-                    .context("failed to send video announcement")?;
-            }
+            video.announce(&channel, &self.discord).await.context("failed to announce video")?;
 
             let published_at = video
                 .published_at
@@ -194,7 +154,7 @@ impl VideoPoster {
     }
 }
 
-struct Video {
+pub struct Video {
     channel_title: String,
     channel_id: String,
     id: String,
@@ -203,11 +163,152 @@ struct Video {
     published_at: OffsetDateTime,
 }
 
+impl Video {
+    pub fn video_id_from_message(message: &str) -> Option<&str> {
+        lazy_static::lazy_static! {
+            static ref RE_VIDEO_ID: Regex = Regex::new(r"(?m)^Video: https://youtu.be/(\S+)$").unwrap();
+        }
+
+        Some(RE_VIDEO_ID.captures(message)?.get(1)?.as_str())
+    }
+
+    fn message_content(&self) -> String {
+        let description = crate::shorten::shorten(
+            self.description.split("Support LRR:").next().unwrap_or("").trim(),
+            twilight_validate::message::MESSAGE_CONTENT_LENGTH_MAX / 2,
+        );
+
+        let mut message = String::new();
+        for line in description.lines() {
+            message.push_str("> ");
+            message.push_str(&crate::markdown::suppress_embeds(line));
+            message.push_str("\n");
+        }
+        if !message.is_empty() {
+            message.push_str("\n");
+        }
+        message.push_str("Video: https://youtu.be/");
+        message.push_str(&self.id);
+        message.push_str("\n\u{200B}");
+        message
+    }
+
+    fn tags(&self, channel: &Channel) -> Vec<Id<TagMarker>> {
+        channel
+            .available_tags
+            .as_deref()
+            .into_iter()
+            .flatten()
+            .filter_map(|tag| {
+                (self.title.contains(&tag.name) || self.channel_title == tag.name).then_some(tag.id)
+            })
+            .collect::<Vec<_>>()
+    }
+
+    pub async fn announce(
+        &self,
+        channel: &Channel,
+        discord: &DiscordClient,
+    ) -> Result<Channel, Error> {
+        if channel.kind == ChannelType::GuildForum {
+            let thread = discord
+                .create_forum_thread(
+                    channel.id,
+                    &crate::shorten::shorten(&self.title, CHANNEL_NAME_LENGTH_MAX),
+                )
+                .applied_tags(&self.tags(channel))
+                .message()
+                .content(&self.message_content())
+                .context("video announcement invalid")?
+                .await
+                .context("failed to create the video thread")?
+                .model()
+                .await
+                .context("failed to deserialize the thread")?
+                .channel;
+
+            Ok(thread)
+        } else {
+            let message = discord
+                .create_message(channel.id)
+                .content(&self.message_content())
+                .context("video announcement invalid")?
+                .await
+                .context("failed to send video announcement")?
+                .model()
+                .await
+                .context("failed to deserialize the message")?;
+
+            let thread = discord
+                .create_thread_from_message(
+                    channel.id,
+                    message.id,
+                    &crate::shorten::shorten(&self.title, CHANNEL_NAME_LENGTH_MAX),
+                )
+                .context("thread name invalid")?
+                .await
+                .context("failed to create the thread")?
+                .model()
+                .await
+                .context("failed to deserialize the thread")?;
+
+            Ok(thread)
+        }
+    }
+
+    pub async fn edit(
+        &self,
+        discord: &DiscordClient,
+        channel: &Channel,
+        message: &Message,
+        thread: &Channel,
+    ) -> Result<(), Error> {
+        let mut req = discord.update_thread(thread.id);
+        let tags;
+        if channel.available_tags.is_some() {
+            tags = self.tags(channel);
+            req = req.applied_tags(Some(&tags));
+        }
+        req.name(&crate::shorten::shorten(&self.title, CHANNEL_NAME_LENGTH_MAX))
+            .context("thread name invalid")?
+            .await
+            .context("failed to update thread name")?;
+
+        discord
+            .update_message(message.channel_id, message.id)
+            .content(Some(&self.message_content()))
+            .context("video announcement invalid")?
+            .await
+            .context("failed to update the video announcement")?;
+        Ok(())
+    }
+}
+
+impl TryFrom<google_youtube3::api::Video> for Video {
+    type Error = Error;
+
+    fn try_from(video: google_youtube3::api::Video) -> Result<Self, Self::Error> {
+        let snippet = video.snippet.context("`snippet` is missing")?;
+        Ok(Self {
+            channel_title: snippet.channel_title.context("`channel_title` is missing")?,
+            channel_id: snippet.channel_id.context("`channel_id` is missing")?,
+            id: video.id.context("`id` is missing")?,
+            title: snippet.title.context("`title` is missing")?,
+            description: snippet.description.context("`description` is missing")?,
+            published_at: OffsetDateTime::parse(
+                &snippet.published_at.context("`published_at` is missing")?,
+                &Iso8601::DEFAULT,
+            )
+            .context("failed to parse `published_at`")?,
+        })
+    }
+}
+
 impl TryFrom<PlaylistItem> for Video {
     type Error = Error;
 
     fn try_from(video: PlaylistItem) -> Result<Self, Self::Error> {
-        let snippet = video.snippet.context("asked for `snippet` yet it is missing")?;
+        let snippet = video.snippet.context("`snippet` is missing")?;
         Ok(Self {
             channel_title: snippet.channel_title.context("`channel_title` is missing")?,
             channel_id: snippet.channel_id.context("`channel_id` is missing")?,
