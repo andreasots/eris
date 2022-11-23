@@ -199,9 +199,7 @@ impl Video {
             .as_deref()
             .into_iter()
             .flatten()
-            .filter_map(|tag| {
-                (self.title.contains(&tag.name) || self.channel_title == tag.name).then_some(tag.id)
-            })
+            .filter_map(|tag| (self.channel_title == tag.name).then_some(tag.id))
             .collect::<Vec<_>>()
     }
 
