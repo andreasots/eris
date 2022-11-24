@@ -43,7 +43,7 @@ pub fn split_to_parts(msg: &str, max_codepoints: usize) -> Vec<String> {
     while let Some(segment) = iter.next() {
         let segment_len = segment.chars().count();
         let has_trailing = iter.peek().is_some();
-        let max_part_len = max_codepoints - has_trailing.then(|| MARKER_LEN).unwrap_or(0);
+        let max_part_len = max_codepoints - if has_trailing { MARKER_LEN } else { 0 };
         if next_len + segment_len <= max_part_len {
             next.push_str(segment);
             next_len += segment_len;

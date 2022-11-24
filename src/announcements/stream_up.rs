@@ -66,17 +66,17 @@ async fn stream_up_inner(
     };
 
     let mut message = String::new();
-    message.push_str(&channel.display_name.as_ref().unwrap_or(&channel.login));
+    message.push_str(channel.display_name.as_ref().unwrap_or(&channel.login));
     message.push_str(" is live with ");
     message.push_str(&what);
     if let Some(ref status) = channel.status {
         message.push_str(" (");
-        message.push_str(&crate::markdown::escape(&status));
-        message.push_str(")");
+        message.push_str(&crate::markdown::escape(status));
+        message.push(')');
     }
     message.push_str("! <https://twitch.tv/");
     message.push_str(&channel.login);
-    message.push_str(">");
+    message.push('>');
 
     let message = discord
         .create_message(config.announcements)

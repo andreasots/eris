@@ -238,7 +238,7 @@ impl<'a> Ast<'a> {
                 Column::Name => {
                     Ok(single_predicate(quote::Column::AttribName, *op, &term[..], |c, v| {
                         // TODO: `sea_query` has `LIKE` but not `ILIKE`
-                        Expr::expr(Func::lower(Expr::col(c))).like(as_ilike(&v).to_lowercase())
+                        Expr::expr(Func::lower(Expr::col(c))).like(as_ilike(v).to_lowercase())
                     })
                     .into())
                 }
@@ -272,7 +272,7 @@ impl<'a> Ast<'a> {
                                         |c, v| {
                                             // TODO: `sea_query` has `LIKE` but not `ILIKE`
                                             Expr::expr(Func::lower(Expr::col(c)))
-                                                .like(as_ilike(&v).to_lowercase())
+                                                .like(as_ilike(v).to_lowercase())
                                         },
                                     ))
                                     .select_only()
@@ -294,7 +294,7 @@ impl<'a> Ast<'a> {
                                         |c, v| {
                                             // TODO: `sea_query` has `LIKE` but not `ILIKE`
                                             Expr::expr(Func::lower(Expr::col(c)))
-                                                .like(as_ilike(&v).to_lowercase())
+                                                .like(as_ilike(v).to_lowercase())
                                         },
                                     ))
                                     .select_only()
@@ -327,9 +327,9 @@ fn unescape(s: &str) -> Cow<str> {
     impl Replacer for Expander {
         fn replace_append(&mut self, captures: &Captures, dst: &mut String) {
             match captures.get(1).unwrap().as_str() {
-                "n" => dst.push_str("\n"),
-                "r" => dst.push_str("\r"),
-                "t" => dst.push_str("\t"),
+                "n" => dst.push('\n'),
+                "r" => dst.push('\r'),
+                "t" => dst.push('\t'),
                 c => dst.push_str(c),
             }
         }
@@ -412,7 +412,7 @@ async fn load_regconfig(conn: &DatabaseConnection) -> Result<(), Error> {
                 .await
                 .context("failed to query the `english` regconfig")?
                 .context("`english` regconfig missing")?;
-            Ok(row.try_get("", "english").context("failed to get the column")?)
+            row.try_get("", "english").context("failed to get the column")
         })
         .await?;
     Ok(())
@@ -709,14 +709,14 @@ impl CommandHandler for Details {
                 .field(EmbedFieldBuilder::new("ID", quote.id.to_string()))
                 .field(EmbedFieldBuilder::new("Quote", crate::markdown::escape(&quote.quote)));
             if let Some(ref name) = quote.attrib_name {
-                embed = embed.field(EmbedFieldBuilder::new("Name", crate::markdown::escape(&name)));
+                embed = embed.field(EmbedFieldBuilder::new("Name", crate::markdown::escape(name)));
             }
             if let Some(date) = quote.attrib_date {
                 embed = embed.field(EmbedFieldBuilder::new("Date", date.to_string()));
             }
             if let Some(ref context) = quote.context {
                 embed = embed
-                    .field(EmbedFieldBuilder::new("Context", crate::markdown::escape(&context)));
+                    .field(EmbedFieldBuilder::new("Context", crate::markdown::escape(context)));
             }
             if let Some(game) = game {
                 embed = embed.field(EmbedFieldBuilder::new("Game ID", game.id.to_string())).field(

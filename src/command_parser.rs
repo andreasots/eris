@@ -277,7 +277,7 @@ impl Builder {
 
     fn expand_pattern(prefix: &str, pattern: &str) -> Result<Regex, Error> {
         let prefix = regex::escape(prefix);
-        let expanded = pattern.replace(" ", r"(?:\s+)");
+        let expanded = pattern.replace(' ', r"(?:\s+)");
         Regex::new(&format!(r"^\s*{prefix}\s*{expanded}\s*$")).map_err(|err| {
             Error::new(err).context(format!("failed to compile pattern {pattern:?}"))
         })
@@ -293,7 +293,7 @@ impl Builder {
             .handlers
             .into_iter()
             .map(|handler| {
-                let pattern = Self::expand_pattern(&config.command_prefix, &handler.pattern())?;
+                let pattern = Self::expand_pattern(&config.command_prefix, handler.pattern())?;
                 Ok((pattern, handler))
             })
             .collect::<Result<Vec<_>, Error>>()

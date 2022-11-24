@@ -142,16 +142,14 @@ impl Autotopic {
         } else {
             let distance =
                 levenshtein::levenshtein(old_topic_static_prefix, new_topic_static_prefix);
-            if distance == 0 {
+            if distance == 0
+                || distance < SIMILARITY_THRESHOLD
+                    && self
+                        .last_updated
+                        .map(|t| (now - t) < SIMILAR_MIN_UPDATE_INTERVAL)
+                        .unwrap_or(false)
+            {
                 return Ok(());
-            } else if distance < SIMILARITY_THRESHOLD {
-                if self
-                    .last_updated
-                    .map(|t| (now - t) < SIMILAR_MIN_UPDATE_INTERVAL)
-                    .unwrap_or(false)
-                {
-                    return Ok(());
-                }
             }
         }
 
@@ -319,7 +317,7 @@ impl Autotopic {
                 messages.push(
                     EventDisplay {
                         event: &Event {
-                            start: start,
+                            start,
                             summary: String::from("Desert Bus for Hope"),
                             end: start + time::Duration::hours(total_hours),
                             location: Some(String::from(

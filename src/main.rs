@@ -40,8 +40,8 @@ mod shorten;
 mod time;
 mod token_renewal;
 
-const DEFAULT_TRACING_FILTER: &'static str = "info,sqlx::query=warn";
-const USER_AGENT: &'static str = concat!(
+const DEFAULT_TRACING_FILTER: &str = "info,sqlx::query=warn";
+const USER_AGENT: &str = concat!(
     "LRRbot/2.0 ",
     env!("CARGO_PKG_NAME"),
     "/",
@@ -289,7 +289,7 @@ async fn main() -> Result<(), Error> {
 
     while let Some((_, event)) = events.next().await {
         if let Some(ref influxdb) = influxdb {
-            if let Err(error) = crate::metrics::on_event(&cache, &influxdb, &event).await {
+            if let Err(error) = crate::metrics::on_event(&cache, influxdb, &event).await {
                 error!(?error, "failed to collect metrics");
             }
         }

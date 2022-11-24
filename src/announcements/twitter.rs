@@ -26,11 +26,11 @@ async fn init(config: &Config) -> Result<(Token, HashMap<u64, Vec<Id<ChannelMark
             .map(|user| (user.screen_name.to_lowercase(), user.id))
             .collect::<HashMap<_, _>>();
 
-    let mut users = HashMap::new();
-
-    for (user, channels) in &config.twitter_users {
-        users.insert(user_ids[user], channels.clone());
-    }
+    let users = config
+        .twitter_users
+        .iter()
+        .map(|(user, channels)| (user_ids[user], channels.clone()))
+        .collect();
 
     Ok((token, users))
 }
@@ -46,7 +46,7 @@ async fn inner<'a>(
         let last_tweet_id =
             state::get::<u64>(&state_key, db).await.context("failed to get the last tweet ID")?;
 
-        let mut tweets = egg_mode::tweet::user_timeline(user_id, true, true, &token)
+        let mut tweets = egg_mode::tweet::user_timeline(user_id, true, true, token)
             .call(last_tweet_id, None)
             .await
             .context("failed to fetch new tweets")?

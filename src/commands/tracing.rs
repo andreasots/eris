@@ -47,10 +47,10 @@ impl<S> CommandHandler for TracingFilter<S> {
         Box::pin(async move {
             let directives = args.get(0).unwrap_or("");
             let directives =
-                if directives != "" { directives } else { crate::DEFAULT_TRACING_FILTER };
+                if !directives.is_empty() { directives } else { crate::DEFAULT_TRACING_FILTER };
 
             let filter =
-                EnvFilter::try_new(&directives).context("failed to construct the new filter")?;
+                EnvFilter::try_new(directives).context("failed to construct the new filter")?;
 
             let mut old_filter = String::new();
 
@@ -66,7 +66,7 @@ impl<S> CommandHandler for TracingFilter<S> {
                 .content(&format!(
                     "Replaced `{}` with `{}`.",
                     crate::markdown::escape(&old_filter),
-                    crate::markdown::escape(&directives)
+                    crate::markdown::escape(directives)
                 ))
                 .context("response message invalid")?
                 .await

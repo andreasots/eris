@@ -63,8 +63,7 @@ impl CommandHandler for Static {
                 if access.user_has_access(message.author.id, guild_id, cache) {
                     let response = response.choose(&mut rand::thread_rng());
                     if let Some(response) = response {
-                        let mut vars = HashMap::new();
-                        vars.insert(
+                        let vars = HashMap::from([(
                             "user".to_string(),
                             message
                                 .guild_id
@@ -73,7 +72,7 @@ impl CommandHandler for Static {
                                 .and_then(CachedMember::nick)
                                 .unwrap_or(&message.author.name)
                                 .to_string(),
-                        );
+                        )]);
 
                         let response = strfmt::strfmt(response, &vars)
                             .context("failed to format the reply")?;
@@ -168,7 +167,7 @@ fn extract_command(cmd: &str) -> String {
     let mut command = String::new();
     for (i, part) in cmd.split_whitespace().enumerate() {
         if i != 0 {
-            command.push_str(" ");
+            command.push(' ');
         }
         command.push_str(part);
     }

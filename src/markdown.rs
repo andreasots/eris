@@ -9,9 +9,9 @@ pub fn escape(text: &str) -> Cow<str> {
 
     RE_META.replace_all(text, |caps: &Captures| {
         if let Some(m) = caps.get(1) {
-            return format!("<{}>", m.as_str().to_string());
+            format!("<{}>", m.as_str())
         } else if let Some(m) = caps.get(2) {
-            return format!("\\{}", m.as_str());
+            format!("\\{}", m.as_str())
         } else {
             unreachable!()
         }

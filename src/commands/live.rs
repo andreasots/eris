@@ -91,14 +91,14 @@ impl CommandHandler for Live {
                         if i != 0 {
                             content.push_str(", ");
                         }
-                        content.push_str(&crate::markdown::escape(&stream.user_name.as_str()));
+                        content.push_str(&crate::markdown::escape(stream.user_name.as_str()));
                         content.push_str(" (https://twitch.tv/");
-                        content.push_str(&stream.user_login.as_str());
+                        content.push_str(stream.user_login.as_str());
                         content.push_str(") is playing ");
                         content.push_str(&crate::markdown::escape(&stream.game_name));
                         content.push_str(" (");
                         content.push_str(&crate::markdown::escape(&stream.title));
-                        content.push_str(")");
+                        content.push(')');
                     }
                     &content
                 })

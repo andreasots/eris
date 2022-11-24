@@ -162,11 +162,10 @@ impl Config {
                         .collect::<Result<HashMap<String, Vec<Id<ChannelMarker>>>, Error>>()
                 })
                 .unwrap_or_else(|| {
-                    let mut twitter = HashMap::new();
-                    twitter
-                        .insert(String::from("loadingreadyrun"), vec![Id::new(322643668831961088)]);
-                    twitter.insert(String::from("desertbus"), vec![Id::new(370211226564689921)]);
-                    Ok(twitter)
+                    Ok(HashMap::from([
+                        (String::from("loadingreadyrun"), vec![Id::new(322643668831961088)]),
+                        (String::from("desertbus"), vec![Id::new(370211226564689921)]),
+                    ]))
                 })?,
 
             contact_spreadsheet: ini

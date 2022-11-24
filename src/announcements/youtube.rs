@@ -182,10 +182,10 @@ impl Video {
         for line in description.lines() {
             message.push_str("> ");
             message.push_str(&crate::markdown::suppress_embeds(line));
-            message.push_str("\n");
+            message.push('\n');
         }
         if !message.is_empty() {
-            message.push_str("\n");
+            message.push('\n');
         }
         message.push_str("Video: https://youtu.be/");
         message.push_str(&self.id);

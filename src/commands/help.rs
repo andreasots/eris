@@ -67,7 +67,7 @@ impl Help {
             let mut cleaned = String::with_capacity(command.len());
             for (i, part) in command.split_whitespace().enumerate() {
                 if i != 0 {
-                    cleaned.push_str(" ");
+                    cleaned.push(' ');
                 }
                 cleaned.push_str(part);
             }
@@ -84,7 +84,7 @@ impl Help {
                 let mut embed = EmbedBuilder::new()
                     .title(format!("`{}{}`", config.command_prefix, help.usage))
                     .description(help.description);
-                if examples.len() > 0 {
+                if !examples.is_empty() {
                     embed = embed.field(EmbedField {
                         inline: false,
                         name: "Examples".into(),

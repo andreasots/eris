@@ -69,7 +69,7 @@ impl CommandHandler for New {
                 .await
                 .context("failed to get the video")?;
 
-            let videos = videos.items.unwrap_or_else(Vec::new);
+            let videos = videos.items.unwrap_or_default();
             if !videos.is_empty() {
                 for video in videos {
                     let thread = Video::try_from(video)
@@ -226,7 +226,7 @@ impl CommandHandler for Refresh {
                 .await
                 .context("failed to get the video")?;
 
-            let videos = videos.items.unwrap_or_else(Vec::new);
+            let videos = videos.items.unwrap_or_default();
             if !videos.is_empty() {
                 for video in videos {
                     Video::try_from(video)

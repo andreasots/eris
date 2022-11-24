@@ -134,7 +134,7 @@ impl Next {
             if let Some(ref location) = event.location {
                 result.push_str(" (");
                 result.push_str(&crate::markdown::escape(location));
-                result.push_str(")");
+                result.push(')');
             }
 
             if let Some(ref desc) = event.description {
@@ -144,7 +144,7 @@ impl Next {
                     &crate::calendar::format_description(desc),
                     200,
                 )));
-                result.push_str(")");
+                result.push(')');
             }
             result.push_str(" on ");
             result.push_str(&
@@ -195,7 +195,7 @@ impl CommandHandler for Next {
                 .create_message(message.channel_id)
                 .reply(message.id)
                 .flags(MessageFlags::SUPPRESS_EMBEDS)
-                .content(&self.get_response(config, &args).await?)
+                .content(&self.get_response(config, args).await?)
                 .context("reply message invalid")?
                 .await
                 .context("failed to reply to command")?;
