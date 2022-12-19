@@ -46,7 +46,16 @@ version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8fd6ab55f1ff5293c7dc9e0e65511cc6a1d0e2e625f2b3c32da83748ceb5f65"
 dependencies = [
- "aliri_braid_impl",
+ "aliri_braid_impl 0.2.4",
+]
+
+[[package]]
+name = "aliri_braid"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8229f042e9dd9f4a59fd80ff0a78a9852015f3ea4692c105f075e35defccd51a"
+dependencies = [
+ "aliri_braid_impl 0.3.1",
 ]
 
 [[package]]
@@ -54,6 +63,17 @@ name = "aliri_braid_impl"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0856c8aaba3fca9cc15c723e0cab5dd352cd236e9fedd96759e56874abef6cb"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "aliri_braid_impl"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bda1e7834e998e8d0439170c12e6a030dfd26d9c7a2b9a66263fff970f710b74"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1176,9 +1196,9 @@ dependencies = [
 
 [[package]]
 name = "ipnet"
-version = "2.5.1"
+version = "2.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f88c5561171189e69df9d98bcf18fd5f9558300f7ea7b801eb8a0fd748bd8745"
+checksum = "11b0d96e660696543b251e58030cf9787df56da39dab19ad60eae7353040917e"
 
 [[package]]
 name = "itertools"
@@ -1510,7 +1530,7 @@ checksum = "7d17b78036a60663b797adeaee46f5c9dfebb86948d1255007a1d6be0271ff99"
 dependencies = [
  "instant",
  "lock_api",
- "parking_lot_core 0.8.5",
+ "parking_lot_core 0.8.6",
 ]
 
 [[package]]
@@ -1525,9 +1545,9 @@ dependencies = [
 
 [[package]]
 name = "parking_lot_core"
-version = "0.8.5"
+version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d76e8e1493bcac0d2766c42737f34458f1c8c50c0d23bcb24ea953affb273216"
+checksum = "60a2cfe6f0ad2bfc16aefa463b497d5c7a5ecd44a23efa72aa342d90177356dc"
 dependencies = [
  "cfg-if",
  "instant",
@@ -2889,7 +2909,7 @@ version = "0.7.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6e899aaa44d0b8ebc0d19271ff3d7e3c4aea9c4c5e7d55c6a6b87848ba6e14d"
 dependencies = [
- "aliri_braid",
+ "aliri_braid 0.2.4",
  "async-trait",
  "displaydoc",
  "futures",
@@ -2916,7 +2936,7 @@ version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d59eb7af6adc561dc31e15afdd353ec31921d7dce5592f41e815731d9e0a51a"
 dependencies = [
- "aliri_braid",
+ "aliri_braid 0.2.4",
  "async-trait",
  "base64",
  "displaydoc",
@@ -2933,11 +2953,11 @@ dependencies = [
 
 [[package]]
 name = "twitch_types"
-version = "0.3.6"
+version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10cb2ab8c1a8f454662f2a6f72b96bb485148ed63d380380f5fb5390590442d5"
+checksum = "3471b4115fcf48136c4e84f6bd5655afdb8e089b64e2d9cf44662c8ae462859c"
 dependencies = [
- "aliri_braid",
+ "aliri_braid 0.3.1",
  "displaydoc",
  "serde",
  "serde_derive",
@@ -2948,9 +2968,9 @@ dependencies = [
 
 [[package]]
 name = "typenum"
-version = "1.15.0"
+version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
+checksum = "497961ef93d974e23eb6f433eb5fe1b7930b659f06d12dec6fc44a8f554c0bba"
 
 [[package]]
 name = "unicode-bidi"
@@ -3169,9 +3189,9 @@ dependencies = [
 
 [[package]]
 name = "webpki-roots"
-version = "0.22.5"
+version = "0.22.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "368bfe657969fb01238bb756d351dcade285e0f6fcbd36dcb23359a5169975be"
+checksum = "b6c71e40d7d2c34a5106301fb632274ca37242cd0c9d3e64dbece371a40a2d87"
 dependencies = [
  "webpki 0.22.0",
 ]
