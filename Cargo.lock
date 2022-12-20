@@ -42,31 +42,11 @@ checksum = "250f629c0161ad8107cf89319e990051fae62832fd343083bea452d93e2205fd"
 
 [[package]]
 name = "aliri_braid"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8fd6ab55f1ff5293c7dc9e0e65511cc6a1d0e2e625f2b3c32da83748ceb5f65"
-dependencies = [
- "aliri_braid_impl 0.2.4",
-]
-
-[[package]]
-name = "aliri_braid"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8229f042e9dd9f4a59fd80ff0a78a9852015f3ea4692c105f075e35defccd51a"
 dependencies = [
- "aliri_braid_impl 0.3.1",
-]
-
-[[package]]
-name = "aliri_braid_impl"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0856c8aaba3fca9cc15c723e0cab5dd352cd236e9fedd96759e56874abef6cb"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
+ "aliri_braid_impl",
 ]
 
 [[package]]
@@ -2905,11 +2885,11 @@ dependencies = [
 
 [[package]]
 name = "twitch_api"
-version = "0.7.0-rc.2"
+version = "0.7.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6e899aaa44d0b8ebc0d19271ff3d7e3c4aea9c4c5e7d55c6a6b87848ba6e14d"
+checksum = "fde9c22ff62d8567b63a46cc1d618a246eaa96f2528f173409a128af50d74e83"
 dependencies = [
- "aliri_braid 0.2.4",
+ "aliri_braid",
  "async-trait",
  "displaydoc",
  "futures",
@@ -2932,11 +2912,11 @@ dependencies = [
 
 [[package]]
 name = "twitch_oauth2"
-version = "0.9.2"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b310aca127ff211e6eaeb6a92f5028ca0060e85bb337eecbdfbc72d4e8308f58"
+checksum = "a56903ec87be83c54f57c123df3101ea7b97f54eb617e8493fde8978c43b0a8a"
 dependencies = [
- "aliri_braid 0.3.1",
+ "aliri_braid",
  "async-trait",
  "base64",
  "displaydoc",
@@ -2957,7 +2937,7 @@ version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3471b4115fcf48136c4e84f6bd5655afdb8e089b64e2d9cf44662c8ae462859c"
 dependencies = [
- "aliri_braid 0.3.1",
+ "aliri_braid",
  "displaydoc",
  "serde",
  "serde_derive",
