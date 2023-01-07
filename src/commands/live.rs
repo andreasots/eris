@@ -122,7 +122,7 @@ fn get_followed_streams<'a, T, C>(
         dyn futures::Stream<
                 Item = Result<
                     Stream,
-                    twitch_api::helix::ClientRequestError<<C as twitch_api::HttpClient<'a>>::Error>,
+                    twitch_api::helix::ClientRequestError<<C as twitch_api::HttpClient>::Error>,
                 >,
             > + Send
             + 'a,
@@ -130,7 +130,7 @@ fn get_followed_streams<'a, T, C>(
 >
 where
     T: twitch_api::twitch_oauth2::TwitchToken + Send + Sync + ?Sized,
-    C: twitch_api::HttpClient<'a> + Sync,
+    C: twitch_api::HttpClient + Sync,
 {
     use futures::StreamExt;
 
