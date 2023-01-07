@@ -5,6 +5,7 @@ use std::pin::Pin;
 use anyhow::{Context, Error};
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client as DiscordClient;
+use twilight_mention::Mention;
 use twilight_model::channel::message::MessageFlags;
 use twilight_model::channel::{Channel, ChannelType, Message};
 
@@ -70,10 +71,7 @@ impl CommandHandler for Voice {
     ) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send + 'a>> {
         Box::pin(async move {
             let content = match self.exec(config, discord, args.get(0).unwrap()).await {
-                Ok(channel) => format!(
-                    "Created a temporary voice channel \"{}\"",
-                    channel.name.as_deref().map(crate::markdown::escape).as_deref().unwrap_or("")
-                ),
+                Ok(channel) => format!("Created a temporary voice channel {}", channel.mention()),
                 Err(error) => format!("Failed to create a temporary voice channel: {}", error),
             };
 
