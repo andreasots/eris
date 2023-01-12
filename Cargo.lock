@@ -2942,9 +2942,9 @@ dependencies = [
 
 [[package]]
 name = "twitch_types"
-version = "0.3.10"
+version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3471b4115fcf48136c4e84f6bd5655afdb8e089b64e2d9cf44662c8ae462859c"
+checksum = "015e62ee19cc924c3199e9a9641d122ab5ee14e5b94fcba9693d6505f537b36e"
 dependencies = [
  "aliri_braid",
  "displaydoc",
