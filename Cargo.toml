@@ -42,7 +42,7 @@ tracing-subscriber = { version = "0.3.16", default-features = false, features = 
 twilight-cache-inmemory = { version = "0.14.1", default-features = false, features = ["permission-calculator"] }
 twilight-gateway = { version = "0.14.0", default-features = false, features = ["rustls-native-roots", "zlib-stock"] }
 twilight-http = { version = "0.14.1", default-features = false, features = ["decompression", "rustls-native-roots"] }
-twilight-model = "0.14.2"
+twilight-model = "0.14.3"
 twilight-util = { version = "0.14.1", default-features = false, features = ["builder", "snowflake"] }
 twilight-validate = "0.14.1"
 twilight-mention = "0.14.0"
