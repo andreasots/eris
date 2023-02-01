@@ -44,7 +44,7 @@ twilight-gateway = { version = "0.14.0", default-features = false, features = ["
 twilight-http = { version = "0.14.1", default-features = false, features = ["decompression", "rustls-native-roots"] }
 twilight-model = "0.14.2"
 twilight-util = { version = "0.14.1", default-features = false, features = ["builder", "snowflake"] }
-twilight-validate = "0.14.1"
+twilight-validate = "0.14.2"
 twilight-mention = "0.14.0"
 twitch_api = { version = "0.7.0-rc.4", features = ["all", "reqwest"] }
 unicode-segmentation = "1.10.0"
