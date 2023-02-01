@@ -2839,9 +2839,9 @@ dependencies = [
 
 [[package]]
 name = "twilight-http-ratelimiting"
-version = "0.14.1"
+version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "138510dde92c0f394e0bbcd93203d616ff095fa1acc92f3bcfe6dbeaace24726"
+checksum = "11aa98cc9392b252b32345d89dfac410b013059fe295a6fd2bbac72e0d6b9f38"
 dependencies = [
  "futures-util",
  "http",
@@ -2893,9 +2893,9 @@ dependencies = [
 
 [[package]]
 name = "twitch_api"
-version = "0.7.0-rc.3"
+version = "0.7.0-rc.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fde9c22ff62d8567b63a46cc1d618a246eaa96f2528f173409a128af50d74e83"
+checksum = "dd1fa6d9a6a8623dd4d20ffecba5edc708bd537cd6e5a335d825948ee6023890"
 dependencies = [
  "aliri_braid",
  "async-trait",
