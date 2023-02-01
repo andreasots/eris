@@ -9,7 +9,6 @@ use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client as DiscordClient;
 use twilight_model::channel::message::MessageFlags;
 use twilight_model::channel::Message;
-use twitch_api::helix::streams::Stream;
 use twitch_api::twitch_oauth2::{AccessToken, UserToken};
 use twitch_api::HelixClient;
 
@@ -72,7 +71,9 @@ impl CommandHandler for Live {
             .await
             .context("failed to validate the bot user token")?;
 
-            let mut streams = get_followed_streams(&self.helix, &token)
+            let mut streams = self
+                .helix
+                .get_followed_streams(&token)
                 .try_collect::<Vec<_>>()
                 .await
                 .context("failed to fetch the streams")?;
@@ -110,36 +111,4 @@ impl CommandHandler for Live {
             Ok(())
         })
     }
-}
-
-// Literally just `HelixClient::get_followed_streams` but the returned stream is `Send`.
-// The returned stream is already send but not defined as such in the interface.
-fn get_followed_streams<'a, T, C>(
-    client: &'a HelixClient<'a, C>,
-    token: &'a T,
-) -> std::pin::Pin<
-    Box<
-        dyn futures::Stream<
-                Item = Result<
-                    Stream,
-                    twitch_api::helix::ClientRequestError<<C as twitch_api::HttpClient>::Error>,
-                >,
-            > + Send
-            + 'a,
-    >,
->
-where
-    T: twitch_api::twitch_oauth2::TwitchToken + Send + Sync + ?Sized,
-    C: twitch_api::HttpClient + Sync,
-{
-    use futures::StreamExt;
-
-    let user_id = match token.user_id().ok_or_else(|| {
-        twitch_api::helix::ClientRequestError::Custom("no user_id found on token".into())
-    }) {
-        Ok(t) => t,
-        Err(e) => return futures::stream::once(async { Err(e) }).boxed(),
-    };
-    let req = twitch_api::helix::streams::GetFollowedStreamsRequest::user_id(user_id);
-    twitch_api::helix::make_stream(req, token, client, std::collections::VecDeque::from)
 }
