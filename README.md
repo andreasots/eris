@@ -9,7 +9,6 @@ Needs a [LRRbot](https://github.com/mrphlip/lrrbot) to run.
 
 Roughly:
 ```bash
-rustup toolchain install nightly
 cd /path/to/lrrbot
 # in a different terminal: . venv/bin/activate; python3 start_bot.py
 cargo run --manifest-path /path/to/eris/Cargo.toml --release
