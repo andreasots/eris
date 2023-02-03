@@ -14,7 +14,7 @@ lalrpop = { version = "0.19.8", default-features = false, features = ["lexer"] }
 anyhow = { version = "1.0.68", default-features = false, features = ["std"] }
 bytes = { version = "1.2.1", default-features = false }
 clap = { version = "4.1.4", default-features = false, features = ["std"] }
-egg-mode = { version = "0.16.0", default-features = false, features = ["rustls"] }
+egg-mode = { version = "0.16.1", default-features = false, features = ["rustls"] }
 futures = { version = "0.3.26", default-features = false, features = ["std", "async-await"] }
 google-calendar3 = "4.0.1"
 google-sheets4 = "4.0.1"
