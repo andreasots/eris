@@ -2815,9 +2815,9 @@ dependencies = [
 
 [[package]]
 name = "twilight-gateway-queue"
-version = "0.14.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21c3de23d1819c451ea9963770115628e8f9376e23254e108c84ccf8adff1b21"
+checksum = "140ae587135d22927b001afbac23c4d312cbdd533051cee95fbf8495eda30b4c"
 dependencies = [
  "tokio",
  "tracing",
