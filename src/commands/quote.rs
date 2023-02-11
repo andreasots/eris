@@ -7,6 +7,7 @@ use anyhow::{Context as _, Error};
 use lalrpop_util::ParseError;
 use rand::seq::SliceRandom;
 use regex::{Captures, Regex, Replacer};
+use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::sea_query::{ConditionExpression, Expr, Func, PgFunc, SimpleExpr};
 use sea_orm::{
     ColumnTrait, Condition, ConnectionTrait, DatabaseBackend, DatabaseConnection, EntityTrait,
@@ -252,7 +253,7 @@ impl<'a> Ast<'a> {
                     Ok(single_predicate(quote::Column::Context, *op, &term[..], |c, v| {
                         c.is_not_null().and(
                             Expr::expr(PgFunc::to_tsvector(
-                                Func::coalesce([Expr::col(c), Expr::val("")]),
+                                Func::coalesce([Expr::col(c).into(), Expr::val("").into()]),
                                 ENGLISH.get().copied(),
                             ))
                             .matches(PgFunc::plainto_tsquery(Expr::val(v), ENGLISH.get().copied())),
@@ -307,7 +308,10 @@ impl<'a> Ast<'a> {
             },
             Ast::Bare(term) => Ok(Expr::expr(PgFunc::to_tsvector(
                 Expr::col(quote::Column::Quote).concatenate(Expr::val(" ")).concatenate(
-                    Func::coalesce([Expr::col(quote::Column::Context), Expr::val("")]),
+                    Func::coalesce([
+                        Expr::col(quote::Column::Context).into(),
+                        Expr::val("").into(),
+                    ]),
                 ),
                 ENGLISH.get().copied(),
             ))
