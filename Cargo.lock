@@ -86,9 +86,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.68"
+version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2cb2f989d18dd141ab8ae82f64d1a8cdd37e0840f73a406896cf5e99502fab61"
+checksum = "224afbd727c3d6e4b90103ece64b8d1b67fbb1973b1046c2281eed3f3803f800"
 
 [[package]]
 name = "ascii-canvas"
@@ -588,9 +588,9 @@ checksum = "03d8c417d7a8cb362e0c37e5d815f5eb7c37f79ff93707329d5a194e42e54ca0"
 
 [[package]]
 name = "egg-mode"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb96b3df2a1dd9fe043e58eed7ba1c835a23561e777e243e8cc08aa4178aec79"
+checksum = "1ba67cb7d82f4e358bf5b67099d949e21f2419bde17b892ce09f0950e5e97be3"
 dependencies = [
  "base64 0.13.1",
  "chrono",
@@ -673,9 +673,9 @@ dependencies = [
  "twilight-gateway",
  "twilight-http",
  "twilight-mention",
- "twilight-model",
+ "twilight-model 0.14.4",
  "twilight-util",
- "twilight-validate",
+ "twilight-validate 0.15.0",
  "twitch_api",
  "unicode-segmentation",
  "unicode-width",
@@ -1044,9 +1044,9 @@ checksum = "c4a1e36c821dbe04574f602848a19f742f4fb3c98d40449f11bcad18d6b17421"
 
 [[package]]
 name = "hyper"
-version = "0.14.23"
+version = "0.14.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "034711faac9d2166cb1baf1a2fb0b60b1f277f8492fd72176c17f3515e1abd3c"
+checksum = "5e011372fa0b68db8350aa7a248930ecc7839bf46d8485577d69f117a75f164c"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -1594,9 +1594,9 @@ checksum = "478c572c3d73181ff3c2539045f6eb99e5491218eae919370993b890cdbdd98e"
 
 [[package]]
 name = "petgraph"
-version = "0.6.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6d5014253a1331579ce62aa67443b4a658c5e7dd03d4bc6d302b94474888143"
+checksum = "4dd7d28ee937e54fe3080c91faa1c3a46c06de6252988a7f4592ba2310ef22a4"
 dependencies = [
  "fixedbitset",
  "indexmap",
@@ -1696,9 +1696,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.50"
+version = "1.0.51"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ef7d57beacfaf2d8aee5937dab7b7f28de3cb8b1828479bb5de2a7106f2bae2"
+checksum = "5d727cae5b39d21da60fa540906919ad737832fe0b1c165da3a34d6548c849d6"
 dependencies = [
  "unicode-ident",
 ]
@@ -2163,9 +2163,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.91"
+version = "1.0.93"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "877c235533714907a8c2464236f5c4b2a17262ef1bd71f38f35ea592c8da6883"
+checksum = "cad406b69c91885b5107daf2c29572f6c8cdb3c66826821e286c533490c0bc76"
 dependencies = [
  "itoa",
  "ryu",
@@ -2787,7 +2787,7 @@ dependencies = [
  "bitflags",
  "dashmap",
  "serde",
- "twilight-model",
+ "twilight-model 0.14.4",
  "twilight-util",
 ]
 
@@ -2810,15 +2810,15 @@ dependencies = [
  "tracing",
  "twilight-gateway-queue",
  "twilight-http",
- "twilight-model",
+ "twilight-model 0.14.4",
  "url 2.3.1",
 ]
 
 [[package]]
 name = "twilight-gateway-queue"
-version = "0.14.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21c3de23d1819c451ea9963770115628e8f9376e23254e108c84ccf8adff1b21"
+checksum = "140ae587135d22927b001afbac23c4d312cbdd533051cee95fbf8495eda30b4c"
 dependencies = [
  "tokio",
  "tracing",
@@ -2840,8 +2840,8 @@ dependencies = [
  "tokio",
  "tracing",
  "twilight-http-ratelimiting",
- "twilight-model",
- "twilight-validate",
+ "twilight-model 0.14.4",
+ "twilight-validate 0.14.2",
 ]
 
 [[package]]
@@ -2862,7 +2862,7 @@ version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e11a444fc7fa4940200e3cc0b574fa92621254e19944087dde929a60996ddc9"
 dependencies = [
- "twilight-model",
+ "twilight-model 0.14.4",
 ]
 
 [[package]]
@@ -2880,13 +2880,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "twilight-model"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "517fdbf3d0593cfaaebde652bc9cdddb176e94af57d6bb86393f2adc9704ae16"
+dependencies = [
+ "bitflags",
+ "serde",
+ "serde-value",
+ "serde_repr",
+ "time 0.3.17",
+ "tracing",
+]
+
+[[package]]
 name = "twilight-util"
 version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3eb1bb1bf2b92e01a66575bd715daf4431da48136d711deb0350d4dd60b9775d"
 dependencies = [
- "twilight-model",
- "twilight-validate",
+ "twilight-model 0.14.4",
+ "twilight-validate 0.14.2",
 ]
 
 [[package]]
@@ -2895,7 +2909,16 @@ version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2e7889d81cb059ca6fdfba45876d7ea3707ea604e23533a0592f7909faffcd2"
 dependencies = [
- "twilight-model",
+ "twilight-model 0.14.4",
+]
+
+[[package]]
+name = "twilight-validate"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ff2bd5e7fff1e1ab3ef6067f7960abc47ef02f9b99f2c864689e8d6fa537dd8"
+dependencies = [
+ "twilight-model 0.15.0",
 ]
 
 [[package]]
