@@ -674,7 +674,7 @@ dependencies = [
  "twilight-http",
  "twilight-mention",
  "twilight-model 0.14.4",
- "twilight-util",
+ "twilight-util 0.15.0",
  "twilight-validate 0.15.0",
  "twitch_api",
  "unicode-segmentation",
@@ -2788,7 +2788,7 @@ dependencies = [
  "dashmap",
  "serde",
  "twilight-model 0.14.4",
- "twilight-util",
+ "twilight-util 0.14.2",
 ]
 
 [[package]]
@@ -2900,7 +2900,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3eb1bb1bf2b92e01a66575bd715daf4431da48136d711deb0350d4dd60b9775d"
 dependencies = [
  "twilight-model 0.14.4",
- "twilight-validate 0.14.2",
+]
+
+[[package]]
+name = "twilight-util"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6edb6a3d2173b73d850c14f61d58afba0b3e5e46258c66070cd908f2941e27aa"
+dependencies = [
+ "twilight-model 0.15.0",
+ "twilight-validate 0.15.0",
 ]
 
 [[package]]

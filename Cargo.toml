@@ -43,7 +43,7 @@ twilight-cache-inmemory = { version = "0.14.3", default-features = false, featur
 twilight-gateway = { version = "0.14.1", default-features = false, features = ["rustls-native-roots", "zlib-stock"] }
 twilight-http = { version = "0.14.3", default-features = false, features = ["decompression", "rustls-native-roots"] }
 twilight-model = "0.14.4"
-twilight-util = { version = "0.14.2", default-features = false, features = ["builder", "snowflake"] }
+twilight-util = { version = "0.15.0", default-features = false, features = ["builder", "snowflake"] }
 twilight-validate = "0.15.0"
 twilight-mention = "0.14.0"
 twitch_api = { version = "0.7.0-rc.4", features = ["all", "reqwest"] }
