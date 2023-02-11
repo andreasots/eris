@@ -606,7 +606,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "sha-1 0.9.8",
+ "sha-1",
  "thiserror",
  "tokio",
  "url 2.3.1",
@@ -1255,15 +1255,6 @@ name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
-
-[[package]]
-name = "leaky-bucket-lite"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1411c737dd21a748044ab29af14b7f920b2dcc277284df6dd986492c98bf5229"
-dependencies = [
- "tokio",
-]
 
 [[package]]
 name = "levenshtein"
@@ -2218,17 +2209,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sha-1"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5058ada175748e33390e40e872bd0fe59a19f265d0158daa551c5a88a76009c"
-dependencies = [
- "cfg-if",
- "cpufeatures",
- "digest 0.10.6",
-]
-
-[[package]]
 name = "sha1"
 version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2642,9 +2622,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-tungstenite"
-version = "0.17.2"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f714dd15bead90401d77e04243611caec13726c2408afd5b31901dfcdcb3b181"
+checksum = "54319c93411147bced34cb5609a80e0a8e44c5999c93903a81cd866630ec0bfd"
 dependencies = [
  "futures-util",
  "log 0.4.17",
@@ -2759,9 +2739,9 @@ checksum = "3528ecfd12c466c6f163363caf2d02a71161dd5e1cc6ae7b34207ea2d42d81ed"
 
 [[package]]
 name = "tungstenite"
-version = "0.17.3"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e27992fd6a8c29ee7eef28fc78349aa244134e10ad447ce3b9f0ac0ed0fa4ce0"
+checksum = "30ee6ab729cd4cf0fd55218530c4522ed30b7b6081752839b68fcec8d0960788"
 dependencies = [
  "base64 0.13.1",
  "byteorder",
@@ -2771,7 +2751,7 @@ dependencies = [
  "log 0.4.17",
  "rand",
  "rustls 0.20.8",
- "sha-1 0.10.1",
+ "sha1",
  "thiserror",
  "url 2.3.1",
  "utf-8",
@@ -2793,14 +2773,14 @@ dependencies = [
 
 [[package]]
 name = "twilight-gateway"
-version = "0.14.1"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77d7510817723d48c8795ac223d8684771fc0d452482416b97f0f48705495227"
+checksum = "18ba14de92d45add2c0de009e493bc16320c41aa34a2fa07991528936a6a7edc"
 dependencies = [
  "bitflags",
  "flate2",
  "futures-util",
- "leaky-bucket-lite",
+ "rand",
  "rustls 0.20.8",
  "rustls-native-certs 0.6.2",
  "serde",
@@ -2809,16 +2789,14 @@ dependencies = [
  "tokio-tungstenite",
  "tracing",
  "twilight-gateway-queue",
- "twilight-http",
- "twilight-model 0.14.4",
- "url 2.3.1",
+ "twilight-model 0.15.0",
 ]
 
 [[package]]
 name = "twilight-gateway-queue"
-version = "0.14.1"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "140ae587135d22927b001afbac23c4d312cbdd533051cee95fbf8495eda30b4c"
+checksum = "46121d26bfc2c32427947c55b46adf07bb38b45de9f5ce07a867b69fd214bc40"
 dependencies = [
  "tokio",
  "tracing",
