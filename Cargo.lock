@@ -648,7 +648,7 @@ dependencies = [
  "serde",
  "serde_json",
  "strfmt",
- "time 0.3.17",
+ "time 0.3.18",
  "time-tz",
  "tokio",
  "tokio-util",
@@ -1986,7 +1986,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "thiserror",
- "time 0.3.17",
+ "time 0.3.18",
  "tracing",
  "url 2.3.1",
  "uuid",
@@ -2013,7 +2013,7 @@ checksum = "d2fbe015dbdaa7d8829d71c1e14fb6289e928ac256b93dfda543c85cd89d6f03"
 dependencies = [
  "sea-query-derive",
  "serde_json",
- "time 0.3.17",
+ "time 0.3.18",
 ]
 
 [[package]]
@@ -2025,7 +2025,7 @@ dependencies = [
  "sea-query",
  "serde_json",
  "sqlx",
- "time 0.3.17",
+ "time 0.3.18",
 ]
 
 [[package]]
@@ -2348,7 +2348,7 @@ dependencies = [
  "sqlx-rt",
  "stringprep",
  "thiserror",
- "time 0.3.17",
+ "time 0.3.18",
  "tokio-stream",
  "url 2.3.1",
  "webpki-roots",
@@ -2494,9 +2494,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.17"
+version = "0.3.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a561bf4617eebd33bca6434b988f39ed798e527f51a1e797d0ee4f61c0a38376"
+checksum = "af0097eaf301d576d0b2aead7a59facab6d53cc636340f0291fab8446a2e8613"
 dependencies = [
  "itoa",
  "libc",
@@ -2533,7 +2533,7 @@ dependencies = [
  "phf_codegen",
  "serde",
  "serde-xml-rs",
- "time 0.3.17",
+ "time 0.3.18",
 ]
 
 [[package]]
@@ -2727,7 +2727,7 @@ dependencies = [
  "serde_json",
  "sharded-slab",
  "thread_local",
- "time 0.3.17",
+ "time 0.3.18",
  "tracing",
  "tracing-core",
  "tracing-log",
@@ -2858,7 +2858,7 @@ dependencies = [
  "serde",
  "serde-value",
  "serde_repr",
- "time 0.3.17",
+ "time 0.3.18",
  "tracing",
 ]
 
@@ -2872,7 +2872,7 @@ dependencies = [
  "serde",
  "serde-value",
  "serde_repr",
- "time 0.3.17",
+ "time 0.3.18",
  "tracing",
 ]
 
@@ -2964,7 +2964,7 @@ dependencies = [
  "serde_derive",
  "serde_repr",
  "thiserror",
- "time 0.3.17",
+ "time 0.3.18",
 ]
 
 [[package]]
@@ -3340,7 +3340,7 @@ dependencies = [
  "seahash",
  "serde",
  "serde_json",
- "time 0.3.17",
+ "time 0.3.18",
  "tokio",
  "tower-service",
  "url 2.3.1",
