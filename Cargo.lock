@@ -648,7 +648,7 @@ dependencies = [
  "serde",
  "serde_json",
  "strfmt",
- "time 0.3.17",
+ "time 0.3.19",
  "time-tz",
  "tokio",
  "tokio-util",
@@ -1986,7 +1986,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "thiserror",
- "time 0.3.17",
+ "time 0.3.19",
  "tracing",
  "url 2.3.1",
  "uuid",
@@ -2013,7 +2013,7 @@ checksum = "d2fbe015dbdaa7d8829d71c1e14fb6289e928ac256b93dfda543c85cd89d6f03"
 dependencies = [
  "sea-query-derive",
  "serde_json",
- "time 0.3.17",
+ "time 0.3.19",
 ]
 
 [[package]]
@@ -2025,7 +2025,7 @@ dependencies = [
  "sea-query",
  "serde_json",
  "sqlx",
- "time 0.3.17",
+ "time 0.3.19",
 ]
 
 [[package]]
@@ -2348,7 +2348,7 @@ dependencies = [
  "sqlx-rt",
  "stringprep",
  "thiserror",
- "time 0.3.17",
+ "time 0.3.19",
  "tokio-stream",
  "url 2.3.1",
  "webpki-roots",
@@ -2494,9 +2494,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.17"
+version = "0.3.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a561bf4617eebd33bca6434b988f39ed798e527f51a1e797d0ee4f61c0a38376"
+checksum = "53250a3b3fed8ff8fd988587d8925d26a83ac3845d9e03b220b37f34c2b8d6c2"
 dependencies = [
  "itoa",
  "libc",
@@ -2514,9 +2514,9 @@ checksum = "2e153e1f1acaef8acc537e68b44906d2db6436e2b35ac2c6b42640fff91f00fd"
 
 [[package]]
 name = "time-macros"
-version = "0.2.6"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d967f99f534ca7e495c575c62638eebc2898a8c84c119b89e250477bc4ba16b2"
+checksum = "a460aeb8de6dcb0f381e1ee05f1cd56fcf5a5f6eb8187ff3d8f0b11078d38b7c"
 dependencies = [
  "time-core",
 ]
@@ -2533,7 +2533,7 @@ dependencies = [
  "phf_codegen",
  "serde",
  "serde-xml-rs",
- "time 0.3.17",
+ "time 0.3.19",
 ]
 
 [[package]]
@@ -2727,7 +2727,7 @@ dependencies = [
  "serde_json",
  "sharded-slab",
  "thread_local",
- "time 0.3.17",
+ "time 0.3.19",
  "tracing",
  "tracing-core",
  "tracing-log",
@@ -2858,7 +2858,7 @@ dependencies = [
  "serde",
  "serde-value",
  "serde_repr",
- "time 0.3.17",
+ "time 0.3.19",
  "tracing",
 ]
 
@@ -2872,7 +2872,7 @@ dependencies = [
  "serde",
  "serde-value",
  "serde_repr",
- "time 0.3.17",
+ "time 0.3.19",
  "tracing",
 ]
 
@@ -2964,7 +2964,7 @@ dependencies = [
  "serde_derive",
  "serde_repr",
  "thiserror",
- "time 0.3.17",
+ "time 0.3.19",
 ]
 
 [[package]]
@@ -3364,7 +3364,7 @@ dependencies = [
  "seahash",
  "serde",
  "serde_json",
- "time 0.3.17",
+ "time 0.3.19",
  "tokio",
  "tower-service",
  "url 2.3.1",
