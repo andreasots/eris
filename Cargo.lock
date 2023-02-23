@@ -414,9 +414,9 @@ dependencies = [
 
 [[package]]
 name = "cxx"
-version = "1.0.89"
+version = "1.0.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc831ee6a32dd495436e317595e639a587aa9907bef96fe6e6abc290ab6204e9"
+checksum = "86d3488e7665a7a483b57e25bdd90d0aeb2bc7608c8d0346acf2ad3f1caf1d62"
 dependencies = [
  "cc",
  "cxxbridge-flags",
@@ -441,15 +441,15 @@ dependencies = [
 
 [[package]]
 name = "cxxbridge-flags"
-version = "1.0.89"
+version = "1.0.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48dcd35ba14ca9b40d6e4b4b39961f23d835dbb8eed74565ded361d93e1feb8a"
+checksum = "a2ef98b8b717a829ca5603af80e1f9e2e48013ab227b68ef37872ef84ee479bf"
 
 [[package]]
 name = "cxxbridge-macro"
-version = "1.0.89"
+version = "1.0.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81bbeb29798b407ccd82a3324ade1a7286e0d29851475990b612670f6f5124d2"
+checksum = "086c685979a698443656e5cf7856c95c642295a38599f12fb1ff76fb28d19892"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -649,7 +649,7 @@ dependencies = [
  "serde",
  "serde_json",
  "strfmt",
- "time 0.3.17",
+ "time 0.3.19",
  "time-tz",
  "tokio",
  "tokio-util",
@@ -1987,7 +1987,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "thiserror",
- "time 0.3.17",
+ "time 0.3.19",
  "tracing",
  "url 2.3.1",
  "uuid",
@@ -2014,7 +2014,7 @@ checksum = "d2fbe015dbdaa7d8829d71c1e14fb6289e928ac256b93dfda543c85cd89d6f03"
 dependencies = [
  "sea-query-derive",
  "serde_json",
- "time 0.3.17",
+ "time 0.3.19",
 ]
 
 [[package]]
@@ -2026,7 +2026,7 @@ dependencies = [
  "sea-query",
  "serde_json",
  "sqlx",
- "time 0.3.17",
+ "time 0.3.19",
 ]
 
 [[package]]
@@ -2349,7 +2349,7 @@ dependencies = [
  "sqlx-rt",
  "stringprep",
  "thiserror",
- "time 0.3.17",
+ "time 0.3.19",
  "tokio-stream",
  "url 2.3.1",
  "webpki-roots",
@@ -2495,9 +2495,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.17"
+version = "0.3.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a561bf4617eebd33bca6434b988f39ed798e527f51a1e797d0ee4f61c0a38376"
+checksum = "53250a3b3fed8ff8fd988587d8925d26a83ac3845d9e03b220b37f34c2b8d6c2"
 dependencies = [
  "itoa",
  "libc",
@@ -2515,9 +2515,9 @@ checksum = "2e153e1f1acaef8acc537e68b44906d2db6436e2b35ac2c6b42640fff91f00fd"
 
 [[package]]
 name = "time-macros"
-version = "0.2.6"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d967f99f534ca7e495c575c62638eebc2898a8c84c119b89e250477bc4ba16b2"
+checksum = "a460aeb8de6dcb0f381e1ee05f1cd56fcf5a5f6eb8187ff3d8f0b11078d38b7c"
 dependencies = [
  "time-core",
 ]
@@ -2534,7 +2534,7 @@ dependencies = [
  "phf_codegen",
  "serde",
  "serde-xml-rs",
- "time 0.3.17",
+ "time 0.3.19",
 ]
 
 [[package]]
@@ -2728,7 +2728,7 @@ dependencies = [
  "serde_json",
  "sharded-slab",
  "thread_local",
- "time 0.3.17",
+ "time 0.3.19",
  "tracing",
  "tracing-core",
  "tracing-log",
@@ -2859,7 +2859,7 @@ dependencies = [
  "serde",
  "serde-value",
  "serde_repr",
- "time 0.3.17",
+ "time 0.3.19",
  "tracing",
 ]
 
@@ -2873,7 +2873,7 @@ dependencies = [
  "serde",
  "serde-value",
  "serde_repr",
- "time 0.3.17",
+ "time 0.3.19",
  "tracing",
 ]
 
@@ -2965,7 +2965,7 @@ dependencies = [
  "serde_derive",
  "serde_repr",
  "thiserror",
- "time 0.3.17",
+ "time 0.3.19",
 ]
 
 [[package]]
@@ -3365,7 +3365,7 @@ dependencies = [
  "seahash",
  "serde",
  "serde_json",
- "time 0.3.17",
+ "time 0.3.19",
  "tokio",
  "tower-service",
  "url 2.3.1",
