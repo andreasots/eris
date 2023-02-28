@@ -13,7 +13,7 @@ lalrpop = { version = "0.19.8", default-features = false, features = ["lexer"] }
 [dependencies]
 anyhow = { version = "1.0.69", default-features = false, features = ["std"] }
 bytes = { version = "1.2.1", default-features = false }
-clap = { version = "4.1.6", default-features = false, features = ["std"] }
+clap = { version = "4.1.7", default-features = false, features = ["std"] }
 egg-mode = { version = "0.16.1", default-features = false, features = ["rustls"] }
 futures = { version = "0.3.26", default-features = false, features = ["std", "async-await"] }
 google-calendar3 = "4.0.1"
