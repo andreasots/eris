@@ -18,7 +18,7 @@ egg-mode = { version = "0.16.1", default-features = false, features = ["rustls"]
 futures = { version = "0.3.27", default-features = false, features = ["std", "async-await"] }
 google-calendar3 = "4.0.1"
 google-sheets4 = "4.0.1"
-google-youtube3 = "4.0.1"
+google-youtube3 = "5.0.2"
 influxdb = { version = "0.6.0", default-features = false, features = ["derive", "reqwest-client-rustls"] }
 lalrpop-util = { version = "0.19.8", features = ["std", "lexer"], default-features = false }
 lazy_static = { version = "1.4.0", default-features = false }
