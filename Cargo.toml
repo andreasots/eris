@@ -16,7 +16,7 @@ bytes = { version = "1.2.1", default-features = false }
 clap = { version = "4.1.9", default-features = false, features = ["std"] }
 egg-mode = { version = "0.16.1", default-features = false, features = ["rustls"] }
 futures = { version = "0.3.27", default-features = false, features = ["std", "async-await"] }
-google-calendar3 = "4.0.1"
+google-calendar3 = "5.0.2"
 google-sheets4 = "4.0.1"
 google-youtube3 = "4.0.1"
 influxdb = { version = "0.6.0", default-features = false, features = ["derive", "reqwest-client-rustls"] }
