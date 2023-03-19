@@ -8,7 +8,7 @@ use google_youtube3::hyper_rustls::HttpsConnector;
 use google_youtube3::YouTube;
 use regex::Regex;
 use sea_orm::DatabaseConnection;
-use time::format_description::well_known::{Iso8601, Rfc3339};
+use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 use tokio::sync::watch::Receiver;
 use tracing::{error, info};
@@ -298,11 +298,11 @@ impl TryFrom<google_youtube3::api::Video> for Video {
             id: video.id.context("`id` is missing")?,
             title: snippet.title.context("`title` is missing")?,
             description: snippet.description.context("`description` is missing")?,
-            published_at: OffsetDateTime::parse(
-                &snippet.published_at.context("`published_at` is missing")?,
-                &Iso8601::DEFAULT,
+            published_at: OffsetDateTime::from_unix_timestamp_nanos(
+                snippet.published_at.context("`published_at` is missing")?.timestamp_nanos()
+                    as i128,
             )
-            .context("failed to parse `published_at`")?,
+            .context("failed to convert `published_at`")?,
         })
     }
 }
@@ -322,11 +322,11 @@ impl TryFrom<PlaylistItem> for Video {
                 .context("`resource_id.video_id` is missing")?,
             title: snippet.title.context("`title` is missing")?,
             description: snippet.description.context("`description` is missing")?,
-            published_at: OffsetDateTime::parse(
-                &snippet.published_at.context("`published_at` is missing")?,
-                &Iso8601::DEFAULT,
+            published_at: OffsetDateTime::from_unix_timestamp_nanos(
+                snippet.published_at.context("`published_at` is missing")?.timestamp_nanos()
+                    as i128,
             )
-            .context("failed to parse `published_at`")?,
+            .context("failed to convert `published_at`")?,
         })
     }
 }

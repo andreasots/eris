@@ -1,9 +1,9 @@
 use anyhow::{Context, Error};
 use google_calendar3::api::EventDateTime;
+use google_calendar3::chrono::{Datelike, TimeZone, Utc};
 use google_calendar3::hyper::client::HttpConnector;
 use google_calendar3::hyper_rustls::HttpsConnector;
-use time::format_description::well_known::Rfc3339;
-use time::{Date, Duration, OffsetDateTime, PrimitiveDateTime, Time};
+use time::{Date, Duration, OffsetDateTime, Time};
 use time_tz::{PrimitiveDateTimeExt, Tz};
 use tracing::info;
 
@@ -36,23 +36,11 @@ impl Event {
 
 fn parse_timestamp(timestamp: EventDateTime, timezone: &Tz) -> Result<OffsetDateTime, Error> {
     if let Some(timestamp) = timestamp.date_time {
-        match OffsetDateTime::parse(&timestamp, &Rfc3339) {
-            Ok(timestamp) => Ok(timestamp),
-            Err(error) => {
-                info!(?error, timestamp, "failed to parse timestamp as `OffsetDateTime`");
-
-                let timestamp = PrimitiveDateTime::parse(&timestamp, &Rfc3339)
-                    .context("failed to parse the timestamp as `PrimitiveDateTime`")?;
-
-                timestamp
-                    .assume_timezone(timezone)
-                    .take_first()
-                    .ok_or_else(|| Error::msg("invalid timestamp: no such instant in time zone"))
-            }
-        }
+        OffsetDateTime::from_unix_timestamp_nanos(timestamp.timestamp_nanos() as i128)
+            .context("failed to convert timestamp to `OffsetDateTime`")
     } else if let Some(date) = timestamp.date {
-        Date::parse(&date, &Rfc3339)
-            .context("failed to parse the date")?
+        Date::from_ordinal_date(date.year(), date.ordinal0() as u16)
+            .context("failed to convert date to `Date`")?
             .with_time(Time::MIDNIGHT)
             .assume_timezone(timezone)
             .take_first()
@@ -93,7 +81,7 @@ pub async fn get_next_event(
         .max_results(10)
         .order_by("startTime")
         .single_events(true)
-        .time_min(&at.format(&Rfc3339).context("failed to format `at`")?)
+        .time_min(Utc.timestamp_nanos(at.unix_timestamp_nanos() as i64))
         .doit()
         .await
         .context("failed to get the calendar events")?;
