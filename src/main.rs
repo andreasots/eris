@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{Context as _, Error};
+use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use google_calendar3::hyper::client::{Client as HyperClient, HttpConnector};
 use google_calendar3::hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
@@ -11,10 +12,10 @@ use google_calendar3::CalendarHub;
 use google_sheets4::Sheets;
 use google_youtube3::YouTube;
 use tokio::sync::RwLock;
-use tracing::error;
+use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 use twilight_cache_inmemory::InMemoryCache;
-use twilight_gateway::{Cluster, Intents};
+use twilight_gateway::Intents;
 use twilight_http::Client as DiscordClient;
 use twilight_model::channel::message::AllowedMentions;
 use twilight_model::gateway::payload::outgoing::update_presence::UpdatePresencePayload;
@@ -37,6 +38,7 @@ mod models;
 mod rpc;
 mod service;
 mod shorten;
+mod shutdown;
 mod time;
 mod token_renewal;
 
@@ -119,6 +121,12 @@ async fn main() -> Result<(), Error> {
         )
         .get_matches();
 
+    let mut tasks = FuturesUnordered::new();
+    let (running_tx, mut running_rx) = tokio::sync::watch::channel(true);
+
+    let (handle, handler_tx) = crate::shutdown::wait_for_outstanding(running_rx.clone());
+    tasks.push(handle);
+
     let config = crate::config::Config::load_from_file(matches.get_one::<PathBuf>("conf").unwrap())
         .context("failed to load the config file")?;
     let config = Arc::new(config);
@@ -168,47 +176,8 @@ async fn main() -> Result<(), Error> {
         .build();
     let discord = Arc::new(discord);
 
-    let intents = Intents::GUILDS
-        | Intents::GUILD_MEMBERS
-        | Intents::GUILD_EMOJIS_AND_STICKERS
-        | Intents::GUILD_VOICE_STATES
-        | Intents::GUILD_MESSAGES
-        | Intents::DIRECT_MESSAGES
-        | Intents::MESSAGE_CONTENT;
-    let (cluster, mut events) = Cluster::builder(config.discord_botsecret.clone(), intents)
-        .http_client(discord.clone())
-        .presence(
-            UpdatePresencePayload::new(
-                vec![MinimalActivity {
-                    kind: ActivityType::Listening,
-                    name: format!(
-                        "{}help || v{}",
-                        config.command_prefix,
-                        env!("CARGO_PKG_VERSION")
-                    ),
-                    url: Some("https://lrrbot.com/".into()),
-                }
-                .into()],
-                false,
-                None,
-                PresenceStatus::Online,
-            )
-            .context("failed to construct the presence")?,
-        )
-        .build()
-        .await
-        .context("failed to create the cluster")?;
-    let cluster = Arc::new(cluster);
-
-    {
-        let cluster = cluster.clone();
-        tokio::spawn(async move {
-            cluster.up().await;
-        });
-    }
-
     let cache = Arc::new(InMemoryCache::new());
-    let lrrbot = Arc::new(crate::rpc::LRRbot::new(&config));
+    let lrrbot = Arc::new(crate::rpc::LRRbot::new(running_rx.clone(), handler_tx.clone(), &config));
 
     let mut rpc_server = {
         #[cfg(unix)]
@@ -239,16 +208,23 @@ async fn main() -> Result<(), Error> {
         ),
     );
 
-    tokio::spawn(rpc_server.serve());
-    tokio::spawn(crate::announcements::post_tweets(config.clone(), db.clone(), discord.clone()));
-    tokio::spawn(crate::announcements::post_videos(
+    tasks.push(tokio::spawn(rpc_server.serve(running_rx.clone(), handler_tx.clone())));
+    tasks.push(tokio::spawn(crate::announcements::post_tweets(
+        running_rx.clone(),
+        config.clone(),
+        db.clone(),
+        discord.clone(),
+    )));
+    tasks.push(tokio::spawn(crate::announcements::post_videos(
+        running_rx.clone(),
         db.clone(),
         cache.clone(),
         config.clone(),
         discord.clone(),
         youtube.clone(),
-    ));
-    tokio::spawn(crate::autotopic::autotopic(
+    )));
+    tasks.push(tokio::spawn(crate::autotopic::autotopic(
+        running_rx.clone(),
         cache.clone(),
         calendar.clone(),
         config.clone(),
@@ -258,14 +234,24 @@ async fn main() -> Result<(), Error> {
         helix.clone(),
         helix_token.clone(),
         lrrbot.clone(),
-    ));
-    tokio::spawn(crate::channel_reaper::channel_reaper(
+    )));
+    tasks.push(tokio::spawn(crate::channel_reaper::channel_reaper(
+        running_rx.clone(),
         cache.clone(),
         config.clone(),
         discord.clone(),
-    ));
-    tokio::spawn(crate::contact::post_messages(config.clone(), discord.clone(), sheets.clone()));
-    tokio::spawn(crate::token_renewal::renew_helix(helix_token.clone(), http_client.clone()));
+    )));
+    tasks.push(tokio::spawn(crate::contact::post_messages(
+        running_rx.clone(),
+        config.clone(),
+        discord.clone(),
+        sheets.clone(),
+    )));
+    tasks.push(tokio::spawn(crate::token_renewal::renew_helix(
+        running_rx.clone(),
+        helix_token.clone(),
+        http_client.clone(),
+    )));
 
     let command_parser = crate::command_parser::CommandParser::builder()
         .command(crate::commands::calendar::Next::fan(calendar.clone()))
@@ -287,18 +273,107 @@ async fn main() -> Result<(), Error> {
         .build(cache.clone(), config.clone(), discord.clone())
         .context("failed to build the command parser")?;
 
-    while let Some((_, event)) = events.next().await {
-        if let Some(ref influxdb) = influxdb {
-            if let Err(error) = crate::metrics::on_event(&cache, influxdb, &event).await {
-                error!(?error, "failed to collect metrics");
-            }
+    let intents = Intents::GUILDS
+        | Intents::GUILD_MEMBERS
+        | Intents::GUILD_EMOJIS_AND_STICKERS
+        | Intents::GUILD_VOICE_STATES
+        | Intents::GUILD_MESSAGES
+        | Intents::DIRECT_MESSAGES
+        | Intents::MESSAGE_CONTENT;
+
+    let shard_config = twilight_gateway::Config::new(config.discord_botsecret.clone(), intents);
+    let presence = UpdatePresencePayload::new(
+        vec![MinimalActivity {
+            kind: ActivityType::Listening,
+            name: format!("{}help || v{}", config.command_prefix, env!("CARGO_PKG_VERSION")),
+            url: Some("https://lrrbot.com/".into()),
         }
+        .into()],
+        false,
+        None,
+        PresenceStatus::Online,
+    )
+    .context("failed to construct the presence")?;
+    let shards =
+        twilight_gateway::stream::create_recommended(&discord, shard_config, |_, builder| {
+            builder.presence(presence.clone()).build()
+        })
+        .await
+        .context("failed to create the shards")?;
 
-        cache.update(&event);
+    for mut shard in shards {
+        let cache = cache.clone();
+        let command_parser = command_parser.clone();
+        let discord = discord.clone();
+        let influxdb = influxdb.clone();
+        let mut running_rx = running_rx.clone();
+        let handler_tx = handler_tx.clone();
 
-        crate::disconnect_afk::on_event(&cache, &discord, &event).await;
+        tasks.push(tokio::spawn(async move {
+            let shard_id = shard.id();
 
-        command_parser.on_event(&event);
+            'outer: loop {
+                let next_event_future = shard.next_event();
+                tokio::pin!(next_event_future);
+
+                'inner: loop {
+                    tokio::select! {
+                        _ = running_rx.changed() => {
+                            break 'outer;
+                        }
+                        res = &mut next_event_future => match res {
+                            Ok(event) => {
+                                if let Some(ref influxdb) = influxdb {
+                                    if let Err(error) =
+                                        crate::metrics::on_event(&cache, influxdb, &event).await
+                                    {
+                                        error!(?error, "failed to collect metrics");
+                                    }
+                                }
+
+                                cache.update(&event);
+
+                                crate::disconnect_afk::on_event(&cache, &discord, &event).await;
+
+                                command_parser.on_event(&handler_tx, &event).await;
+
+                                break 'inner;
+                            }
+                            Err(error) => {
+                                error!(
+                                    ?error,
+                                    shard.id = ?shard_id,
+                                    "failed to receive an event from the shard"
+                                );
+
+                                if error.is_fatal() {
+                                    break 'outer;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }));
+    }
+
+    tasks.push(tokio::spawn(async move {
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => (),
+            _ = running_rx.changed() => (),
+        }
+    }));
+
+    if let Some(Err(error)) = tasks.next().await {
+        error!(?error, "task failed");
+    }
+    info!("stopping bot");
+    running_tx.send_replace(false);
+
+    while let Some(res) = tasks.next().await {
+        if let Err(error) = res {
+            error!(?error, "task failed")
+        }
     }
 
     Ok(())

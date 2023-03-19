@@ -5,6 +5,7 @@ use std::time::Duration;
 use anyhow::{Context, Error};
 use egg_mode::Token;
 use sea_orm::DatabaseConnection;
+use tokio::sync::watch::Receiver;
 use tracing::{error, info};
 use twilight_http::Client as DiscordClient;
 use twilight_model::id::marker::ChannelMarker;
@@ -122,7 +123,12 @@ async fn inner<'a>(
     Ok(())
 }
 
-pub async fn post_tweets(config: Arc<Config>, db: DatabaseConnection, discord: Arc<DiscordClient>) {
+pub async fn post_tweets(
+    mut running: Receiver<bool>,
+    config: Arc<Config>,
+    db: DatabaseConnection,
+    discord: Arc<DiscordClient>,
+) {
     let (token, users) = match init(&config).await {
         Ok(res) => res,
         Err(error) => {
@@ -134,10 +140,13 @@ pub async fn post_tweets(config: Arc<Config>, db: DatabaseConnection, discord: A
     let mut timer = tokio::time::interval(Duration::from_secs(10));
 
     loop {
-        timer.tick().await;
-
-        if let Err(error) = inner(&db, &discord, &token, &users).await {
-            error!(?error, "Failed to announce new tweets");
+        tokio::select! {
+            _ = running.changed() => break,
+            _ = timer.tick() => {
+                if let Err(error) = inner(&db, &discord, &token, &users).await {
+                    error!(?error, "Failed to announce new tweets");
+                }
+            }
         }
     }
 }

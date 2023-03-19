@@ -5,6 +5,8 @@ use std::sync::Arc;
 
 use anyhow::{Context, Error};
 use regex::{Captures, Regex, RegexSet};
+use tokio::sync::mpsc::Sender;
+use tokio::task::JoinHandle;
 use tracing::{error, info, Instrument};
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_gateway::Event;
@@ -135,11 +137,12 @@ pub struct Help {
     pub examples: Cow<'static, [Cow<'static, str>]>,
 }
 
+#[derive(Clone)]
 pub struct CommandParser {
     cache: Arc<InMemoryCache>,
     config: Arc<Config>,
     discord: Arc<DiscordClient>,
-    matcher: RegexSet,
+    matcher: Arc<RegexSet>,
     handlers: Arc<Vec<(Regex, Box<dyn CommandHandler>)>>,
 }
 
@@ -148,7 +151,7 @@ impl CommandParser {
         Builder { handlers: vec![] }
     }
 
-    pub fn on_event(&self, event: &Event) {
+    pub async fn on_event(&self, handler_tx: &Sender<JoinHandle<()>>, event: &Event) {
         let Event::MessageCreate(event) = event else { return };
         let MessageCreate(ref message) = **event;
 
@@ -157,70 +160,73 @@ impl CommandParser {
         }
 
         if let Some(i) = self.matcher.matches(&message.content).into_iter().next() {
-            tokio::spawn({
-                let cache = self.cache.clone();
-                let config = self.config.clone();
-                let discord = self.discord.clone();
-                let handlers = self.handlers.clone();
-                let message = message.clone();
+            let _ = handler_tx
+                .send(tokio::spawn({
+                    let cache = self.cache.clone();
+                    let config = self.config.clone();
+                    let discord = self.discord.clone();
+                    let handlers = self.handlers.clone();
+                    let message = message.clone();
 
-                async move {
-                    let Some((pattern, handler)) = handlers.get(i) else { return };
+                    async move {
+                        let Some((pattern, handler)) = handlers.get(i) else { return };
 
-                    let span = tracing::info_span!(
-                        "handle_command",
-                        handler.name = handler.name(),
-                        message.content = message.content.as_str(),
-                        message.id = message.id.get(),
-                        message.author.id = message.author.id.get(),
-                        message.author.name = message.author.name.as_str(),
-                        message.author.discriminator = message.author.discriminator,
-                    );
+                        let span = tracing::info_span!(
+                            "handle_command",
+                            handler.name = handler.name(),
+                            message.content = message.content.as_str(),
+                            message.id = message.id.get(),
+                            message.author.id = message.author.id.get(),
+                            message.author.name = message.author.name.as_str(),
+                            message.author.discriminator = message.author.discriminator,
+                        );
 
-                    async {
-                        info!("Command received");
+                        async {
+                            info!("Command received");
 
-                        let guild_id = message.guild_id.unwrap_or(config.guild);
-                        let access = handler.access();
-                        if !access.user_has_access(message.author.id, guild_id, &cache) {
-                            info!(?access, guild.id = guild_id.get(), "refusing access");
+                            let guild_id = message.guild_id.unwrap_or(config.guild);
+                            let access = handler.access();
+                            if !access.user_has_access(message.author.id, guild_id, &cache) {
+                                info!(?access, guild.id = guild_id.get(), "refusing access");
 
-                            if let Err(error) =
-                                refuse_access(&discord, message.channel_id, message.id, access)
-                                    .await
-                            {
-                                error!(?error, "failed to report access refusal to the user");
+                                if let Err(error) =
+                                    refuse_access(&discord, message.channel_id, message.id, access)
+                                        .await
+                                {
+                                    error!(?error, "failed to report access refusal to the user");
+                                }
+
+                                return;
                             }
 
-                            return;
-                        }
+                            let args = (pattern.captures_len() > 1)
+                                .then_some(())
+                                .and_then(|()| pattern.captures(&message.content))
+                                .map(Args::from_captures)
+                                .unwrap_or_else(Args::empty);
 
-                        let args = (pattern.captures_len() > 1)
-                            .then_some(())
-                            .and_then(|()| pattern.captures(&message.content))
-                            .map(Args::from_captures)
-                            .unwrap_or_else(Args::empty);
+                            let cmds = Commands { handlers: &handlers };
 
-                        let cmds = Commands { handlers: &handlers };
-
-                        if let Err(error) =
-                            handler.handle(&cache, &config, &discord, cmds, &message, &args).await
-                        {
-                            error!(?error, "command handler failed");
-                            if let Err(error) =
-                                error_feedback(&discord, message.channel_id, message.id, error)
-                                    .await
+                            if let Err(error) = handler
+                                .handle(&cache, &config, &discord, cmds, &message, &args)
+                                .await
                             {
-                                error!(?error, "failed to report the error to the user");
+                                error!(?error, "command handler failed");
+                                if let Err(error) =
+                                    error_feedback(&discord, message.channel_id, message.id, error)
+                                        .await
+                                {
+                                    error!(?error, "failed to report the error to the user");
+                                }
+                            } else {
+                                info!("Command processed successfully");
                             }
-                        } else {
-                            info!("Command processed successfully");
                         }
+                        .instrument(span)
+                        .await
                     }
-                    .instrument(span)
-                    .await
-                }
-            });
+                }))
+                .await;
         }
     }
 }
@@ -301,6 +307,7 @@ impl Builder {
 
         let matcher = RegexSet::new(handlers.iter().map(|(pattern, _)| pattern.as_str()))
             .context("failed to build the matcher")?;
+        let matcher = Arc::new(matcher);
 
         Ok(CommandParser { cache, config, discord, matcher, handlers: Arc::new(handlers) })
     }

@@ -10,6 +10,7 @@ use regex::Regex;
 use sea_orm::DatabaseConnection;
 use time::format_description::well_known::{Iso8601, Rfc3339};
 use time::OffsetDateTime;
+use tokio::sync::watch::Receiver;
 use tracing::{error, info};
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client as DiscordClient;
@@ -22,6 +23,7 @@ use crate::config::Config;
 use crate::models::state;
 
 pub async fn post_videos(
+    mut running: Receiver<bool>,
     db: DatabaseConnection,
     cache: Arc<InMemoryCache>,
     config: Arc<Config>,
@@ -48,10 +50,13 @@ pub async fn post_videos(
     let mut interval = tokio::time::interval(Duration::from_secs(300));
 
     loop {
-        interval.tick().await;
-
-        if let Err(error) = poster.run().await {
-            error!(?error, "failed to post videos");
+        tokio::select! {
+            _ = running.changed() => break,
+            _ = interval.tick() => {
+                if let Err(error) = poster.run().await {
+                    error!(?error, "failed to post videos");
+                }
+            },
         }
     }
 }

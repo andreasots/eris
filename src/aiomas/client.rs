@@ -11,11 +11,17 @@ use serde_json::Value;
 use tokio::net::TcpStream;
 #[cfg(unix)]
 use tokio::net::UnixStream;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::watch::Receiver;
+use tokio::task::JoinHandle;
 use tracing::error;
 
 use super::codec::{self, Exception, Request};
 
 pub struct NewClient {
+    running: Receiver<bool>,
+    handler_tx: Sender<JoinHandle<()>>,
+
     #[cfg(unix)]
     path: PathBuf,
 
@@ -25,26 +31,44 @@ pub struct NewClient {
 
 #[cfg(unix)]
 impl NewClient {
-    pub fn new<P: Into<PathBuf>>(path: P) -> NewClient {
-        NewClient { path: path.into() }
+    pub fn new<P: Into<PathBuf>>(
+        running: Receiver<bool>,
+        handler_tx: Sender<JoinHandle<()>>,
+        path: P,
+    ) -> NewClient {
+        NewClient { running, handler_tx, path: path.into() }
     }
 
     pub async fn new_client(&self) -> Result<Client, Error> {
-        Ok(Client::from_stream(UnixStream::connect(&self.path).await?))
+        Ok(Client::from_stream(
+            self.running.clone(),
+            self.handler_tx.clone(),
+            UnixStream::connect(&self.path).await?,
+        )
+        .await)
     }
 }
 
 #[cfg(not(unix))]
 impl NewClient {
-    pub fn new(port: u16) -> NewClient {
-        NewClient { port }
+    pub fn new(
+        running: Receiver<bool>,
+        handler_tx: Sender<JoinHandle<()>>,
+        port: u16,
+    ) -> NewClient {
+        NewClient { running, handler_tx, port }
     }
 
     pub async fn new_client(&self) -> Result<Client, Error> {
         use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 
         let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), self.port);
-        Ok(Client::from_stream(TcpStream::connect(&addr).await?))
+        Ok(Client::from_stream(
+            self.running.clone(),
+            self.handler_tx.clone(),
+            TcpStream::connect(&addr).await?,
+        )
+        .await)
     }
 }
 
@@ -53,17 +77,22 @@ pub struct Client {
 }
 
 impl Client {
-    fn from_stream<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + 'static>(
+    async fn from_stream<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + 'static>(
+        running: Receiver<bool>,
+        handler_tx: Sender<JoinHandle<()>>,
         stream: S,
     ) -> Client {
         let (tx, rx) = mpsc::channel(16);
 
-        tokio::spawn(Client::dispatch(rx, codec::client(stream)));
+        let _ = handler_tx
+            .send(tokio::spawn(Client::dispatch(running, rx, codec::client(stream))))
+            .await;
 
         Client { channel: tx }
     }
 
     async fn dispatch<T>(
+        mut running: Receiver<bool>,
         mut channel: mpsc::Receiver<(Request, oneshot::Sender<Result<Value, Exception>>)>,
         stream: T,
     ) where
@@ -75,8 +104,9 @@ impl Client {
         let mut pending = HashMap::<u64, oneshot::Sender<Result<Value, Exception>>>::new();
         let mut next_request_id = 0;
 
-        loop {
+        while *running.borrow() || !pending.is_empty() {
             select! {
+                _ = running.changed().fuse() => continue,
                 new_request = channel.next().fuse() => {
                     match new_request {
                         Some((request, channel)) => {
@@ -142,7 +172,10 @@ mod tests {
 
         let (read, mut write) = UnixStream::pair().expect("failed to create a socket pair");
 
-        let mut client = Client::from_stream(read);
+        let (_running_tx, running_rx) = tokio::sync::watch::channel(true);
+        let (handles_tx, _handles_rx) = tokio::sync::mpsc::channel(8);
+
+        let mut client = Client::from_stream(running_rx, handles_tx, read).await;
 
         let first =
             client.call((String::from("test"), vec![], HashMap::new())).await.expect("queue first");

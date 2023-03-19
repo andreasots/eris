@@ -4,6 +4,9 @@ use anyhow::{Context, Error};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::watch::Receiver;
+use tokio::task::JoinHandle;
 
 use crate::aiomas::NewClient;
 use crate::config::Config;
@@ -43,11 +46,15 @@ pub struct LRRbot {
 }
 
 impl LRRbot {
-    pub fn new(config: &Config) -> LRRbot {
+    pub fn new(
+        running: Receiver<bool>,
+        handler_tx: Sender<JoinHandle<()>>,
+        config: &Config,
+    ) -> LRRbot {
         #[cfg(unix)]
-        let client = NewClient::new(&config.lrrbot_socket);
+        let client = NewClient::new(running, handler_tx, &config.lrrbot_socket);
         #[cfg(not(unix))]
-        let client = NewClient::new(config.lrrbot_port);
+        let client = NewClient::new(running, handler_tx, config.lrrbot_port);
 
         LRRbot { service: Retry::new(Reconnect::new(client), 3) }
     }

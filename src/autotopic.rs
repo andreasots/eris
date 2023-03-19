@@ -6,6 +6,7 @@ use anyhow::{Context, Error};
 use sea_orm::{DatabaseConnection, EntityTrait};
 use separator::FixedPlaceSeparatable;
 use time::OffsetDateTime;
+use tokio::sync::watch::Receiver;
 use tokio::sync::RwLock;
 use tracing::error;
 use twilight_cache_inmemory::InMemoryCache;
@@ -54,6 +55,7 @@ impl<'a> fmt::Display for EventDisplay<'a> {
 }
 
 pub async fn autotopic(
+    mut running: Receiver<bool>,
     cache: Arc<InMemoryCache>,
     calendar: CalendarHub,
     config: Arc<Config>,
@@ -69,10 +71,13 @@ pub async fn autotopic(
         Autotopic::new(cache, calendar, config, db, desertbus, discord, helix, helix_token, lrrbot);
 
     loop {
-        timer.tick().await;
-
-        if let Err(error) = autotopic.update_topic().await {
-            error!(?error, "Failed to update the topic");
+        tokio::select! {
+            _ = running.changed() => break,
+            _ = timer.tick() => {
+                if let Err(error) = autotopic.update_topic().await {
+                    error!(?error, "Failed to update the topic");
+                }
+            },
         }
     }
 }

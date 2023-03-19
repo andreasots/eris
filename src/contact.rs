@@ -11,6 +11,7 @@ use google_sheets4::hyper_rustls::HttpsConnector;
 use google_sheets4::Sheets;
 use time::{OffsetDateTime, PrimitiveDateTime};
 use time_tz::PrimitiveDateTimeExt;
+use tokio::sync::watch::Receiver;
 use tracing::{error, info};
 use twilight_http::Client as DiscordClient;
 use twilight_model::util::Timestamp;
@@ -24,6 +25,7 @@ const SENT_KEY: &str = "lrrbot.sent";
 const EPOCH: PrimitiveDateTime = time::macros::datetime!(1899-12-30 00:00:00);
 
 pub async fn post_messages(
+    mut running: Receiver<bool>,
     config: Arc<Config>,
     discord: Arc<DiscordClient>,
     sheets: Sheets<HttpsConnector<HttpConnector>>,
@@ -36,10 +38,13 @@ pub async fn post_messages(
     let mut timer = tokio::time::interval(Duration::from_secs(60));
 
     loop {
-        timer.tick().await;
-
-        if let Err(error) = inner(&config, &discord, &sheets).await {
-            error!(?error, "Failed to post new messages");
+        tokio::select! {
+            _ = running.changed() => break,
+            _ = timer.tick() => {
+                if let Err(error) = inner(&config, &discord, &sheets).await {
+                    error!(?error, "Failed to post new messages");
+                }
+            },
         }
     }
 }

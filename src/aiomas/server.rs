@@ -15,6 +15,9 @@ use serde_json::Value;
 use tokio::net::TcpListener;
 #[cfg(unix)]
 use tokio::net::UnixListener;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::watch::Receiver;
+use tokio::task::JoinHandle;
 use tracing::error;
 
 use crate::aiomas::codec::{self, Exception, Request};
@@ -138,22 +141,27 @@ impl Server {
         self.methods.insert(method.into(), Box::new(RouteHandler { route, _marker: PhantomData }));
     }
 
-    pub async fn serve(self) {
+    pub async fn serve(self, mut running: Receiver<bool>, handler_tx: Sender<JoinHandle<()>>) {
         let Server { methods, listener } = self;
 
         let methods = Arc::new(methods);
 
         loop {
-            match listener.accept().await {
-                Ok((socket, _remote_addr)) => {
-                    tokio::spawn(Server::process(methods.clone(), codec::server(socket)));
-                }
-                Err(error) => error!(?error, "Failed to accept an incoming connection"),
+            tokio::select! {
+                _ = running.changed() => break,
+                res = listener.accept() => match res {
+                    Ok((socket, _remote_addr)) => {
+                        let _ = handler_tx.send(tokio::spawn(Server::process(running.clone(), handler_tx.clone(), methods.clone(), codec::server(socket)))).await;
+                    }
+                    Err(error) => error!(?error, "Failed to accept an incoming connection"),
+                },
             }
         }
     }
 
     async fn process<T>(
+        mut running: Receiver<bool>,
+        handler_tx: Sender<JoinHandle<()>>,
         methods: Arc<HashMap<String, Box<dyn Handler + Send + Sync + 'static>>>,
         transport: T,
     ) where
@@ -165,32 +173,40 @@ impl Server {
     {
         let (mut sink, mut stream) = transport.split();
         let (tx, mut rx) = mpsc::channel(16);
-        tokio::spawn(async move {
-            while let Some(response) = rx.next().await {
-                if let Err(error) = sink.send(response).await {
-                    error!(?error, "Failed to send a response");
-                    break;
+        let _ = handler_tx
+            .send(tokio::spawn(async move {
+                while let Some(response) = rx.next().await {
+                    if let Err(error) = sink.send(response).await {
+                        error!(?error, "Failed to send a response");
+                        break;
+                    }
                 }
-            }
-        });
+            }))
+            .await;
 
         loop {
-            match stream.try_next().await {
-                Ok(Some((id, (method, args, kwargs)))) => {
-                    let mut tx = tx.clone();
-                    let future = match methods.get(&method) {
-                        Some(handler) => handler.handle(args, kwargs),
-                        None => async move { Err(format!("no such method: {}", method)) }.boxed(),
-                    };
+            tokio::select! {
+                _ = running.changed() => break,
+                // Probably not cancel-safe but we're not continuing anyway.
+                req = stream.try_next() => match req {
+                    Ok(Some((id, (method, args, kwargs)))) => {
+                        let mut tx = tx.clone();
+                        let future = match methods.get(&method) {
+                            Some(handler) => handler.handle(args, kwargs),
+                            None => async move { Err(format!("no such method: {}", method)) }.boxed(),
+                        };
 
-                    tokio::spawn(async move {
-                        let _ = tx.send((id, future.await)).await;
-                    });
-                }
-                Ok(None) => break,
-                Err(error) => {
-                    error!(?error, "Failed to read a request");
-                    break;
+                        let _ = handler_tx
+                            .send(tokio::spawn(async move {
+                                let _ = tx.send((id, future.await)).await;
+                            }))
+                            .await;
+                    }
+                    Ok(None) => break,
+                    Err(error) => {
+                        error!(?error, "Failed to read a request");
+                        break;
+                    }
                 }
             }
         }
