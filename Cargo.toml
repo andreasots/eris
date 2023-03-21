@@ -11,7 +11,7 @@ build = "build.rs"
 lalrpop = { version = "0.19.8", default-features = false, features = ["lexer"] }
 
 [dependencies]
-anyhow = { version = "1.0.69", default-features = false, features = ["std"] }
+anyhow = { version = "1.0.70", default-features = false, features = ["std"] }
 bytes = { version = "1.2.1", default-features = false }
 clap = { version = "4.1.11", default-features = false, features = ["std"] }
 egg-mode = { version = "0.16.1", default-features = false, features = ["rustls"] }
