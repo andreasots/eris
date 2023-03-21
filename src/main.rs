@@ -12,7 +12,7 @@ use google_calendar3::CalendarHub;
 use google_sheets4::Sheets;
 use google_youtube3::YouTube;
 use tokio::sync::RwLock;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_gateway::Intents;
@@ -39,6 +39,7 @@ mod rpc;
 mod service;
 mod shorten;
 mod shutdown;
+mod systemd;
 mod time;
 mod token_renewal;
 
@@ -273,6 +274,14 @@ async fn main() -> Result<(), Error> {
         .build(cache.clone(), config.clone(), discord.clone())
         .context("failed to build the command parser")?;
 
+    let sd_notify = match crate::systemd::Notify::new() {
+        Ok(notify) => Some(Arc::new(notify)),
+        Err(error) => {
+            warn!(?error, "failed to create the systemd notifier");
+            None
+        }
+    };
+
     let intents = Intents::GUILDS
         | Intents::GUILD_MEMBERS
         | Intents::GUILD_EMOJIS_AND_STICKERS
@@ -308,6 +317,7 @@ async fn main() -> Result<(), Error> {
         let influxdb = influxdb.clone();
         let mut running_rx = running_rx.clone();
         let handler_tx = handler_tx.clone();
+        let sd_notify = sd_notify.clone();
 
         tasks.push(tokio::spawn(async move {
             let shard_id = shard.id();
@@ -323,6 +333,12 @@ async fn main() -> Result<(), Error> {
                         }
                         res = &mut next_event_future => match res {
                             Ok(event) => {
+                                if let Some(sd_notify) = sd_notify.as_ref() {
+                                    if let Err(error) = sd_notify.feed_watchdog() {
+                                        warn!(?error, "failed to feed the systemd watchdog");
+                                    }
+                                }
+
                                 if let Some(ref influxdb) = influxdb {
                                     if let Err(error) =
                                         crate::metrics::on_event(&cache, influxdb, &event).await
@@ -363,6 +379,12 @@ async fn main() -> Result<(), Error> {
             _ = running_rx.changed() => (),
         }
     }));
+
+    if let Some(sd_notify) = sd_notify.as_ref() {
+        if let Err(error) = sd_notify.ready() {
+            warn!(?error, "failed to notify systemd that the bot is up");
+        }
+    }
 
     if let Some(Err(error)) = tasks.next().await {
         error!(?error, "task failed");
