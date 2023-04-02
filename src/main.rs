@@ -322,49 +322,40 @@ async fn main() -> Result<(), Error> {
         tasks.push(tokio::spawn(async move {
             let shard_id = shard.id();
 
-            'outer: loop {
-                let next_event_future = shard.next_event();
-                tokio::pin!(next_event_future);
-
-                'inner: loop {
-                    tokio::select! {
-                        _ = running_rx.changed() => {
-                            break 'outer;
-                        }
-                        res = &mut next_event_future => match res {
-                            Ok(event) => {
-                                if let Some(sd_notify) = sd_notify.as_ref() {
-                                    if let Err(error) = sd_notify.feed_watchdog() {
-                                        warn!(?error, "failed to feed the systemd watchdog");
-                                    }
+            loop {
+                tokio::select! {
+                    _ = running_rx.changed() => break,
+                    res = shard.next_event() => match res {
+                        Ok(event) => {
+                            if let Some(sd_notify) = sd_notify.as_ref() {
+                                if let Err(error) = sd_notify.feed_watchdog() {
+                                    warn!(?error, "failed to feed the systemd watchdog");
                                 }
-
-                                if let Some(ref influxdb) = influxdb {
-                                    if let Err(error) =
-                                        crate::metrics::on_event(&cache, influxdb, &event).await
-                                    {
-                                        error!(?error, "failed to collect metrics");
-                                    }
-                                }
-
-                                cache.update(&event);
-
-                                crate::disconnect_afk::on_event(&cache, &discord, &event).await;
-
-                                command_parser.on_event(&handler_tx, &event).await;
-
-                                break 'inner;
                             }
-                            Err(error) => {
-                                error!(
-                                    ?error,
-                                    shard.id = ?shard_id,
-                                    "failed to receive an event from the shard"
-                                );
 
-                                if error.is_fatal() {
-                                    break 'outer;
+                            if let Some(ref influxdb) = influxdb {
+                                if let Err(error) =
+                                    crate::metrics::on_event(&cache, influxdb, &event).await
+                                {
+                                    error!(?error, "failed to collect metrics");
                                 }
+                            }
+
+                            cache.update(&event);
+
+                            crate::disconnect_afk::on_event(&cache, &discord, &event).await;
+
+                            command_parser.on_event(&handler_tx, &event).await;
+                        }
+                        Err(error) => {
+                            error!(
+                                ?error,
+                                shard.id = ?shard_id,
+                                "failed to receive an event from the shard"
+                            );
+
+                            if error.is_fatal() {
+                                break;
                             }
                         }
                     }
