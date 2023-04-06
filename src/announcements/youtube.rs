@@ -11,7 +11,7 @@ use sea_orm::DatabaseConnection;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 use tokio::sync::watch::Receiver;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client as DiscordClient;
 use twilight_model::channel::{Channel, ChannelType, Message};
@@ -40,7 +40,8 @@ pub async fn post_videos(
         return;
     }
 
-    let poster = match VideoPoster::new(db, cache, channel_id, &config, discord, youtube).await {
+    let mut poster = match VideoPoster::new(db, cache, channel_id, &config, discord, youtube).await
+    {
         Ok(poster) => poster,
         Err(error) => {
             error!(?error, "failed to construct the video poster");
@@ -54,6 +55,7 @@ pub async fn post_videos(
             _ = running.changed() => break,
             _ = interval.tick() => {
                 if let Err(error) = poster.run().await {
+                    poster.check_for_existing_threads = true;
                     error!(?error, "failed to post videos");
                 }
             },
@@ -68,6 +70,8 @@ struct VideoPoster {
     playlists: Vec<String>,
     discord: Arc<DiscordClient>,
     youtube: YouTube<HttpsConnector<HttpConnector>>,
+
+    check_for_existing_threads: bool,
 }
 
 impl VideoPoster {
@@ -97,10 +101,22 @@ impl VideoPoster {
             );
         }
 
-        Ok(Self { db, cache, channel_id, playlists: channels, discord, youtube })
+        Ok(Self {
+            db,
+            cache,
+            channel_id,
+            playlists: channels,
+            discord,
+            youtube,
+            check_for_existing_threads: true,
+        })
     }
 
-    async fn run(&self) -> Result<(), Error> {
+    async fn run(&mut self) -> Result<(), Error> {
+        let Some(channel) = self.cache.channel(self.channel_id) else {
+            return Err(Error::msg("video announcements channel not in cache"));
+        };
+
         let mut videos = vec![];
 
         for playlist_id in &self.playlists {
@@ -125,10 +141,6 @@ impl VideoPoster {
 
         videos.sort_by(|a, b| a.published_at.cmp(&b.published_at));
 
-        let Some(channel) = self.cache.channel(self.channel_id) else {
-            return Err(Error::msg("video announcements channel not in cache"));
-        };
-
         for video in videos {
             let state_key =
                 format!("eris.announcements.youtube.{}.last_video_published_at", video.channel_id);
@@ -144,6 +156,20 @@ impl VideoPoster {
                 continue;
             }
 
+            if self.check_for_existing_threads {
+                match video.is_already_announced(&channel, &self.cache, &self.discord).await {
+                    Ok(true) => continue,
+                    Ok(false) => (),
+                    Err(error) => {
+                        error!(
+                            ?error,
+                            video.id,
+                            "failed to determine if the video is already announced, assuming that it is not"
+                        );
+                    }
+                }
+            }
+
             video.announce(&channel, &self.discord).await.context("failed to announce video")?;
 
             let published_at = video
@@ -154,6 +180,8 @@ impl VideoPoster {
                 .await
                 .context("failed to set the last video published timestamp")?;
         }
+
+        self.check_for_existing_threads = false;
 
         Ok(())
     }
@@ -175,6 +203,70 @@ impl Video {
         }
 
         Some(RE_VIDEO_ID.captures(message)?.get(1)?.as_str())
+    }
+
+    async fn is_already_announced(
+        &self,
+        channel: &Channel,
+        cache: &InMemoryCache,
+        discord: &DiscordClient,
+    ) -> Result<bool, Error> {
+        let mut threads = cache
+            .guild_channels(channel.guild_id.context("channel not in a guild")?)
+            .context("guild channels not in cache")?
+            .iter()
+            .copied()
+            .filter_map(|id| {
+                let channel = cache.channel(id);
+                if channel.is_none() {
+                    error!(
+                        channel.id = id.get(),
+                        "channel referenced by cache but not itself in cache"
+                    );
+                }
+                channel
+            })
+            .filter(|thread| thread.parent_id == Some(channel.id))
+            .map(|thread| thread.id)
+            .collect::<Vec<_>>();
+
+        threads.sort_by(|a, b| a.cmp(b).reverse());
+        threads.truncate(10);
+
+        for thread_id in threads {
+            let mut messages = discord
+                .channel_messages(thread_id)
+                .after(Id::new(1))
+                .limit(1)
+                .context("limit invalid")?
+                .await
+                .context("failed to get the messages")?
+                .models()
+                .await
+                .context("failed to deserialize the messages")?;
+
+            let Some(original_message) = messages.pop() else {
+                warn!(thread.id = thread_id.get(), "thread empty or no permissions");
+                continue
+            };
+            let original_message = if let Some(message) = original_message.referenced_message {
+                (*message).clone()
+            } else {
+                original_message
+            };
+
+            if Self::video_id_from_message(&original_message.content) == Some(&self.id) {
+                info!(
+                    thread.id = thread_id.get(),
+                    video.id = self.id,
+                    "announcement thread already created"
+                );
+
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
     }
 
     fn message_content(&self) -> String {
