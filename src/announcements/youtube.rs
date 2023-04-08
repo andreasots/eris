@@ -156,21 +156,27 @@ impl VideoPoster {
                 continue;
             }
 
-            if self.check_for_existing_threads {
-                match video.is_already_announced(&channel, &self.cache, &self.discord).await {
-                    Ok(true) => continue,
-                    Ok(false) => (),
-                    Err(error) => {
+            let is_announced = if self.check_for_existing_threads {
+                video.is_already_announced(&channel, &self.cache, &self.discord).await
+                    .unwrap_or_else(|error| {
                         error!(
                             ?error,
                             video.id,
                             "failed to determine if the video is already announced, assuming that it is not"
                         );
-                    }
-                }
-            }
 
-            video.announce(&channel, &self.discord).await.context("failed to announce video")?;
+                        false
+                    })
+            } else {
+                false
+            };
+
+            if !is_announced {
+                video
+                    .announce(&channel, &self.discord)
+                    .await
+                    .context("failed to announce video")?;
+            }
 
             let published_at = video
                 .published_at
