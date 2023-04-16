@@ -23,7 +23,7 @@ influxdb = { version = "0.6.0", default-features = false, features = ["derive", 
 lalrpop-util = { version = "0.19.9", features = ["std", "lexer"], default-features = false }
 lazy_static = { version = "1.4.0", default-features = false }
 levenshtein = "1.0.5"
-libloading = "0.7.4"
+libloading = "0.8.0"
 log = { version = "0.4.17", default-features = false, features = ["max_level_info", "release_max_level_info", "std"] }
 rand = { version = "0.8.5", default-features = false, features = ["std", "std_rng"] }
 regex = { version = "1.7.3", default-features = false, features = ["perf", "std", "unicode"] }
@@ -31,7 +31,7 @@ reqwest = { version = "0.11.16", default-features = false, features = ["rustls-t
 rust-ini = { version = "0.18.0", default-features = false }
 sea-orm = { version = "0.11.2", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-json"] }
 separator = { version = "0.4.1", default-features = false }
-serde = { version = "1.0.159", default-features = false, features = ["derive"] }
+serde = { version = "1.0.160", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.96", default-features = false }
 strfmt = { version = "0.2.4", default-features = false }
 time = { version = "0.3.20", default-features = false, features = ["formatting", "parsing", "macros", "serde", "serde-well-known"] }
