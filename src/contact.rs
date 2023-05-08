@@ -9,8 +9,8 @@ use google_sheets4::api::{
 use google_sheets4::hyper::client::HttpConnector;
 use google_sheets4::hyper_rustls::HttpsConnector;
 use google_sheets4::Sheets;
-use time::{OffsetDateTime, PrimitiveDateTime};
-use time_tz::PrimitiveDateTimeExt;
+use time::PrimitiveDateTime;
+use time_tz::{PrimitiveDateTimeExt, Tz};
 use tokio::sync::watch::Receiver;
 use tracing::{error, info};
 use twilight_http::Client as DiscordClient;
@@ -57,10 +57,12 @@ struct Entry<'a> {
     row: i32,
 }
 
-fn extract_timestamp(cell: &CellData, epoch: OffsetDateTime) -> Option<Timestamp> {
+fn extract_timestamp(cell: &CellData, tz: &Tz) -> Option<Timestamp> {
     // The timestamp is in days since 1899-12-30. Apparently for compatibility with Lotus 1-2-3.
     let offset = Duration::from_secs_f64(cell.effective_value.as_ref()?.number_value? * 86400.0);
-    Timestamp::from_micros(((epoch + offset).unix_timestamp_nanos() / 1_000) as i64).ok()
+    let timestamp = EPOCH + offset;
+    let timestamp = timestamp.assume_timezone(tz).take_first().unwrap_or_else(|| timestamp.assume_utc());
+    Timestamp::from_micros((timestamp.unix_timestamp_nanos() / 1_000) as i64).ok()
 }
 
 fn extract_string(cell: &CellData) -> Option<&str> {
@@ -74,7 +76,6 @@ fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(i32, Vec<Entry>)> {
         .and_then(|prop| prop.time_zone.as_deref())
         .and_then(time_tz::timezones::get_by_name)
         .unwrap_or(time_tz::timezones::db::UTC);
-    let epoch = EPOCH.assume_timezone(tz).take_first().unwrap_or_else(|| EPOCH.assume_utc());
     let sheets = spreadsheet.sheets.as_ref()?;
     let sheet = sheets.get(0)?;
     let sheet_id = sheet.properties.as_ref()?.sheet_id?;
@@ -103,7 +104,7 @@ fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(i32, Vec<Entry>)> {
             let values = row.values.as_ref();
 
             let timestamp =
-                values.and_then(|row| row.get(0)).and_then(|cell| extract_timestamp(cell, epoch));
+                values.and_then(|row| row.get(0)).and_then(|cell| extract_timestamp(cell, tz));
             let message = values.and_then(|row| row.get(1)).and_then(extract_string);
             let username = values.and_then(|row| row.get(2)).and_then(extract_string);
 
