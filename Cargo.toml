@@ -20,7 +20,7 @@ google-calendar3 = "5.0.2"
 google-sheets4 = "5.0.2"
 google-youtube3 = "5.0.2"
 influxdb = { version = "0.6.0", default-features = false, features = ["derive", "reqwest-client-rustls"] }
-lalrpop-util = { version = "0.19.12", features = ["std", "lexer"], default-features = false }
+lalrpop-util = { version = "0.20.0", features = ["std", "lexer"], default-features = false }
 lazy_static = { version = "1.4.0", default-features = false }
 levenshtein = "1.0.5"
 libloading = "0.8.0"
