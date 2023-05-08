@@ -369,7 +369,7 @@ async fn report_parse_error(
 ) -> Result<(), Error> {
     let (start, end) = match &err {
         ParseError::InvalidToken { location } => (*location, *location),
-        ParseError::UnrecognizedEOF { location, .. } => (*location, *location),
+        ParseError::UnrecognizedEof { location, .. } => (*location, *location),
         ParseError::UnrecognizedToken { token: (start, _, end), .. } => (*start, *end),
         ParseError::ExtraToken { token: (start, _, end) } => (*start, *end),
         ParseError::User { error } => match *error {},
