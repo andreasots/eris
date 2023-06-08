@@ -669,7 +669,7 @@ dependencies = [
  "serde",
  "serde_json",
  "strfmt",
- "time 0.3.21",
+ "time 0.3.22",
  "time-tz",
  "tokio",
  "tokio-util",
@@ -2101,7 +2101,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "thiserror",
- "time 0.3.21",
+ "time 0.3.22",
  "tracing",
  "url 2.3.1",
  "uuid",
@@ -2128,7 +2128,7 @@ checksum = "bbab99b8cd878ab7786157b7eb8df96333a6807cc6e45e8888c85b51534b401a"
 dependencies = [
  "sea-query-derive",
  "serde_json",
- "time 0.3.21",
+ "time 0.3.22",
 ]
 
 [[package]]
@@ -2140,7 +2140,7 @@ dependencies = [
  "sea-query",
  "serde_json",
  "sqlx",
- "time 0.3.21",
+ "time 0.3.22",
 ]
 
 [[package]]
@@ -2317,7 +2317,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with_macros",
- "time 0.3.21",
+ "time 0.3.22",
 ]
 
 [[package]]
@@ -2489,7 +2489,7 @@ dependencies = [
  "sqlx-rt",
  "stringprep",
  "thiserror",
- "time 0.3.21",
+ "time 0.3.22",
  "tokio-stream",
  "url 2.3.1",
  "webpki-roots",
@@ -2643,9 +2643,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.21"
+version = "0.3.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f3403384eaacbca9923fa06940178ac13e4edb725486d70e8e15881d0c836cc"
+checksum = "ea9e1b3cf1243ae005d9e74085d4d542f3125458f3a81af210d901dcd7411efd"
 dependencies = [
  "itoa",
  "libc",
@@ -2682,7 +2682,7 @@ dependencies = [
  "phf_codegen",
  "serde",
  "serde-xml-rs",
- "time 0.3.21",
+ "time 0.3.22",
 ]
 
 [[package]]
@@ -2903,7 +2903,7 @@ dependencies = [
  "serde_json",
  "sharded-slab",
  "thread_local",
- "time 0.3.21",
+ "time 0.3.22",
  "tracing",
  "tracing-core",
  "tracing-log",
@@ -3033,7 +3033,7 @@ dependencies = [
  "serde",
  "serde-value",
  "serde_repr",
- "time 0.3.21",
+ "time 0.3.22",
  "tracing",
 ]
 
@@ -3112,7 +3112,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a741b3a7c79a497c0164e00838ca3a50bc57e4e7378d38befe418b9fbc4df54a"
 dependencies = [
  "serde",
- "time 0.3.21",
+ "time 0.3.22",
 ]
 
 [[package]]
@@ -3578,7 +3578,7 @@ dependencies = [
  "seahash",
  "serde",
  "serde_json",
- "time 0.3.21",
+ "time 0.3.22",
  "tokio",
  "tower-service",
  "url 2.3.1",
