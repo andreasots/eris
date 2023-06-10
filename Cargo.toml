@@ -50,4 +50,4 @@ twilight-validate = "0.15.1"
 twitch_api = { version = "0.7.0-rc.6", features = ["all", "reqwest"] }
 unicode-segmentation = "1.10.1"
 unicode-width = { version = "0.1.10", default-features = false }
-url = { version = "2.3.1", default-features = false }
+url = { version = "2.4.0", default-features = false }
