@@ -24,7 +24,7 @@ lalrpop-util = { version = "0.20.0", features = ["std", "lexer", "unicode"], def
 lazy_static = { version = "1.4.0", default-features = false }
 levenshtein = "1.0.5"
 libloading = "0.8.0"
-log = { version = "0.4.17", default-features = false, features = ["max_level_info", "release_max_level_info", "std"] }
+log = { version = "0.4.18", default-features = false, features = ["max_level_info", "release_max_level_info", "std"] }
 rand = { version = "0.8.5", default-features = false, features = ["std", "std_rng"] }
 regex = { version = "1.8.4", default-features = false, features = ["perf", "std", "unicode"] }
 reqwest = { version = "0.11.18", default-features = false, features = ["rustls-tls", "json"] }
