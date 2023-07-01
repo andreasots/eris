@@ -3,16 +3,105 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Error};
+use egg_mode::entities::MediaType;
+use egg_mode::tweet::Tweet;
 use egg_mode::Token;
 use sea_orm::DatabaseConnection;
 use tokio::sync::watch::Receiver;
 use tracing::{error, info};
 use twilight_http::Client as DiscordClient;
+use twilight_model::channel::message::Embed;
 use twilight_model::id::marker::ChannelMarker;
 use twilight_model::id::Id;
+use twilight_model::util::Timestamp;
+use twilight_util::builder::embed::{
+    EmbedAuthorBuilder, EmbedBuilder, EmbedFooterBuilder, ImageSource,
+};
+use twilight_validate::embed::{AUTHOR_NAME_LENGTH, DESCRIPTION_LENGTH};
 
 use crate::config::Config;
 use crate::models::state;
+use crate::shorten::shorten;
+
+pub fn create_embeds(tweet: &Tweet) -> Vec<Embed> {
+    let mut embeds = vec![];
+
+    let mut text = tweet.text.clone();
+
+    for url in &tweet.entities.urls {
+        text = text.replace(
+            url.url.as_str(),
+            url.expanded_url.as_deref().unwrap_or(url.display_url.as_str()),
+        );
+    }
+
+    if let Some(ref media) = tweet.entities.media {
+        for media in media {
+            text = text.replace(media.url.as_str(), &media.expanded_url);
+        }
+    }
+
+    let mut embed = EmbedBuilder::new().description(shorten(&text, DESCRIPTION_LENGTH));
+
+    let unsupported_media = tweet
+        .extended_entities
+        .as_ref()
+        .map(|entities| {
+            entities
+                .media
+                .iter()
+                .filter_map(|e| match e.media_type {
+                    MediaType::Photo => None,
+                    MediaType::Video => Some("a video"),
+                    MediaType::Gif => Some("a \"GIF\""),
+                })
+                .collect()
+        })
+        .unwrap_or_else(Vec::new);
+
+    if !unsupported_media.is_empty() {
+        let types = unsupported_media.join(", ");
+        let replacement = if unsupported_media.len() == 1 { "a thumbnail" } else { "thumbnails" };
+        embed = embed.footer(EmbedFooterBuilder::new(format!(
+            "NOTE: unsupported media ({types}) replaced with {replacement}"
+        )));
+    }
+
+    if let Ok(timestamp) = Timestamp::from_micros(tweet.created_at.timestamp_micros()) {
+        embed = embed.timestamp(timestamp);
+    }
+
+    if let Some(ref user) = tweet.user {
+        let mut author = EmbedAuthorBuilder::new(shorten(
+            &format!("{} (@{})", user.name, user.screen_name),
+            AUTHOR_NAME_LENGTH,
+        ))
+        .url(format!("https://twitter.com/{}", user.screen_name));
+        if let Ok(profile_image) = ImageSource::url(&user.profile_image_url_https) {
+            author = author.icon_url(profile_image);
+        }
+        embed = embed
+            .author(author)
+            .url(format!("https://twitter.com/{}/status/{}", user.screen_name, tweet.id));
+    } else {
+        embed = embed.url(format!("https://twitter.com/i/status/{}", tweet.id));
+    }
+
+    if let Some(ref entities) = tweet.extended_entities {
+        for entity in &entities.media {
+            if let Ok(image) = ImageSource::url(&entity.media_url_https) {
+                embed = embed.image(image);
+                embeds.push(embed.build());
+
+                embed = EmbedBuilder::new().url(embeds[0].url.as_ref().unwrap());
+            }
+        }
+    } else {
+        embeds.push(embed.build());
+    }
+
+    embeds
+}
 
 async fn init(config: &Config) -> Result<(Token, HashMap<u64, Vec<Id<ChannelMarker>>>), Error> {
     let token = egg_mode::auth::bearer_token(&config.twitter_api)
@@ -67,12 +156,14 @@ async fn inner<'a>(
                 {
                     let message = if let Some(ref user) = tweet.user {
                         format!(
-                            "New tweet from {}: https://twitter.com/{}/status/{}",
+                            "New tweet from {}: <https://twitter.com/{}/status/{}>",
                             user.name, user.screen_name, tweet.id,
                         )
                     } else {
-                        format!("New tweet: https://twitter.com/i/status/{}", tweet.id)
+                        format!("New tweet: <https://twitter.com/i/status/{}>", tweet.id)
                     };
+
+                    let embeds = create_embeds(&tweet);
 
                     for channel in channels.iter().copied() {
                         if let Some(retweeted_user_id) = tweet
@@ -97,6 +188,8 @@ async fn inner<'a>(
                             .create_message(channel)
                             .content(&message)
                             .context("announcement message is invalid")?
+                            .embeds(&embeds)
+                            .context("embed is invalid")?
                             .await
                             .context("failed to send the announcement message")?
                             .model()
