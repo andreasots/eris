@@ -210,6 +210,13 @@ async fn main() -> Result<(), Error> {
     );
 
     tasks.push(tokio::spawn(rpc_server.serve(running_rx.clone(), handler_tx.clone())));
+    tasks.push(tokio::spawn(crate::announcements::post_toots(
+        running_rx.clone(),
+        config.clone(),
+        db.clone(),
+        discord.clone(),
+        http_client.clone(),
+    )));
     tasks.push(tokio::spawn(crate::announcements::post_tweets(
         running_rx.clone(),
         config.clone(),

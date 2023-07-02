@@ -14,6 +14,7 @@ use time_tz::Tz;
 use twilight_model::id::marker::{ChannelMarker, GuildMarker};
 use twilight_model::id::Id;
 use twitch_api::twitch_oauth2::{ClientId, ClientSecret};
+use url::Url;
 
 #[derive(Debug)]
 pub struct Config {
@@ -56,6 +57,9 @@ pub struct Config {
 
     pub twitter_api: KeyPair,
     pub twitter_users: HashMap<String, Vec<Id<ChannelMarker>>>,
+
+    pub mastodon_server: Url,
+    pub mastodon_users: HashMap<String, Vec<Id<ChannelMarker>>>,
 
     pub contact_spreadsheet: Option<String>,
 
@@ -161,12 +165,34 @@ impl Config {
                         })
                         .collect::<Result<HashMap<String, Vec<Id<ChannelMarker>>>, Error>>()
                 })
+                .transpose()?
                 .unwrap_or_else(|| {
-                    Ok(HashMap::from([
+                    HashMap::from([
                         (String::from("loadingreadyrun"), vec![Id::new(322643668831961088)]),
                         (String::from("desertbus"), vec![Id::new(370211226564689921)]),
-                    ]))
-                })?,
+                    ])
+                }),
+
+            mastodon_server: Self::get_option_parsed(&ini, "mastodon_server")?
+                .unwrap_or_else(|| Url::parse("https://mastodon.qrpth.eu/").unwrap()),
+            mastodon_users: ini
+                .section(Some("eris.mastodon"))
+                .map(|section| {
+                    section
+                        .iter()
+                        .map(|(name, channels)| {
+                            Ok((
+                                name.into(),
+                                channels
+                                    .split(',')
+                                    .map(|id| Ok(str::parse(id)?))
+                                    .collect::<Result<Vec<Id<ChannelMarker>>, Error>>()?,
+                            ))
+                        })
+                        .collect::<Result<HashMap<String, Vec<Id<ChannelMarker>>>, Error>>()
+                })
+                .transpose()?
+                .unwrap_or_default(),
 
             contact_spreadsheet: ini
                 .get_from(Some("lrrbot"), "discord_contact_spreadsheet")
