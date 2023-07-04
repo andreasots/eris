@@ -20,7 +20,7 @@ futures = { version = "0.3.28", default-features = false, features = ["std", "as
 google-calendar3 = "5.0.2"
 google-sheets4 = "5.0.2"
 google-youtube3 = "5.0.2"
-influxdb = { version = "0.6.0", default-features = false, features = ["derive", "reqwest-client-rustls"] }
+influxdb = { version = "0.7.0", default-features = false, features = ["derive", "reqwest-client-rustls"] }
 lalrpop-util = { version = "0.20.0", features = ["std", "lexer", "unicode"], default-features = false }
 lazy_static = { version = "1.4.0", default-features = false }
 levenshtein = "1.0.5"
