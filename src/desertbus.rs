@@ -24,7 +24,7 @@ impl DesertBus {
     }
 
     pub fn start_time() -> OffsetDateTime {
-        datetime!(2022-11-12 14:00:00)
+        datetime!(2023-11-11 14:00:00)
             .assume_timezone(time_tz::timezones::db::america::VANCOUVER)
             .unwrap_first()
     }
