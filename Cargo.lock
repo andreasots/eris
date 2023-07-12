@@ -721,7 +721,7 @@ dependencies = [
  "serde",
  "serde_json",
  "strfmt",
- "time 0.3.22",
+ "time 0.3.23",
  "time-tz",
  "tokio",
  "tokio-util",
@@ -2175,7 +2175,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "thiserror",
- "time 0.3.22",
+ "time 0.3.23",
  "tracing",
  "url 2.4.0",
  "uuid",
@@ -2202,7 +2202,7 @@ checksum = "bbab99b8cd878ab7786157b7eb8df96333a6807cc6e45e8888c85b51534b401a"
 dependencies = [
  "sea-query-derive",
  "serde_json",
- "time 0.3.22",
+ "time 0.3.23",
 ]
 
 [[package]]
@@ -2214,7 +2214,7 @@ dependencies = [
  "sea-query",
  "serde_json",
  "sqlx",
- "time 0.3.22",
+ "time 0.3.23",
 ]
 
 [[package]]
@@ -2392,7 +2392,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with_macros",
- "time 0.3.22",
+ "time 0.3.23",
 ]
 
 [[package]]
@@ -2564,7 +2564,7 @@ dependencies = [
  "sqlx-rt",
  "stringprep",
  "thiserror",
- "time 0.3.22",
+ "time 0.3.23",
  "tokio-stream",
  "url 2.4.0",
  "webpki-roots",
@@ -2718,9 +2718,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.22"
+version = "0.3.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea9e1b3cf1243ae005d9e74085d4d542f3125458f3a81af210d901dcd7411efd"
+checksum = "59e399c068f43a5d116fedaf73b203fa4f9c519f17e2b34f63221d3792f81446"
 dependencies = [
  "itoa",
  "libc",
@@ -2738,9 +2738,9 @@ checksum = "7300fbefb4dadc1af235a9cef3737cea692a9d97e1b9cbcd4ebdae6f8868e6fb"
 
 [[package]]
 name = "time-macros"
-version = "0.2.9"
+version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "372950940a5f07bf38dbe211d7283c9e6d7327df53794992d293e534c733d09b"
+checksum = "96ba15a897f3c86766b757e5ac7221554c6750054d74d5b28844fce5fb36a6c4"
 dependencies = [
  "time-core",
 ]
@@ -2757,7 +2757,7 @@ dependencies = [
  "phf_codegen",
  "serde",
  "serde-xml-rs",
- "time 0.3.22",
+ "time 0.3.23",
 ]
 
 [[package]]
@@ -2979,7 +2979,7 @@ dependencies = [
  "serde_json",
  "sharded-slab",
  "thread_local",
- "time 0.3.22",
+ "time 0.3.23",
  "tracing",
  "tracing-core",
  "tracing-log",
@@ -3109,7 +3109,7 @@ dependencies = [
  "serde",
  "serde-value",
  "serde_repr",
- "time 0.3.22",
+ "time 0.3.23",
  "tracing",
 ]
 
@@ -3188,7 +3188,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a741b3a7c79a497c0164e00838ca3a50bc57e4e7378d38befe418b9fbc4df54a"
 dependencies = [
  "serde",
- "time 0.3.22",
+ "time 0.3.23",
 ]
 
 [[package]]
@@ -3573,7 +3573,7 @@ dependencies = [
  "seahash",
  "serde",
  "serde_json",
- "time 0.3.22",
+ "time 0.3.23",
  "tokio",
  "tower-service",
  "url 2.4.0",
