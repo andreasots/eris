@@ -8,7 +8,6 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Error};
-use egg_mode::KeyPair;
 use ini::Ini;
 use time_tz::Tz;
 use twilight_model::id::marker::{ChannelMarker, GuildMarker};
@@ -54,9 +53,6 @@ pub struct Config {
     pub general_channel: Id<ChannelMarker>,
     pub lrr_videos_channel: Option<Id<ChannelMarker>>,
     pub guild: Id<GuildMarker>,
-
-    pub twitter_api: KeyPair,
-    pub twitter_users: HashMap<String, Vec<Id<ChannelMarker>>>,
 
     pub mastodon_server: Url,
     pub mastodon_users: HashMap<String, Vec<Id<ChannelMarker>>>,
@@ -145,33 +141,6 @@ impl Config {
             lrr_videos_channel: Config::get_option_parsed(&ini, "discord_channel_lrr_videos")?,
             guild: Config::get_option_parsed(&ini, "discord_serverid")?
                 .unwrap_or(Id::new(288920509272555520)),
-            twitter_api: KeyPair::new(
-                Config::get_option_required(&ini, "twitter_api_key")?,
-                Config::get_option_required(&ini, "twitter_api_secret")?,
-            ),
-            twitter_users: ini
-                .section(Some("eris.twitter"))
-                .map(|section| {
-                    section
-                        .iter()
-                        .map(|(name, channels)| {
-                            Ok((
-                                name.to_lowercase(),
-                                channels
-                                    .split(',')
-                                    .map(|id| Ok(str::parse(id)?))
-                                    .collect::<Result<Vec<Id<ChannelMarker>>, Error>>()?,
-                            ))
-                        })
-                        .collect::<Result<HashMap<String, Vec<Id<ChannelMarker>>>, Error>>()
-                })
-                .transpose()?
-                .unwrap_or_else(|| {
-                    HashMap::from([
-                        (String::from("loadingreadyrun"), vec![Id::new(322643668831961088)]),
-                        (String::from("desertbus"), vec![Id::new(370211226564689921)]),
-                    ])
-                }),
 
             mastodon_server: Self::get_option_parsed(&ini, "mastodon_server")?
                 .unwrap_or_else(|| Url::parse("https://mastodon.qrpth.eu/").unwrap()),
