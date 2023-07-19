@@ -16,7 +16,7 @@ use crate::rpc::LRRbot;
 pub struct Channel {
     display_name: Option<String>,
     login: String,
-    status: Option<String>,
+    title: Option<String>,
 }
 
 async fn stream_up_inner(
@@ -51,27 +51,30 @@ async fn stream_up_inner(
         (game, show, game_entry)
     };
 
-    let what = {
-        let game = game.as_ref();
-        let game_entry = game_entry.as_ref();
-        let game_display_name = game.map(|game| {
-            game_entry.and_then(|entry| entry.display_name.as_ref()).unwrap_or(&game.name)
-        });
-
-        if let Some(show) = show {
-            game_display_name.map(|name| format!("{} on {}", name, show.name)).unwrap_or(show.name)
-        } else {
-            game_display_name.cloned().unwrap_or_else(|| "nothing".to_string())
-        }
-    };
-
     let mut message = String::new();
     message.push_str(channel.display_name.as_ref().unwrap_or(&channel.login));
     message.push_str(" is live with ");
-    message.push_str(&what);
-    if let Some(ref status) = channel.status {
+    {
+        let game = game.as_ref();
+        let game_entry = game_entry.as_ref();
+        let game_display_name = game.map(|game| {
+            game_entry.and_then(|entry| entry.display_name.as_deref()).unwrap_or(&game.name)
+        });
+
+        match (game_display_name, show.as_ref()) {
+            (Some(game), Some(show)) => {
+                message.push_str(game);
+                message.push_str(" on ");
+                message.push_str(&show.name);
+            }
+            (Some(game), None) => message.push_str(game),
+            (None, Some(show)) => message.push_str(&show.name),
+            (None, None) => message.push_str("nothing"),
+        }
+    }
+    if let Some(title) = channel.title.as_deref().filter(|s| !s.is_empty()) {
         message.push_str(" (");
-        message.push_str(&crate::markdown::escape(status));
+        message.push_str(&crate::markdown::escape(title));
         message.push(')');
     }
     message.push_str("! <https://twitch.tv/");
