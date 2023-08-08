@@ -515,6 +515,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "deranged"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7684a49fb1af197853ef7b2ee694bc1f5b4179556f1e5710e1760c5db6f5e929"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "derivative"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -523,15 +532,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "deranged"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7684a49fb1af197853ef7b2ee694bc1f5b4179556f1e5710e1760c5db6f5e929"
-dependencies = [
- "serde",
 ]
 
 [[package]]
@@ -2130,9 +2130,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.101.1"
+version = "0.101.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15f36a6828982f422756984e47912a7a51dcbc2a197aa791158f8ca61cd8204e"
+checksum = "513722fd73ad80a71f72b61009ea1b584bcfa1483ca93949c8f290298837fa59"
 dependencies = [
  "ring",
  "untrusted",
