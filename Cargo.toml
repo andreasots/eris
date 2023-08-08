@@ -35,7 +35,7 @@ serde = { version = "1.0.179", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.104", default-features = false }
 strfmt = { version = "0.2.4", default-features = false }
 time = { version = "0.3.25", default-features = false, features = ["formatting", "parsing", "macros", "serde", "serde-well-known"] }
-time-tz = { version = "1.0.3", default-features = false, features = ["db"] }
+time-tz = { version = "2.0.0", default-features = false, features = ["db"] }
 tokio = { version = "1.29.1", default-features = false, features = ["net", "fs", "io-util", "rt-multi-thread", "macros", "time", "parking_lot", "signal"] }
 tokio-util = { version = "0.7.8", default-features = false, features = ["codec"] }
 tracing = { version = "0.1.37", default-features = false, features = ["std", "attributes", "max_level_trace", "release_max_level_debug"] }
