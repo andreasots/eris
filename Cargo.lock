@@ -2868,6 +2868,7 @@ checksum = "a79d09ac6b08c1ab3906a2f7cc2e81a0e27c7ae89c63812df75e52bef0751e07"
 dependencies = [
  "deranged",
  "itoa",
+ "js-sys",
  "libc",
  "num_threads",
  "serde",
@@ -2892,9 +2893,9 @@ dependencies = [
 
 [[package]]
 name = "time-tz"
-version = "1.0.3"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a422f65dfdf08a81317d54fa00b45dc58cbccab69be78c1447391cc39ae8c9d4"
+checksum = "733bc522e97980eb421cbf381160ff225bd14262a48a739110f6653c6258d625"
 dependencies = [
  "cfg-if",
  "parse-zoneinfo",
@@ -2903,6 +2904,7 @@ dependencies = [
  "serde",
  "serde-xml-rs",
  "time",
+ "wasm-bindgen",
 ]
 
 [[package]]
