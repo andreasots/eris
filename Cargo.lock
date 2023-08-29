@@ -1140,7 +1140,7 @@ dependencies = [
  "http",
  "hyper",
  "log",
- "rustls 0.20.8",
+ "rustls 0.20.9",
  "rustls-native-certs",
  "tokio",
  "tokio-rustls 0.23.4",
@@ -2085,9 +2085,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.20.8"
+version = "0.20.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fff78fc74d175294f4e83b28343315ffcfb114b156f0185e9741cb5570f50e2f"
+checksum = "1b80e3dec595989ea8510028f30c408a4630db12c9cbb8de34203b89d6577e99"
 dependencies = [
  "log",
  "ring",
@@ -2967,7 +2967,7 @@ version = "0.23.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c43ee83903113e03984cb9e5cebe6c04a5116269e900e3ddba8f068a62adda59"
 dependencies = [
- "rustls 0.20.8",
+ "rustls 0.20.9",
  "tokio",
  "webpki",
 ]
@@ -3001,7 +3001,7 @@ checksum = "54319c93411147bced34cb5609a80e0a8e44c5999c93903a81cd866630ec0bfd"
 dependencies = [
  "futures-util",
  "log",
- "rustls 0.20.8",
+ "rustls 0.20.9",
  "rustls-native-certs",
  "tokio",
  "tokio-rustls 0.23.4",
@@ -3140,7 +3140,7 @@ dependencies = [
  "httparse",
  "log",
  "rand",
- "rustls 0.20.8",
+ "rustls 0.20.9",
  "sha1",
  "thiserror",
  "url 2.4.0",
@@ -3171,7 +3171,7 @@ dependencies = [
  "flate2",
  "futures-util",
  "rand",
- "rustls 0.20.8",
+ "rustls 0.20.9",
  "rustls-native-certs",
  "serde",
  "serde_json",
@@ -3692,7 +3692,7 @@ dependencies = [
  "itertools",
  "log",
  "percent-encoding 2.3.0",
- "rustls 0.20.8",
+ "rustls 0.20.9",
  "rustls-pemfile",
  "seahash",
  "serde",
