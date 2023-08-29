@@ -676,7 +676,7 @@ dependencies = [
  "twitch_api",
  "unicode-segmentation",
  "unicode-width",
- "url 2.4.0",
+ "url 2.4.1",
 ]
 
 [[package]]
@@ -2009,7 +2009,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.24.1",
  "tower-service",
- "url 2.4.0",
+ "url 2.4.1",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -2210,7 +2210,7 @@ dependencies = [
  "thiserror",
  "time",
  "tracing",
- "url 2.4.0",
+ "url 2.4.1",
  "uuid",
 ]
 
@@ -2582,7 +2582,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tracing",
- "url 2.4.0",
+ "url 2.4.1",
  "webpki-roots 0.24.0",
 ]
 
@@ -2622,7 +2622,7 @@ dependencies = [
  "syn 1.0.109",
  "tempfile",
  "tokio",
- "url 2.4.0",
+ "url 2.4.1",
 ]
 
 [[package]]
@@ -2728,7 +2728,7 @@ dependencies = [
  "sqlx-core",
  "time",
  "tracing",
- "url 2.4.0",
+ "url 2.4.1",
 ]
 
 [[package]]
@@ -3143,7 +3143,7 @@ dependencies = [
  "rustls 0.20.8",
  "sha1",
  "thiserror",
- "url 2.4.0",
+ "url 2.4.1",
  "utf-8",
  "webpki",
 ]
@@ -3291,7 +3291,7 @@ dependencies = [
  "tracing",
  "twitch_oauth2",
  "twitch_types",
- "url 2.4.0",
+ "url 2.4.1",
  "version_check",
 ]
 
@@ -3313,7 +3313,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "twitch_types",
- "url 2.4.0",
+ "url 2.4.1",
 ]
 
 [[package]]
@@ -3396,9 +3396,9 @@ dependencies = [
 
 [[package]]
 name = "url"
-version = "2.4.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50bff7831e19200a85b17131d085c25d7811bc4e186efdaf54bbd132994a88cb"
+checksum = "143b538f18257fac9cad154828a57c6bf5157e1aa604d4816b5995bf6de87ae5"
 dependencies = [
  "form_urlencoded",
  "idna 0.4.0",
@@ -3700,7 +3700,7 @@ dependencies = [
  "time",
  "tokio",
  "tower-service",
- "url 2.4.0",
+ "url 2.4.1",
 ]
 
 [[package]]
