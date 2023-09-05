@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
     - name: Check that there is a single Tokio version used
       run: cargo metadata --format-version 1 | jq '.packages[] | select(.name == "tokio") | .version' | wc -l | grep -q '^1$'
