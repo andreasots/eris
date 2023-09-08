@@ -122,9 +122,9 @@ pub struct Commands<'a> {
     handlers: &'a [(Regex, Box<dyn CommandHandler>)],
 }
 
-impl Commands<'_> {
-    pub fn help(&self) -> impl Iterator<Item = Help> + '_ {
-        self.handlers.iter().filter_map(|(_, handler)| handler.help())
+impl<'a> Commands<'a> {
+    pub fn iter<'b>(&'b self) -> impl Iterator<Item = &'a dyn CommandHandler> + 'b {
+        self.handlers.iter().map(|(_, handler)| &**handler)
     }
 }
 

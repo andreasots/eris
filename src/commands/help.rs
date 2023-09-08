@@ -21,6 +21,7 @@ impl Help {
 
     async fn listing(
         &self,
+        cache: &InMemoryCache,
         config: &Config,
         discord: &DiscordClient,
         commands: Commands<'_>,
@@ -32,13 +33,19 @@ impl Help {
             "for those see [LRRbot's website](https://lrrbot.com/help#help-section-text).",
         ));
 
+        let guild_id = message.guild_id.unwrap_or(config.guild);
+
         let mut fields = vec![];
-        for cmd in commands.help() {
-            fields.push(EmbedField {
-                inline: true,
-                name: format!("{}{}", config.command_prefix, cmd.name),
-                value: cmd.summary.into(),
-            });
+        for cmd in commands.iter() {
+            if cmd.access().user_has_access(message.author.id, guild_id, cache) {
+                if let Some(help) = cmd.help() {
+                    fields.push(EmbedField {
+                        inline: true,
+                        name: format!("{}{}", config.command_prefix, help.name),
+                        value: help.summary.into(),
+                    });
+                }
+            }
         }
         fields.sort_by(|a, b| a.name.cmp(&b.name));
         for field in fields {
@@ -74,7 +81,7 @@ impl Help {
             cleaned
         };
 
-        match commands.help().find(|help| help.name == command) {
+        match commands.iter().filter_map(|cmd| cmd.help()).find(|help| help.name == command) {
             Some(help) => {
                 let examples = help
                     .examples
@@ -136,7 +143,7 @@ impl CommandHandler for Help {
 
     fn handle<'a>(
         &'a self,
-        _: &'a InMemoryCache,
+        cache: &'a InMemoryCache,
         config: &'a Config,
         discord: &'a DiscordClient,
         commands: Commands<'a>,
@@ -147,7 +154,7 @@ impl CommandHandler for Help {
             Some(command) => {
                 Box::pin(self.single_command(config, discord, commands, message, command))
             }
-            None => Box::pin(self.listing(config, discord, commands, message)),
+            None => Box::pin(self.listing(cache, config, discord, commands, message)),
         }
     }
 }
