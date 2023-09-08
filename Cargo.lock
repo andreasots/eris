@@ -902,9 +902,30 @@ checksum = "b6c80984affa11d98d1b88b66ac8853f143217b399d3c74116778ff8fdb4ed2e"
 
 [[package]]
 name = "google-apis-common"
-version = "5.0.4"
+version = "5.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "376bc8360e10783fd357de4aad0f6c9e4c0ae4bc3362c5955e40017db0cd4a71"
+checksum = "bf0d0bf11c1a1c1c304a7379fa173659bda32fdd2f042c5af5a066f547cb2fef"
+dependencies = [
+ "base64 0.13.1",
+ "chrono",
+ "http",
+ "hyper",
+ "itertools",
+ "mime",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "tokio",
+ "tower-service",
+ "url 1.7.2",
+ "yup-oauth2",
+]
+
+[[package]]
+name = "google-apis-common"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87ee789438087de4e6aa14e8505f661d4f45b161f2d21807c1fee0d68b54732d"
 dependencies = [
  "base64 0.13.1",
  "chrono",
@@ -923,15 +944,15 @@ dependencies = [
 
 [[package]]
 name = "google-calendar3"
-version = "5.0.2+20221229"
+version = "5.0.3+20221229"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5036cfeebded0e872296aac36d8065e38c20d8bb1ccf1d4fbf54ce27b948158b"
+checksum = "c34ab87fa230d2b54e29863a60fa8150f232300cdcf0e2fba860fd5a5c2f90ed"
 dependencies = [
  "anyhow",
- "google-apis-common",
+ "google-apis-common 6.0.0",
  "http",
  "hyper",
- "hyper-rustls 0.23.2",
+ "hyper-rustls 0.24.1",
  "itertools",
  "mime",
  "serde",
@@ -948,7 +969,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d5958204950ad5a5205a2c9dc33211c247e56f70a33a38823053cee37c3de579"
 dependencies = [
  "anyhow",
- "google-apis-common",
+ "google-apis-common 5.0.2",
  "http",
  "hyper",
  "hyper-rustls 0.23.2",
@@ -968,7 +989,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c9f572cb4cce392852f63619c3053785ea34999dbf3fec6f697a52415aa7307b"
 dependencies = [
  "anyhow",
- "google-apis-common",
+ "google-apis-common 5.0.2",
  "http",
  "hyper",
  "hyper-rustls 0.23.2",
@@ -1161,7 +1182,9 @@ dependencies = [
  "futures-util",
  "http",
  "hyper",
+ "log",
  "rustls 0.21.6",
+ "rustls-native-certs",
  "tokio",
  "tokio-rustls 0.24.1",
 ]
@@ -3685,9 +3708,9 @@ checksum = "1eee6bf5926be7cf998d7381a9a23d833fd493f6a8034658a9505a4dc4b20444"
 
 [[package]]
 name = "yup-oauth2"
-version = "8.1.1"
+version = "8.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1da09943413fec574fbc624011874b716e4b446f83d43f8248a5903e7ffc5e52"
+checksum = "364ca376b5c04d9b2be9693054e3e0d2d146b363819d0f9a10c6ee66e4c8406b"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3695,11 +3718,11 @@ dependencies = [
  "futures",
  "http",
  "hyper",
- "hyper-rustls 0.23.2",
+ "hyper-rustls 0.24.1",
  "itertools",
  "log",
  "percent-encoding 2.3.0",
- "rustls 0.20.9",
+ "rustls 0.21.6",
  "rustls-pemfile",
  "seahash",
  "serde",
