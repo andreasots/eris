@@ -49,5 +49,5 @@ twilight-util = { version = "0.15.2", default-features = false, features = ["bui
 twilight-validate = "0.15.1"
 twitch_api = { version = "0.7.0-rc.6", features = ["all", "reqwest"] }
 unicode-segmentation = "1.10.1"
-unicode-width = { version = "0.1.10", default-features = false }
+unicode-width = { version = "0.1.11", default-features = false }
 url = { version = "2.4.1", default-features = false, features = ["serde"] }
