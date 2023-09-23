@@ -36,8 +36,7 @@ impl Event {
 
 fn parse_timestamp(timestamp: EventDateTime, timezone: &Tz) -> Result<OffsetDateTime, Error> {
     if let Some(timestamp) = timestamp.date_time {
-        OffsetDateTime::from_unix_timestamp_nanos(timestamp.timestamp_nanos() as i128)
-            .context("failed to convert timestamp to `OffsetDateTime`")
+        crate::time::chrono_to_time(timestamp)
     } else if let Some(date) = timestamp.date {
         Date::from_ordinal_date(date.year(), date.ordinal0() as u16)
             .context("failed to convert date to `Date`")?

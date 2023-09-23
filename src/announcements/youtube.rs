@@ -32,7 +32,7 @@ pub async fn post_videos(
 ) {
     let Some(channel_id) = config.lrr_videos_channel else {
         info!("video discussion forum is not set");
-        return
+        return;
     };
 
     if config.youtube_channels.is_empty() {
@@ -253,7 +253,7 @@ impl Video {
 
             let Some(original_message) = messages.pop() else {
                 warn!(thread.id = thread_id.get(), "thread empty or no permissions");
-                continue
+                continue;
             };
             let original_message = if let Some(message) = original_message.referenced_message {
                 (*message).clone()
@@ -396,9 +396,8 @@ impl TryFrom<google_youtube3::api::Video> for Video {
             id: video.id.context("`id` is missing")?,
             title: snippet.title.context("`title` is missing")?,
             description: snippet.description.context("`description` is missing")?,
-            published_at: OffsetDateTime::from_unix_timestamp_nanos(
-                snippet.published_at.context("`published_at` is missing")?.timestamp_nanos()
-                    as i128,
+            published_at: crate::time::chrono_to_time(
+                snippet.published_at.context("`published_at` is missing")?,
             )
             .context("failed to convert `published_at`")?,
         })
@@ -420,9 +419,8 @@ impl TryFrom<PlaylistItem> for Video {
                 .context("`resource_id.video_id` is missing")?,
             title: snippet.title.context("`title` is missing")?,
             description: snippet.description.context("`description` is missing")?,
-            published_at: OffsetDateTime::from_unix_timestamp_nanos(
-                snippet.published_at.context("`published_at` is missing")?.timestamp_nanos()
-                    as i128,
+            published_at: crate::time::chrono_to_time(
+                snippet.published_at.context("`published_at` is missing")?,
             )
             .context("failed to convert `published_at`")?,
         })

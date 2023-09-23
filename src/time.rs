@@ -1,6 +1,8 @@
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
-use time::Duration;
+use anyhow::{Context, Error};
+use google_calendar3::chrono::{DateTime, TimeZone};
+use time::{Duration, OffsetDateTime};
 
 pub struct HumanReadable(Duration);
 
@@ -45,4 +47,10 @@ impl Display for HumanReadable {
 
         Ok(())
     }
+}
+
+pub fn chrono_to_time(timestamp: DateTime<impl TimeZone>) -> Result<OffsetDateTime, Error> {
+    let ts = OffsetDateTime::from_unix_timestamp(timestamp.timestamp())
+        .context("failed to convert timestamp to `OffsetDateTime`")?;
+    Ok(ts + Duration::nanoseconds(timestamp.timestamp_subsec_nanos() as i64))
 }
