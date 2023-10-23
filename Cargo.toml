@@ -26,7 +26,7 @@ levenshtein = "1.0.5"
 libloading = "0.8.1"
 log = { version = "0.4.19", default-features = false, features = ["max_level_info", "release_max_level_info", "std"] }
 rand = { version = "0.8.5", default-features = false, features = ["std", "std_rng"] }
-regex = { version = "1.9.6", default-features = false, features = ["perf", "std", "unicode"] }
+regex = { version = "1.10.2", default-features = false, features = ["perf", "std", "unicode"] }
 reqwest = { version = "0.11.22", default-features = false, features = ["rustls-tls", "json"] }
 rust-ini = { version = "0.19.0", default-features = false }
 sea-orm = { version = "0.12.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-json"] }
@@ -34,7 +34,7 @@ separator = { version = "0.4.1", default-features = false }
 serde = { version = "1.0.188", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.107", default-features = false }
 strfmt = { version = "0.2.4", default-features = false }
-time = { version = "0.3.29", default-features = false, features = ["formatting", "parsing", "macros", "serde", "serde-well-known"] }
+time = { version = "0.3.30", default-features = false, features = ["formatting", "parsing", "macros", "serde", "serde-well-known"] }
 time-tz = { version = "2.0.0", default-features = false, features = ["db"] }
 tokio = { version = "1.29.1", default-features = false, features = ["net", "fs", "io-util", "rt-multi-thread", "macros", "time", "signal", "tracing"] }
 tokio-util = { version = "0.7.9", default-features = false, features = ["codec"] }
