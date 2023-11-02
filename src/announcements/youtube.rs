@@ -21,7 +21,6 @@ use twilight_validate::channel::CHANNEL_NAME_LENGTH_MAX;
 
 use crate::config::Config;
 use crate::models::state;
-use crate::rpc::LRRbot;
 
 pub async fn post_videos(
     mut running: Receiver<bool>,
@@ -29,7 +28,6 @@ pub async fn post_videos(
     cache: Arc<InMemoryCache>,
     config: Arc<Config>,
     discord: Arc<DiscordClient>,
-    lrrbot: Arc<LRRbot>,
     youtube: YouTube<HttpsConnector<HttpConnector>>,
 ) {
     let Some(channel_id) = config.lrr_videos_channel else {
@@ -42,17 +40,14 @@ pub async fn post_videos(
         return;
     }
 
-    let mut poster =
-        match VideoPoster::new(db, cache, channel_id, config, discord, lrrbot, youtube).await {
-            Ok(poster) => poster,
-            Err(error) => {
-                error!(?error, "failed to construct the video poster");
-                return;
-            }
-        };
-
-    tokio::time::sleep(Duration::from_secs(30)).await;
-
+    let mut poster = match VideoPoster::new(db, cache, channel_id, &config, discord, youtube).await
+    {
+        Ok(poster) => poster,
+        Err(error) => {
+            error!(?error, "failed to construct the video poster");
+            return;
+        }
+    };
     let mut interval = tokio::time::interval(Duration::from_secs(300));
 
     loop {
@@ -72,10 +67,8 @@ struct VideoPoster {
     db: DatabaseConnection,
     cache: Arc<InMemoryCache>,
     channel_id: Id<ChannelMarker>,
-    config: Arc<Config>,
     playlists: Vec<String>,
     discord: Arc<DiscordClient>,
-    lrrbot: Arc<LRRbot>,
     youtube: YouTube<HttpsConnector<HttpConnector>>,
 
     check_for_existing_threads: bool,
@@ -86,9 +79,8 @@ impl VideoPoster {
         db: DatabaseConnection,
         cache: Arc<InMemoryCache>,
         channel_id: Id<ChannelMarker>,
-        config: Arc<Config>,
+        config: &Config,
         discord: Arc<DiscordClient>,
-        lrrbot: Arc<LRRbot>,
         youtube: YouTube<HttpsConnector<HttpConnector>>,
     ) -> Result<Self, Error> {
         let mut req = youtube.channels().list(&vec!["contentDetails".into()]);
@@ -113,10 +105,8 @@ impl VideoPoster {
             db,
             cache,
             channel_id,
-            config,
             playlists: channels,
             discord,
-            lrrbot,
             youtube,
             check_for_existing_threads: true,
         })
@@ -191,17 +181,7 @@ impl VideoPoster {
                 false
             });
 
-            if is_livestream {
-                super::stream_up::stream_up_youtube(
-                    &self.config,
-                    &self.db,
-                    &self.discord,
-                    &self.lrrbot,
-                    &video,
-                )
-                .await
-                .context("failed to announce livestream")?;
-            } else if !is_announced {
+            if !is_announced && !is_livestream {
                 video
                     .announce(&channel, &self.discord)
                     .await
@@ -224,12 +204,12 @@ impl VideoPoster {
 }
 
 pub struct Video {
-    pub channel_title: String,
-    pub channel_id: String,
-    pub id: String,
-    pub title: String,
-    pub description: String,
-    pub published_at: OffsetDateTime,
+    channel_title: String,
+    channel_id: String,
+    id: String,
+    title: String,
+    description: String,
+    published_at: OffsetDateTime,
 }
 
 impl Video {
