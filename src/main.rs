@@ -223,6 +223,7 @@ async fn main() -> Result<(), Error> {
         cache.clone(),
         config.clone(),
         discord.clone(),
+        lrrbot.clone(),
         youtube.clone(),
     )));
     tasks.push(tokio::spawn(crate::autotopic::autotopic(
