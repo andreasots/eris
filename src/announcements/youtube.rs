@@ -171,7 +171,17 @@ impl VideoPoster {
                 false
             };
 
-            if !is_announced {
+            let is_livestream = video.is_livestream(&self.youtube).await.unwrap_or_else(|error| {
+                error!(
+                    ?error,
+                    video.id,
+                    "failed to determine if the video is a livestream, assuming that it is not"
+                );
+
+                false
+            });
+
+            if !is_announced && !is_livestream {
                 video
                     .announce(&channel, &self.discord)
                     .await
@@ -273,6 +283,28 @@ impl Video {
         }
 
         Ok(false)
+    }
+
+    async fn is_livestream(
+        &self,
+        youtube: &YouTube<HttpsConnector<HttpConnector>>,
+    ) -> Result<bool, Error> {
+        let (_, list) = youtube
+            .videos()
+            .list(&vec!["liveStreamingDetails".into()])
+            .add_id(&self.id)
+            .doit()
+            .await
+            .context("failed to fetch livestreaming details")?;
+
+        let video = list
+            .items
+            .context("video query returned no videos")?
+            .into_iter()
+            .find(|video| video.id.as_deref() == Some(&self.id))
+            .context("video query didn't return this video")?;
+
+        Ok(video.live_streaming_details.is_some())
     }
 
     fn message_content(&self) -> String {
