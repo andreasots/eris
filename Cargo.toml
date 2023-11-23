@@ -29,7 +29,7 @@ rand = { version = "0.8.5", default-features = false, features = ["std", "std_rn
 regex = { version = "1.10.2", default-features = false, features = ["perf", "std", "unicode"] }
 reqwest = { version = "0.11.22", default-features = false, features = ["rustls-tls", "json"] }
 rust-ini = { version = "0.20.0", default-features = false }
-sea-orm = { version = "0.12.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-json"] }
+sea-orm = { version = "0.12.7", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-json"] }
 separator = { version = "0.4.1", default-features = false }
 serde = { version = "1.0.192", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.108", default-features = false }
