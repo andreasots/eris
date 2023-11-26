@@ -670,7 +670,7 @@ dependencies = [
  "twitch_api",
  "unicode-segmentation",
  "unicode-width",
- "url 2.4.1",
+ "url 2.5.0",
 ]
 
 [[package]]
@@ -752,7 +752,7 @@ version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13624c2627564efccf4934284bdd98cbaa14e79b0b5a141218e507b3a823456"
 dependencies = [
- "percent-encoding 2.3.0",
+ "percent-encoding 2.3.1",
 ]
 
 [[package]]
@@ -1185,9 +1185,9 @@ dependencies = [
 
 [[package]]
 name = "idna"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d20d6b07bfbc108882d88ed8e37d39636dcc260e15e30c45e6ba089610b917c"
+checksum = "634d9b1461af396cad843f47fdba5597a4f9e6ddd4bfb6ff5d85028c25cb12f6"
 dependencies = [
  "unicode-bidi",
  "unicode-normalization",
@@ -1686,9 +1686,9 @@ checksum = "31010dd2e1ac33d5b46a5b413495239882813e0369f8ed8a5e266f173602f831"
 
 [[package]]
 name = "percent-encoding"
-version = "2.3.0"
+version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b2a4787296e9989611394c33f193f676704af1686e70b8f8033ab5ba9a35a94"
+checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 
 [[package]]
 name = "petgraph"
@@ -1978,7 +1978,7 @@ dependencies = [
  "log",
  "mime",
  "once_cell",
- "percent-encoding 2.3.0",
+ "percent-encoding 2.3.1",
  "pin-project-lite",
  "rustls 0.21.7",
  "rustls-pemfile",
@@ -1989,7 +1989,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.24.1",
  "tower-service",
- "url 2.4.1",
+ "url 2.5.0",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -2202,7 +2202,7 @@ dependencies = [
  "thiserror",
  "time",
  "tracing",
- "url 2.4.1",
+ "url 2.5.0",
  "uuid",
 ]
 
@@ -2561,7 +2561,7 @@ dependencies = [
  "memchr",
  "once_cell",
  "paste",
- "percent-encoding 2.3.0",
+ "percent-encoding 2.3.1",
  "rustls 0.21.7",
  "rustls-pemfile",
  "serde",
@@ -2574,7 +2574,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tracing",
- "url 2.4.1",
+ "url 2.5.0",
  "webpki-roots 0.24.0",
 ]
 
@@ -2614,7 +2614,7 @@ dependencies = [
  "syn 1.0.109",
  "tempfile",
  "tokio",
- "url 2.4.1",
+ "url 2.5.0",
 ]
 
 [[package]]
@@ -2645,7 +2645,7 @@ dependencies = [
  "md-5",
  "memchr",
  "once_cell",
- "percent-encoding 2.3.0",
+ "percent-encoding 2.3.1",
  "rand",
  "rsa",
  "serde",
@@ -2715,12 +2715,12 @@ dependencies = [
  "futures-util",
  "libsqlite3-sys",
  "log",
- "percent-encoding 2.3.0",
+ "percent-encoding 2.3.1",
  "serde",
  "sqlx-core",
  "time",
  "tracing",
- "url 2.4.1",
+ "url 2.5.0",
 ]
 
 [[package]]
@@ -3157,7 +3157,7 @@ dependencies = [
  "rustls 0.20.9",
  "sha1",
  "thiserror",
- "url 2.4.1",
+ "url 2.5.0",
  "utf-8",
  "webpki",
 ]
@@ -3216,7 +3216,7 @@ dependencies = [
  "brotli",
  "hyper",
  "hyper-rustls 0.23.2",
- "percent-encoding 2.3.0",
+ "percent-encoding 2.3.1",
  "rand",
  "serde",
  "serde_json",
@@ -3304,7 +3304,7 @@ dependencies = [
  "tracing",
  "twitch_oauth2",
  "twitch_types",
- "url 2.4.1",
+ "url 2.5.0",
  "version_check",
 ]
 
@@ -3327,7 +3327,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "twitch_types",
- "url 2.4.1",
+ "url 2.5.0",
 ]
 
 [[package]]
@@ -3417,13 +3417,13 @@ dependencies = [
 
 [[package]]
 name = "url"
-version = "2.4.1"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "143b538f18257fac9cad154828a57c6bf5157e1aa604d4816b5995bf6de87ae5"
+checksum = "31e6302e3bb753d46e83516cae55ae196fc0c309407cf11ab35cc51a4c2a4633"
 dependencies = [
  "form_urlencoded",
- "idna 0.4.0",
- "percent-encoding 2.3.0",
+ "idna 0.5.0",
+ "percent-encoding 2.3.1",
  "serde",
 ]
 
@@ -3710,7 +3710,7 @@ dependencies = [
  "hyper-rustls 0.24.1",
  "itertools 0.10.5",
  "log",
- "percent-encoding 2.3.0",
+ "percent-encoding 2.3.1",
  "rustls 0.21.7",
  "rustls-pemfile",
  "seahash",
@@ -3719,7 +3719,7 @@ dependencies = [
  "time",
  "tokio",
  "tower-service",
- "url 2.4.1",
+ "url 2.5.0",
 ]
 
 [[package]]
