@@ -3728,9 +3728,9 @@ checksum = "0fcb9cbac069e033553e8bb871be2fbdffcab578eb25bd0f7c508cedc6dcd75a"
 
 [[package]]
 name = "yup-oauth2"
-version = "8.3.0"
+version = "8.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "364ca376b5c04d9b2be9693054e3e0d2d146b363819d0f9a10c6ee66e4c8406b"
+checksum = "24bea7df5a9a74a9a0de92f22e5ab3fb9505dd960c7f1f00de5b7231d9d97206"
 dependencies = [
  "anyhow",
  "async-trait",
