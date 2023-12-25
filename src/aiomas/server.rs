@@ -1,22 +1,21 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::future::Future;
 use std::marker::PhantomData;
 #[cfg(unix)]
 use std::path::Path;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use anyhow::{Context, Error};
-use futures::channel::mpsc;
-use futures::future::{ready, BoxFuture};
-use futures::prelude::*;
+use futures_util::{future, FutureExt, Sink, SinkExt, Stream, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 #[cfg(not(unix))]
 use tokio::net::TcpListener;
 #[cfg(unix)]
 use tokio::net::UnixListener;
-use tokio::sync::mpsc::Sender;
-use tokio::sync::watch::Receiver;
+use tokio::sync::{mpsc, watch};
 use tokio::task::JoinHandle;
 use tracing::error;
 
@@ -30,7 +29,7 @@ pub trait Route<Args> {
         &self,
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
-    ) -> BoxFuture<'static, Result<Value, Exception>>;
+    ) -> Pin<Box<dyn Future<Output = Result<Value, Exception>> + Send + 'static>>;
 }
 
 impl<Fun, Fut, R, E, T0> Route<(T0,)> for Fun
@@ -45,13 +44,13 @@ where
         &self,
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
-    ) -> BoxFuture<'static, Result<Value, Exception>> {
+    ) -> Pin<Box<dyn Future<Output = Result<Value, Exception>> + Send + 'static>> {
         if !kwargs.is_empty() {
-            return ready(Err(String::from("function takes no keyword arguments"))).boxed();
+            return future::ready(Err(String::from("function takes no keyword arguments"))).boxed();
         }
 
         if args.len() != 1 {
-            return ready(Err(format!(
+            return future::ready(Err(format!(
                 "function only takes a single argument ({} given)",
                 args.len()
             )))
@@ -62,7 +61,8 @@ where
         let arg0 = match serde_json::from_value(iter.next().unwrap()) {
             Ok(arg) => arg,
             Err(err) => {
-                return ready(Err(format!("failed to deserialize argument 0: {err:?}"))).boxed()
+                return future::ready(Err(format!("failed to deserialize argument 0: {err:?}")))
+                    .boxed()
             }
         };
 
@@ -83,7 +83,7 @@ trait Handler {
         &self,
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
-    ) -> BoxFuture<'static, Result<Value, Exception>>;
+    ) -> Pin<Box<dyn Future<Output = Result<Value, Exception>> + Send + 'static>>;
 }
 
 struct RouteHandler<R, Args> {
@@ -99,7 +99,7 @@ where
         &self,
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
-    ) -> BoxFuture<'static, Result<Value, Exception>> {
+    ) -> Pin<Box<dyn Future<Output = Result<Value, Exception>> + Send + 'static>> {
         self.route.handle(args, kwargs)
     }
 }
@@ -141,7 +141,11 @@ impl Server {
         self.methods.insert(method.into(), Box::new(RouteHandler { route, _marker: PhantomData }));
     }
 
-    pub async fn serve(self, mut running: Receiver<bool>, handler_tx: Sender<JoinHandle<()>>) {
+    pub async fn serve(
+        self,
+        mut running: watch::Receiver<bool>,
+        handler_tx: mpsc::Sender<JoinHandle<()>>,
+    ) {
         let Server { methods, listener } = self;
 
         let methods = Arc::new(methods);
@@ -160,8 +164,8 @@ impl Server {
     }
 
     async fn process<T>(
-        mut running: Receiver<bool>,
-        handler_tx: Sender<JoinHandle<()>>,
+        mut running: watch::Receiver<bool>,
+        handler_tx: mpsc::Sender<JoinHandle<()>>,
         methods: Arc<HashMap<String, Box<dyn Handler + Send + Sync + 'static>>>,
         transport: T,
     ) where
@@ -175,7 +179,7 @@ impl Server {
         let (tx, mut rx) = mpsc::channel(16);
         let _ = handler_tx
             .send(tokio::spawn(async move {
-                while let Some(response) = rx.next().await {
+                while let Some(response) = rx.recv().await {
                     if let Err(error) = sink.send(response).await {
                         error!(?error, "Failed to send a response");
                         break;
@@ -190,7 +194,7 @@ impl Server {
                 // Probably not cancel-safe but we're not continuing anyway.
                 req = stream.try_next() => match req {
                     Ok(Some((id, (method, args, kwargs)))) => {
-                        let mut tx = tx.clone();
+                        let tx = tx.clone();
                         let future = match methods.get(&method) {
                             Some(handler) => handler.handle(args, kwargs),
                             None => async move { Err(format!("no such method: {}", method)) }.boxed(),

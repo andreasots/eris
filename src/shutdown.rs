@@ -1,5 +1,4 @@
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
+use futures_util::stream::{FuturesUnordered, StreamExt};
 use tokio::sync::{mpsc, watch};
 use tokio::task::JoinHandle;
 use tracing::error;

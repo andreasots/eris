@@ -3,24 +3,21 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use anyhow::{Context, Error};
-use futures::channel::{mpsc, oneshot};
-use futures::prelude::*;
-use futures::select;
+use futures_util::{Sink, SinkExt, Stream, StreamExt};
 use serde_json::Value;
 #[cfg(not(unix))]
 use tokio::net::TcpStream;
 #[cfg(unix)]
 use tokio::net::UnixStream;
-use tokio::sync::mpsc::Sender;
-use tokio::sync::watch::Receiver;
+use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
 use tracing::error;
 
 use super::codec::{self, Exception, Request};
 
 pub struct NewClient {
-    running: Receiver<bool>,
-    handler_tx: Sender<JoinHandle<()>>,
+    running: watch::Receiver<bool>,
+    handler_tx: mpsc::Sender<JoinHandle<()>>,
 
     #[cfg(unix)]
     path: PathBuf,
@@ -32,8 +29,8 @@ pub struct NewClient {
 #[cfg(unix)]
 impl NewClient {
     pub fn new<P: Into<PathBuf>>(
-        running: Receiver<bool>,
-        handler_tx: Sender<JoinHandle<()>>,
+        running: watch::Receiver<bool>,
+        handler_tx: mpsc::Sender<JoinHandle<()>>,
         path: P,
     ) -> NewClient {
         NewClient { running, handler_tx, path: path.into() }
@@ -78,8 +75,8 @@ pub struct Client {
 
 impl Client {
     async fn from_stream<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + 'static>(
-        running: Receiver<bool>,
-        handler_tx: Sender<JoinHandle<()>>,
+        running: watch::Receiver<bool>,
+        handler_tx: mpsc::Sender<JoinHandle<()>>,
         stream: S,
     ) -> Client {
         let (tx, rx) = mpsc::channel(16);
@@ -92,7 +89,7 @@ impl Client {
     }
 
     async fn dispatch<T>(
-        mut running: Receiver<bool>,
+        mut running: watch::Receiver<bool>,
         mut channel: mpsc::Receiver<(Request, oneshot::Sender<Result<Value, Exception>>)>,
         stream: T,
     ) where
@@ -105,9 +102,9 @@ impl Client {
         let mut next_request_id = 0;
 
         while *running.borrow() || !pending.is_empty() {
-            select! {
-                _ = running.changed().fuse() => continue,
-                new_request = channel.next().fuse() => {
+            tokio::select! {
+                _ = running.changed() => continue,
+                new_request = channel.recv() => {
                     match new_request {
                         Some((request, channel)) => {
                             let request_id = next_request_id;
@@ -123,7 +120,7 @@ impl Client {
                         None => return,
                     }
                 },
-                new_response = stream.next().fuse() => {
+                new_response = stream.next() => {
                     match new_response {
                         Some(Ok((request_id, response))) => {
                             if let Some(channel) = pending.remove(&request_id) {

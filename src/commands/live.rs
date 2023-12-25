@@ -3,7 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 
 use anyhow::{Context as _, Error};
-use futures::TryStreamExt;
+use futures_util::TryStreamExt;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client as DiscordClient;

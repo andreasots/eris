@@ -3,7 +3,7 @@ use std::fmt::{Formatter, Result as FmtResult};
 
 use anyhow::Error;
 use bytes::{Bytes, BytesMut};
-use futures::{Sink, SinkExt, Stream, TryStreamExt};
+use futures_util::{Sink, SinkExt, Stream, TryStreamExt};
 use serde::de::{Error as DeserializationError, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{self, Value};

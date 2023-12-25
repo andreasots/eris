@@ -3,8 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{Context as _, Error};
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
+use futures_util::stream::{FuturesUnordered, StreamExt};
 use google_calendar3::hyper::client::{Client as HyperClient, HttpConnector};
 use google_calendar3::hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use google_calendar3::oauth2::authenticator::{Authenticator, ServiceAccountAuthenticator};

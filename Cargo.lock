@@ -644,7 +644,7 @@ dependencies = [
  "bytes",
  "caseless",
  "clap",
- "futures",
+ "futures-util",
  "google-calendar3",
  "google-sheets4",
  "google-youtube3",

@@ -61,7 +61,8 @@ fn extract_timestamp(cell: &CellData, tz: &Tz) -> Option<Timestamp> {
     // The timestamp is in days since 1899-12-30. Apparently for compatibility with Lotus 1-2-3.
     let offset = Duration::from_secs_f64(cell.effective_value.as_ref()?.number_value? * 86400.0);
     let timestamp = EPOCH + offset;
-    let timestamp = timestamp.assume_timezone(tz).take_first().unwrap_or_else(|| timestamp.assume_utc());
+    let timestamp =
+        timestamp.assume_timezone(tz).take_first().unwrap_or_else(|| timestamp.assume_utc());
     Timestamp::from_micros((timestamp.unix_timestamp_nanos() / 1_000) as i64).ok()
 }
 

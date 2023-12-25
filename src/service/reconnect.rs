@@ -1,7 +1,6 @@
 use anyhow::{Context, Error};
-use futures::channel::oneshot;
 use serde_json::Value;
-use tokio::sync::Mutex;
+use tokio::sync::{oneshot, Mutex};
 
 use crate::aiomas::{Client, Exception, NewClient, Request};
 

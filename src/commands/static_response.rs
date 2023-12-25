@@ -46,9 +46,7 @@ impl CommandHandler for Static {
         args: &'a Args,
     ) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send + 'a>> {
         Box::pin(async move {
-            let Some(command) = args.get(0) else {
-                return Ok(())
-            };
+            let Some(command) = args.get(0) else { return Ok(()) };
             let command = extract_command(command);
 
             let response = self
