@@ -7,13 +7,14 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use anyhow::{anyhow, Error};
+use anyhow::{anyhow, Context, Error};
 use ini::Ini;
-use time_tz::Tz;
 use twilight_model::id::marker::{ChannelMarker, GuildMarker};
 use twilight_model::id::Id;
 use twitch_api::twitch_oauth2::{ClientId, ClientSecret};
 use url::Url;
+
+use crate::tz::Tz;
 
 #[derive(Debug)]
 pub struct Config {
@@ -24,7 +25,7 @@ pub struct Config {
 
     pub command_prefix: String,
 
-    pub timezone: &'static Tz,
+    pub timezone: Tz,
 
     #[cfg(unix)]
     pub lrrbot_socket: PathBuf,
@@ -85,8 +86,7 @@ impl Config {
             timezone: {
                 let timezone =
                     ini.get_from(Some("lrrbot"), "timezone").unwrap_or("America/Vancouver");
-                time_tz::timezones::get_by_name(timezone)
-                    .ok_or_else(|| Error::msg(format!("unknown timezone: {timezone}")))?
+                Tz::from_name(timezone).context("failed to load the timezone")?
             },
 
             #[cfg(unix)]

@@ -77,8 +77,8 @@ pub mod quote {
     use std::convert::TryInto;
     use std::fmt::{Display, Formatter};
 
+    use chrono::NaiveDate;
     use sea_orm::entity::prelude::*;
-    use time::Date;
 
     #[derive(Debug, Clone, DeriveEntityModel)]
     #[sea_orm(table_name = "quotes")]
@@ -87,7 +87,7 @@ pub mod quote {
         pub id: i32,
         pub quote: String,
         pub attrib_name: Option<String>,
-        pub attrib_date: Option<Date>,
+        pub attrib_date: Option<NaiveDate>,
         pub deleted: bool,
         pub context: Option<String>,
         pub game_id: Option<i32>,

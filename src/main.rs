@@ -41,6 +41,7 @@ mod shutdown;
 mod systemd;
 mod time;
 mod token_renewal;
+mod tz;
 
 const DEFAULT_TRACING_FILTER: &str = "info,sqlx::query=warn";
 const USER_AGENT: &str = concat!(
@@ -84,7 +85,7 @@ async fn main() -> Result<(), Error> {
         .flatten_event(true)
         .with_current_span(true)
         .with_span_list(true)
-        .with_timer(tracing_subscriber::fmt::time::UtcTime::rfc_3339())
+        .with_timer(tracing_subscriber::fmt::time::ChronoUtc::rfc_3339())
         .with_env_filter(EnvFilter::new(match std::env::var(EnvFilter::DEFAULT_ENV) {
             Ok(filter) => Cow::Owned(filter),
             Err(std::env::VarError::NotPresent) => Cow::Borrowed(DEFAULT_TRACING_FILTER),

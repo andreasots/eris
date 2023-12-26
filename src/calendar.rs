@@ -1,11 +1,11 @@
 use anyhow::{Context, Error};
+use chrono::{DateTime, Duration, Utc};
 use google_calendar3::api::EventDateTime;
-use google_calendar3::chrono::{Datelike, TimeZone, Utc};
 use google_calendar3::hyper::client::HttpConnector;
 use google_calendar3::hyper_rustls::HttpsConnector;
-use time::{Date, Duration, OffsetDateTime, Time};
-use time_tz::{PrimitiveDateTimeExt, Tz};
 use tracing::info;
+
+use crate::tz::Tz;
 
 pub const LRR: &str = "loadingreadyrun.com_72jmf1fn564cbbr84l048pv1go@group.calendar.google.com";
 pub const FANSTREAMS: &str = "caffeinatedlemur@gmail.com";
@@ -13,9 +13,9 @@ pub const FANSTREAMS: &str = "caffeinatedlemur@gmail.com";
 pub type CalendarHub = google_calendar3::CalendarHub<HttpsConnector<HttpConnector>>;
 
 pub struct Event {
-    pub start: OffsetDateTime,
+    pub start: DateTime<Utc>,
     pub summary: String,
-    pub end: OffsetDateTime,
+    pub end: DateTime<Utc>,
     pub location: Option<String>,
     pub description: Option<String>,
 }
@@ -34,16 +34,17 @@ impl Event {
     }
 }
 
-fn parse_timestamp(timestamp: &EventDateTime, timezone: &Tz) -> Result<OffsetDateTime, Error> {
+fn parse_timestamp(timestamp: &EventDateTime, timezone: &Tz) -> Result<DateTime<Utc>, Error> {
     if let Some(timestamp) = timestamp.date_time {
-        crate::time::chrono_to_time(&timestamp)
+        Ok(timestamp)
     } else if let Some(date) = timestamp.date {
-        Date::from_ordinal_date(date.year(), date.ordinal0() as u16)
-            .context("failed to convert date to `Date`")?
-            .with_time(Time::MIDNIGHT)
-            .assume_timezone(timezone)
-            .take_first()
-            .ok_or_else(|| Error::msg("invalid timestamp: midnight doesn't exist in time zone"))
+        Ok(date
+            .and_hms_opt(0, 0, 0)
+            .context("midnight is invalid?")?
+            .and_local_timezone(timezone)
+            .earliest()
+            .ok_or_else(|| Error::msg("invalid timestamp: midnight doesn't exist in time zone"))?
+            .with_timezone(&Utc))
     } else {
         Err(Error::msg("timestamp missing"))
     }
@@ -71,7 +72,7 @@ pub fn format_description(description: &str) -> String {
 pub async fn get_next_event(
     client: &CalendarHub,
     calendar_id: &str,
-    at: OffsetDateTime,
+    at: DateTime<Utc>,
     include_current: bool,
 ) -> Result<Vec<Event>, Error> {
     let (_, res) = client
@@ -80,19 +81,18 @@ pub async fn get_next_event(
         .max_results(10)
         .order_by("startTime")
         .single_events(true)
-        .time_min(Utc.timestamp_nanos(at.unix_timestamp_nanos() as i64))
+        .time_min(at)
         .doit()
         .await
         .context("failed to get the calendar events")?;
 
-    let timezone =
-        time_tz::timezones::get_by_name(res.time_zone.as_deref().unwrap_or("America/Vancouver"))
-            .context("calendar in an unknown timezone")?;
+    let timezone = Tz::from_name(res.time_zone.as_deref().unwrap_or("America/Vancouver"))
+        .context("calendar in an unknown timezone")?;
 
     let Some(events) = res.items else { return Ok(vec![]) };
     let events = events
         .into_iter()
-        .filter_map(|event| match Event::from_api_event(event, timezone) {
+        .filter_map(|event| match Event::from_api_event(event, &timezone) {
             Ok(event) => Some(event),
             Err(error) => {
                 info!(?error, "failed to normalize the event");

@@ -1,8 +1,6 @@
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
-use anyhow::{Context, Error};
-use google_calendar3::chrono::{DateTime, TimeZone};
-use time::{Duration, OffsetDateTime};
+use chrono::Duration;
 
 pub struct HumanReadable(Duration);
 
@@ -17,40 +15,34 @@ impl Display for HumanReadable {
         let mut d = self.0;
         let mut started = false;
 
-        if d < Duration::ZERO {
+        if d < Duration::zero() {
             d = -d;
             f.write_str("-")?;
         }
 
-        if d.whole_days() > 0 {
-            write!(f, "{}d", d.whole_days())?;
-            d = d - Duration::days(d.whole_days());
+        if d.num_days() > 0 {
+            write!(f, "{}d", d.num_days())?;
+            d = d - Duration::days(d.num_days());
             started = true;
         }
 
-        if started || d.whole_hours() > 0 {
-            write!(f, "{}h", d.whole_hours())?;
-            d = d - Duration::hours(d.whole_hours());
+        if started || d.num_hours() > 0 {
+            write!(f, "{}h", d.num_hours())?;
+            d = d - Duration::hours(d.num_hours());
             started = true;
         }
 
-        if started || d.whole_minutes() > 0 {
-            write!(f, "{}m", d.whole_minutes())?;
-            d = d - Duration::minutes(d.whole_minutes());
+        if started || d.num_minutes() > 0 {
+            write!(f, "{}m", d.num_minutes())?;
+            d = d - Duration::minutes(d.num_minutes());
             started = true;
         }
 
         // skip seconds if longer than a minute
         if !started {
-            write!(f, "{}s", d.whole_seconds())?;
+            write!(f, "{}s", d.num_seconds())?;
         }
 
         Ok(())
     }
-}
-
-pub fn chrono_to_time(timestamp: &DateTime<impl TimeZone>) -> Result<OffsetDateTime, Error> {
-    let ts = OffsetDateTime::from_unix_timestamp(timestamp.timestamp())
-        .context("failed to convert timestamp to `OffsetDateTime`")?;
-    Ok(ts + Duration::nanoseconds(timestamp.timestamp_subsec_nanos() as i64))
 }

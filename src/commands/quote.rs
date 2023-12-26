@@ -4,6 +4,7 @@ use std::future::Future;
 use std::pin::Pin;
 
 use anyhow::{Context as _, Error};
+use chrono::NaiveDate;
 use lalrpop_util::ParseError;
 use rand::seq::SliceRandom;
 use regex::{Captures, Regex, Replacer};
@@ -13,8 +14,6 @@ use sea_orm::{
     ColumnTrait, Condition, ConnectionTrait, DatabaseBackend, DatabaseConnection, EntityTrait,
     ModelTrait, QueryFilter, QuerySelect, QueryTrait, Statement,
 };
-use time::macros::format_description;
-use time::Date;
 use tokio::sync::OnceCell;
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client as DiscordClient;
@@ -234,7 +233,7 @@ impl<'a> Ast<'a> {
                     .into())
                 }
                 Column::Date => {
-                    let term = Date::parse(term, format_description!("[year]-[month]-[day]"))
+                    let term = NaiveDate::parse_from_str(term, "%Y-%m-%d")
                         .with_context(|| format!("failed to parse {term:?} as a date"))?;
                     Ok(single_predicate(quote::Column::AttribDate, *op, term, |c, v| c.eq(v))
                         .into())

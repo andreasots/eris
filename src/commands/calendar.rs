@@ -1,11 +1,10 @@
 use std::borrow::Cow;
+use std::fmt::Write;
 use std::future::Future;
 use std::pin::Pin;
 
 use anyhow::{Context as _, Error};
-use time::macros::format_description;
-use time::OffsetDateTime;
-use time_tz::{OffsetDateTimeExt, TimeZone};
+use chrono::Utc;
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client as DiscordClient;
 use twilight_model::channel::message::MessageFlags;
@@ -15,6 +14,7 @@ use crate::calendar::{CalendarHub, FANSTREAMS, LRR};
 use crate::command_parser::{Args, CommandHandler, Commands, Help};
 use crate::config::Config;
 use crate::time::HumanReadable;
+use crate::tz::Tz;
 
 #[derive(Clone, Copy)]
 enum Mode {
@@ -98,19 +98,21 @@ impl Next {
     }
 
     pub async fn get_response(&self, config: &Config, args: &Args) -> Result<String, Error> {
+        let tz;
         let tz = match args.get(0) {
-            Some(name) => {
-                match time_tz::timezones::iter().find(|tz| tz.name().eq_ignore_ascii_case(name)) {
-                    Some(tz) => tz,
-                    None => {
-                        return Ok(format!("Unknown time zone: {}", crate::markdown::escape(name)))
-                    }
+            Some(name) => match Tz::from_name_case_insensitive(name) {
+                Ok(zone) => {
+                    tz = zone;
+                    &tz
                 }
-            }
-            None => config.timezone,
+                Err(_) => {
+                    return Ok(format!("Unknown time zone: {}", crate::markdown::escape(name)))
+                }
+            },
+            None => &config.timezone,
         };
 
-        let now = OffsetDateTime::now_utc();
+        let now = Utc::now();
 
         let events = crate::calendar::get_next_event(
             &self.calendar,
@@ -147,16 +149,8 @@ impl Next {
                 result.push(')');
             }
             result.push_str(" on ");
-            result.push_str(&
-            event
-                .start
-                .to_timezone(tz)
-                .format(format_description!(
-                    // TODO: timezone short name
-                    "[weekday repr:short] [day padding:space] [month repr:short] at [hour repr:12]:[minute] [period]"
-                ))
-                .context("failed to format the event start")?
-            );
+            write!(result, "{}", event.start.with_timezone(&tz).format("%a %e %b %I:%M %p %Z"))
+                .context("failed to write to string")?;
 
             result.push_str(" (");
             if event.start > now {

@@ -1,8 +1,8 @@
 use std::fmt::Write;
 
 use anyhow::{Context, Error};
+use chrono::Utc;
 use influxdb::{Client as InfluxDb, InfluxDbWriteable, Timestamp};
-use time::OffsetDateTime;
 use tracing::error;
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_gateway::Event;
@@ -82,12 +82,6 @@ impl<'a> Measurement<'a> {
     }
 }
 
-fn now() -> Timestamp {
-    Timestamp::Nanoseconds(
-        u128::try_from(OffsetDateTime::now_utc().unix_timestamp_nanos()).unwrap_or(0),
-    )
-}
-
 fn is_guild_text_channel(kind: ChannelType) -> bool {
     match kind {
         ChannelType::GuildText
@@ -141,7 +135,7 @@ pub async fn on_event(
     match event {
         Event::GuildCreate(event) => {
             let GuildCreate(ref guild) = **event;
-            let time = now();
+            let time = Timestamp::from(Utc::now());
             let mut measurements = vec![];
 
             for channel in &guild.channels {
@@ -198,7 +192,7 @@ pub async fn on_event(
 
         Event::ChannelCreate(event) => {
             let ChannelCreate(ref channel) = **event;
-            let time = now();
+            let time = Timestamp::from(Utc::now());
             let mut measurements = vec![];
 
             if is_guild_text_channel(channel.kind) {
@@ -224,7 +218,7 @@ pub async fn on_event(
         }
         Event::ChannelUpdate(event) => {
             let ChannelUpdate(ref channel) = **event;
-            let time = now();
+            let time = Timestamp::from(Utc::now());
             let mut measurements = vec![];
 
             if is_guild_text_channel(channel.kind) {
@@ -263,7 +257,7 @@ pub async fn on_event(
         }
         Event::ChannelDelete(event) => {
             let ChannelDelete(ref channel) = **event;
-            let time = now();
+            let time = Timestamp::from(Utc::now());
             let mut measurements = vec![];
 
             if is_guild_text_channel(channel.kind) {
@@ -291,7 +285,7 @@ pub async fn on_event(
         Event::ThreadCreate(event) => {
             let ThreadCreate(ref thread) = **event;
             let channel = thread.parent_id.and_then(|id| cache.channel(id));
-            let time = now();
+            let time = Timestamp::from(Utc::now());
 
             influxdb
                 .query(
@@ -304,7 +298,7 @@ pub async fn on_event(
         Event::ThreadUpdate(event) => {
             let ThreadUpdate(ref thread) = **event;
             let channel = thread.parent_id.and_then(|id| cache.channel(id));
-            let time = now();
+            let time = Timestamp::from(Utc::now());
 
             influxdb
                 .query(
@@ -317,7 +311,7 @@ pub async fn on_event(
         &Event::ThreadDelete(ThreadDelete { id, parent_id, .. }) => {
             let thread = cache.channel(id);
             let channel = cache.channel(parent_id);
-            let time = now();
+            let time = Timestamp::from(Utc::now());
 
             influxdb
                 .query(
@@ -340,7 +334,7 @@ pub async fn on_event(
             let old_state = new_state
                 .guild_id
                 .and_then(|guild_id| cache.voice_state(new_state.user_id, guild_id));
-            let time = now();
+            let time = Timestamp::from(Utc::now());
             let mut measurements = vec![];
 
             let old_channel_id = old_state.map(|state| state.channel_id());
@@ -440,7 +434,7 @@ pub async fn on_event(
 
         Event::MessageCreate(event) => {
             let MessageCreate(ref message) = **event;
-            let time = now();
+            let time = Timestamp::from(Utc::now());
 
             let (channel, thread) = if let Some(channel) = cache.channel(message.channel_id) {
                 if let ChannelType::Private | ChannelType::Group = channel.kind {

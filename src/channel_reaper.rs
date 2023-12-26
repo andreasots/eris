@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use time::OffsetDateTime;
+use chrono::{TimeZone, Utc};
 use tokio::sync::watch::Receiver;
 use tracing::{error, info};
 use twilight_cache_inmemory::InMemoryCache;
@@ -26,7 +26,7 @@ pub async fn channel_reaper(
         tokio::select! {
             _ = running.changed() => break,
             _ = interval.tick() => {
-                let now = OffsetDateTime::now_utc();
+                let now = Utc::now();
 
                 let Some(channels) = cache
                     .guild_channels(config.guild) else { continue };
@@ -37,12 +37,10 @@ pub async fn channel_reaper(
                         continue
                     };
 
-                    let created_at = channel_id.timestamp();
-                    let created_at_fraction = Duration::from_millis((created_at % 1000) as u64);
-                    let created_at = match OffsetDateTime::from_unix_timestamp(created_at / 1000) {
-                        Ok(created_at) => created_at + created_at_fraction,
-                        Err(error) => {
-                            info!(channel.id = channel_id.get(), ?error, "timestamp out of range");
+                    let created_at = match Utc.timestamp_millis_opt(channel_id.timestamp()).latest() {
+                        Some(created_at) => created_at,
+                        None => {
+                            info!(channel.id = channel_id.get(), "timestamp out of range");
                             continue;
                         }
                     };
@@ -55,7 +53,7 @@ pub async fn channel_reaper(
                         continue;
                     }
 
-                    if (now - created_at) < MIN_CHANNEL_AGE {
+                    if created_at + MIN_CHANNEL_AGE > now {
                         continue;
                     }
 

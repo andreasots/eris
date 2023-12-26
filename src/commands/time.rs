@@ -3,10 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 
 use anyhow::{Context, Error};
-use time::format_description::FormatItem;
-use time::macros::format_description;
-use time::OffsetDateTime;
-use time_tz::OffsetDateTimeExt;
+use chrono::Utc;
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client;
 use twilight_model::channel::Message;
@@ -17,7 +14,7 @@ use crate::config::Config;
 pub struct Time {
     pattern: &'static str,
     help: Help,
-    format: &'static [FormatItem<'static>],
+    format: &'static str,
 }
 
 impl Time {
@@ -31,7 +28,7 @@ impl Time {
                 description: "Post the current moonbase time.".into(),
                 examples: Cow::Borrowed(&[]),
             },
-            format: format_description!("[hour repr:12]:[minute] [period]"),
+            format: "%l:%M %p",
         }
     }
 
@@ -45,7 +42,7 @@ impl Time {
                 description: "Post the current moonbase time using a 24-hour clock.".into(),
                 examples: Cow::Borrowed(&[]),
             },
-            format: format_description!("[hour repr:24]:[minute]"),
+            format: "%H:%M",
         }
     }
 }
@@ -69,15 +66,13 @@ impl CommandHandler for Time {
         _: &'a Args,
     ) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send + 'a>> {
         Box::pin(async move {
-            let now = OffsetDateTime::now_utc()
-                .to_timezone(config.timezone)
-                .format(self.format)
-                .context("failed to format the current time")?;
-
             discord
                 .create_message(message.channel_id)
                 .reply(message.id)
-                .content(&format!("Current moonbase time: {now}"))
+                .content(&format!(
+                    "Current moonbase time: {}",
+                    Utc::now().with_timezone(&&config.timezone).format(self.format)
+                ))
                 .context("reply message invalid")?
                 .await
                 .context("failed to reply to command")?;

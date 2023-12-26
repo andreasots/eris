@@ -3,9 +3,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Error};
+use chrono::{DateTime, Utc};
 use sea_orm::{DatabaseConnection, EntityTrait};
 use separator::FixedPlaceSeparatable;
-use time::OffsetDateTime;
 use tokio::sync::watch::Receiver;
 use tokio::sync::RwLock;
 use tracing::error;
@@ -30,7 +30,8 @@ const DYNAMIC_TAIL_SEPARATOR: &str = " \u{2009}\u{200A}\u{200B}";
 // Don't update the topic if the old and new topics have a Levenshtein distance below `SIMILARITY_THRESHOLD`.
 const SIMILARITY_THRESHOLD: usize = 5;
 // But even then update the topic every `SIMILAR_MIN_UPDATE_INTERVAL`.
-const SIMILAR_MIN_UPDATE_INTERVAL: time::Duration = time::Duration::minutes(30);
+const SIMILAR_MIN_UPDATE_INTERVAL: chrono::Duration =
+    chrono::Duration::milliseconds(30 * 60 * 1000);
 
 struct EventDisplay<'a> {
     event: &'a Event,
@@ -38,7 +39,7 @@ struct EventDisplay<'a> {
 
 impl<'a> fmt::Display for EventDisplay<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "<t:{}:R>: {} ", self.event.start.unix_timestamp(), self.event.summary)?;
+        write!(f, "<t:{}:R>: {} ", self.event.start.timestamp(), self.event.summary)?;
 
         if let Some(ref location) = self.event.location {
             write!(f, "({}) ", crate::markdown::escape(location))?;
@@ -48,7 +49,7 @@ impl<'a> fmt::Display for EventDisplay<'a> {
             let desc = crate::calendar::format_description(desc);
             write!(f, "({}) ", crate::markdown::escape(&crate::shorten::shorten(&desc, 200)))?;
         }
-        write!(f, "on <t:{}:F>.", self.event.start.unix_timestamp())?;
+        write!(f, "on <t:{}:F>.", self.event.start.timestamp())?;
 
         Ok(())
     }
@@ -83,7 +84,7 @@ pub async fn autotopic(
 }
 
 struct Autotopic {
-    last_updated: Option<OffsetDateTime>,
+    last_updated: Option<DateTime<Utc>>,
 
     cache: Arc<InMemoryCache>,
     calendar: CalendarHub,
@@ -138,7 +139,7 @@ impl Autotopic {
         let old_topic_static_prefix =
             old_topic.rsplit_once(DYNAMIC_TAIL_SEPARATOR).unwrap_or((old_topic, "")).0;
 
-        let now = OffsetDateTime::now_utc();
+        let now = Utc::now();
 
         if !is_dynamic {
             if old_topic_static_prefix == new_topic_static_prefix {
@@ -236,7 +237,7 @@ impl Autotopic {
                 Err(error) => error!(?error, "failed to generate the uptime message"),
             }
         } else {
-            let now = OffsetDateTime::now_utc();
+            let now = Utc::now();
 
             let events =
                 crate::calendar::get_next_event(&self.calendar, crate::calendar::LRR, now, false)
@@ -289,12 +290,12 @@ impl Autotopic {
 
     async fn desertbus(
         &self,
-        now: OffsetDateTime,
+        now: DateTime<Utc>,
         events: &[Event],
     ) -> Result<(Vec<String>, bool), Error> {
         let start = DesertBus::start_time();
-        let announce_start = start - time::Duration::days(2);
-        let announce_end = start + time::Duration::days(9);
+        let announce_start = start - chrono::Duration::days(2);
+        let announce_end = start + chrono::Duration::days(9);
         let mut messages = vec![];
         let mut is_dynamic = false;
 
@@ -314,7 +315,7 @@ impl Autotopic {
                 }
             };
             let total_hours = DesertBus::hours_raised(money_raised);
-            let duration = time::Duration::seconds_f64(total_hours * 3600.0);
+            let duration = Duration::from_secs_f64(total_hours * 3600.0);
             let end = start + duration;
             if now < start {
                 messages.push(
@@ -347,8 +348,8 @@ impl Autotopic {
                 let bussed = now - start;
                 messages.push(format!(
                     "{}:{:02} hours of {total_hours} so far.",
-                    bussed.whole_hours(),
-                    bussed.whole_minutes() % 60,
+                    bussed.num_hours(),
+                    bussed.num_minutes() % 60,
                 ));
                 is_dynamic = true;
             }

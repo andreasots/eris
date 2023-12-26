@@ -1,9 +1,11 @@
+use std::sync::OnceLock;
+
 use anyhow::{Context, Error};
+use chrono::{DateTime, TimeZone, Utc};
 use reqwest::Client;
 use serde::Deserialize;
-use time::macros::datetime;
-use time::OffsetDateTime;
-use time_tz::PrimitiveDateTimeExt;
+
+use crate::tz::Tz;
 
 #[derive(Deserialize)]
 struct Init {
@@ -23,10 +25,19 @@ impl DesertBus {
         DesertBus { client }
     }
 
-    pub fn start_time() -> OffsetDateTime {
-        datetime!(2023-11-11 14:00:00)
-            .assume_timezone(time_tz::timezones::db::america::VANCOUVER)
-            .unwrap_first()
+    pub fn start_time() -> DateTime<Utc> {
+        static START_TIME: OnceLock<DateTime<Utc>> = OnceLock::new();
+
+        START_TIME
+            .get_or_init(|| {
+                let tz = &Tz::from_name("America/Vancouver")
+                    .expect("no timezone named `America/Vancouver`");
+                tz.with_ymd_and_hms(2023, 11, 11, 14, 0, 0)
+                    .single()
+                    .expect("ambiguous timestamp")
+                    .with_timezone(&Utc)
+            })
+            .clone()
     }
 
     pub fn hours_raised(money_raised: f64) -> f64 {

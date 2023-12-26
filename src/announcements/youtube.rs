@@ -2,14 +2,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Error};
+use chrono::{DateTime, Utc};
 use google_youtube3::api::PlaylistItem;
 use google_youtube3::hyper::client::HttpConnector;
 use google_youtube3::hyper_rustls::HttpsConnector;
 use google_youtube3::YouTube;
 use regex::Regex;
 use sea_orm::DatabaseConnection;
-use time::format_description::well_known::Rfc3339;
-use time::OffsetDateTime;
 use tokio::sync::watch::Receiver;
 use tracing::{error, info, warn};
 use twilight_cache_inmemory::InMemoryCache;
@@ -147,10 +146,10 @@ impl VideoPoster {
             let last_published_at = state::get::<String>(&state_key, &self.db)
                 .await
                 .context("failed to get the last video published timestamp")?
-                .map(|ts| OffsetDateTime::parse(&ts, &Rfc3339))
+                .map(|ts| DateTime::parse_from_rfc3339(&ts))
                 .transpose()
                 .context("failed to parse the last video published timestamp")?
-                .unwrap_or(OffsetDateTime::UNIX_EPOCH);
+                .map_or(DateTime::UNIX_EPOCH, |ts| ts.with_timezone(&Utc));
 
             if last_published_at >= video.published_at {
                 continue;
@@ -188,11 +187,7 @@ impl VideoPoster {
                     .context("failed to announce video")?;
             }
 
-            let published_at = video
-                .published_at
-                .format(&Rfc3339)
-                .context("failed to format the video published timestamp")?;
-            state::set(state_key, &published_at, &self.db)
+            state::set(state_key, &video.published_at.to_rfc3339(), &self.db)
                 .await
                 .context("failed to set the last video published timestamp")?;
         }
@@ -209,7 +204,7 @@ pub struct Video {
     id: String,
     title: String,
     description: String,
-    published_at: OffsetDateTime,
+    published_at: DateTime<Utc>,
 }
 
 impl Video {
@@ -428,10 +423,7 @@ impl TryFrom<google_youtube3::api::Video> for Video {
             id: video.id.context("`id` is missing")?,
             title: snippet.title.context("`title` is missing")?,
             description: snippet.description.context("`description` is missing")?,
-            published_at: crate::time::chrono_to_time(
-                &snippet.published_at.context("`published_at` is missing")?,
-            )
-            .context("failed to convert `published_at`")?,
+            published_at: snippet.published_at.context("`published_at` is missing")?,
         })
     }
 }
@@ -451,10 +443,7 @@ impl TryFrom<PlaylistItem> for Video {
                 .context("`resource_id.video_id` is missing")?,
             title: snippet.title.context("`title` is missing")?,
             description: snippet.description.context("`description` is missing")?,
-            published_at: crate::time::chrono_to_time(
-                &snippet.published_at.context("`published_at` is missing")?,
-            )
-            .context("failed to convert `published_at`")?,
+            published_at: snippet.published_at.context("`published_at` is missing")?,
         })
     }
 }

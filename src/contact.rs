@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Error};
+use chrono::NaiveDate;
 use google_sheets4::api::{
     BatchUpdateSpreadsheetRequest, CellData, CreateDeveloperMetadataRequest, DeveloperMetadata,
     DeveloperMetadataLocation, DimensionRange, Request, Spreadsheet,
@@ -9,8 +10,6 @@ use google_sheets4::api::{
 use google_sheets4::hyper::client::HttpConnector;
 use google_sheets4::hyper_rustls::HttpsConnector;
 use google_sheets4::Sheets;
-use time::PrimitiveDateTime;
-use time_tz::{PrimitiveDateTimeExt, Tz};
 use tokio::sync::watch::Receiver;
 use tracing::{error, info};
 use twilight_http::Client as DiscordClient;
@@ -20,9 +19,9 @@ use twilight_validate::embed::{AUTHOR_NAME_LENGTH, DESCRIPTION_LENGTH};
 
 use crate::config::Config;
 use crate::shorten::{shorten, split_to_parts};
+use crate::tz::Tz;
 
 const SENT_KEY: &str = "lrrbot.sent";
-const EPOCH: PrimitiveDateTime = time::macros::datetime!(1899-12-30 00:00:00);
 
 pub async fn post_messages(
     mut running: Receiver<bool>,
@@ -59,11 +58,14 @@ struct Entry<'a> {
 
 fn extract_timestamp(cell: &CellData, tz: &Tz) -> Option<Timestamp> {
     // The timestamp is in days since 1899-12-30. Apparently for compatibility with Lotus 1-2-3.
+    let epoch = NaiveDate::from_ymd_opt(1899, 12, 30)?.and_hms_opt(0, 0, 0)?;
     let offset = Duration::from_secs_f64(cell.effective_value.as_ref()?.number_value? * 86400.0);
-    let timestamp = EPOCH + offset;
-    let timestamp =
-        timestamp.assume_timezone(tz).take_first().unwrap_or_else(|| timestamp.assume_utc());
-    Timestamp::from_micros(i64::try_from(timestamp.unix_timestamp_nanos() / 1_000).ok()?).ok()
+    let timestamp = epoch + offset;
+    let micros = timestamp
+        .and_local_timezone(tz)
+        .earliest()
+        .map_or_else(|| timestamp.timestamp_micros(), |ts| ts.timestamp_micros());
+    Timestamp::from_micros(micros).ok()
 }
 
 fn extract_string(cell: &CellData) -> Option<&str> {
@@ -75,8 +77,8 @@ fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(i32, Vec<Entry>)> {
         .properties
         .as_ref()
         .and_then(|prop| prop.time_zone.as_deref())
-        .and_then(time_tz::timezones::get_by_name)
-        .unwrap_or(time_tz::timezones::db::UTC);
+        .and_then(|tz| Tz::from_name(tz).ok())
+        .unwrap_or_else(Tz::utc);
     let sheets = spreadsheet.sheets.as_ref()?;
     let sheet = sheets.get(0)?;
     let sheet_id = sheet.properties.as_ref()?.sheet_id?;
@@ -105,7 +107,7 @@ fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(i32, Vec<Entry>)> {
             let values = row.values.as_ref();
 
             let timestamp =
-                values.and_then(|row| row.get(0)).and_then(|cell| extract_timestamp(cell, tz));
+                values.and_then(|row| row.get(0)).and_then(|cell| extract_timestamp(cell, &tz));
             let message = values.and_then(|row| row.get(1)).and_then(extract_string);
             let username = values.and_then(|row| row.get(2)).and_then(extract_string);
 

@@ -16,8 +16,8 @@ use crate::config::Config;
 use crate::models::state;
 
 mod mastodon_api {
+    use chrono::{DateTime, FixedOffset};
     use serde::Deserialize;
-    use time::OffsetDateTime;
     use url::Url;
 
     #[derive(Deserialize)]
@@ -49,8 +49,7 @@ mod mastodon_api {
         /// ID of the account that authored the status being replied to.
         pub in_reply_to_account_id: Option<String>,
         /// The date when this status was created.
-        #[serde(with = "time::serde::iso8601")]
-        pub created_at: OffsetDateTime,
+        pub created_at: DateTime<FixedOffset>,
     }
 }
 
