@@ -2,18 +2,17 @@ use anyhow::{Context, Error};
 use serde_json::Value;
 use tokio::sync::{oneshot, Mutex};
 
-use crate::aiomas::{Client, Exception, NewClient, Request};
+use crate::aiomas::{Client, Connector, Exception, Request};
 
-// FIXME: this should be generic over the factory but that requires generic associated types and
-//  existential types.
+// FIXME: this should be generic over the connector but that requires Rust 1.75
 pub struct Reconnect {
-    factory: NewClient,
+    connector: Connector,
     client: Mutex<Option<Client>>,
 }
 
 impl Reconnect {
-    pub fn new(factory: NewClient) -> Reconnect {
-        Reconnect { factory, client: Mutex::new(None) }
+    pub fn new(factory: Connector) -> Reconnect {
+        Reconnect { connector: factory, client: Mutex::new(None) }
     }
 
     async fn call_inner(
@@ -31,7 +30,7 @@ impl Reconnect {
 
             res
         } else {
-            let mut client = self.factory.new_client().await?;
+            let mut client = self.connector.connect().await?;
 
             let res = client.call(req).await;
 

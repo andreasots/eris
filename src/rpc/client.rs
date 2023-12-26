@@ -8,7 +8,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::watch::Receiver;
 use tokio::task::JoinHandle;
 
-use crate::aiomas::NewClient;
+use crate::aiomas::Connector;
 use crate::config::Config;
 use crate::service::{Reconnect, Retry};
 
@@ -52,9 +52,9 @@ impl LRRbot {
         config: &Config,
     ) -> LRRbot {
         #[cfg(unix)]
-        let client = NewClient::new(running, handler_tx, &config.lrrbot_socket);
+        let client = Connector::new(running, handler_tx, &config.lrrbot_socket);
         #[cfg(not(unix))]
-        let client = NewClient::new(running, handler_tx, config.lrrbot_port);
+        let client = Connector::new(running, handler_tx, config.lrrbot_port);
 
         LRRbot { service: Retry::new(Reconnect::new(client), 3) }
     }

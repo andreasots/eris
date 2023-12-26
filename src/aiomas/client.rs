@@ -15,7 +15,7 @@ use tracing::error;
 
 use super::codec::{self, Exception, Request};
 
-pub struct NewClient {
+pub struct Connector {
     running: watch::Receiver<bool>,
     handler_tx: mpsc::Sender<JoinHandle<()>>,
 
@@ -27,16 +27,16 @@ pub struct NewClient {
 }
 
 #[cfg(unix)]
-impl NewClient {
+impl Connector {
     pub fn new<P: Into<PathBuf>>(
         running: watch::Receiver<bool>,
         handler_tx: mpsc::Sender<JoinHandle<()>>,
         path: P,
-    ) -> NewClient {
-        NewClient { running, handler_tx, path: path.into() }
+    ) -> Connector {
+        Connector { running, handler_tx, path: path.into() }
     }
 
-    pub async fn new_client(&self) -> Result<Client, Error> {
+    pub async fn connect(&self) -> Result<Client, Error> {
         Ok(Client::from_stream(
             self.running.clone(),
             self.handler_tx.clone(),
@@ -47,16 +47,16 @@ impl NewClient {
 }
 
 #[cfg(not(unix))]
-impl NewClient {
+impl Connector {
     pub fn new(
         running: Receiver<bool>,
         handler_tx: Sender<JoinHandle<()>>,
         port: u16,
-    ) -> NewClient {
-        NewClient { running, handler_tx, port }
+    ) -> Connector {
+        Connector { running, handler_tx, port }
     }
 
-    pub async fn new_client(&self) -> Result<Client, Error> {
+    pub async fn connect(&self) -> Result<Client, Error> {
         use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 
         let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), self.port);

@@ -60,15 +60,7 @@ pub enum Column {
 impl Column {
     /// Does the fuzzy match on this column use the full-text search?
     fn fuzzy_is_fts(self) -> bool {
-        match self {
-            Column::Context => true,
-            Column::Date => false,
-            Column::Game => false,
-            Column::Id => false,
-            Column::Name => false,
-            Column::Quote => true,
-            Column::Show => false,
-        }
+        self == Column::Quote || self == Column::Context
     }
 }
 
@@ -123,11 +115,11 @@ impl<'a> Ast<'a> {
                                 Ast::Column {
                                     column: l_column,
                                     op: Op::Fuzzy,
-                                    term: Cow::Borrowed(ref left),
+                                    term: Cow::Borrowed(left),
                                 } if l_column == column => Ast::Column {
                                     column,
                                     op: Op::Fuzzy,
-                                    term: Cow::Owned(format!("{} {}", left, term)),
+                                    term: Cow::Owned(format!("{left} {term}")),
                                 },
                                 Ast::Column {
                                     column: l_column,
@@ -153,7 +145,7 @@ impl<'a> Ast<'a> {
                         for expr in &mut exprs {
                             *expr = match expr {
                                 Ast::Bare(Cow::Borrowed(orig)) => {
-                                    Ast::Bare(Cow::Owned(format!("{} {}", orig, term)))
+                                    Ast::Bare(Cow::Owned(format!("{orig} {term}")))
                                 }
                                 Ast::Bare(Cow::Owned(orig)) => {
                                     orig.push(' ');
@@ -180,11 +172,9 @@ impl<'a> Ast<'a> {
             ) if l_column == r_column && l_column.fuzzy_is_fts() => Ast::Column {
                 column: l_column,
                 op: Op::Fuzzy,
-                term: Cow::Owned(format!("{} {}", l_term, r_term)),
+                term: Cow::Owned(format!("{l_term} {r_term}")),
             },
-            (Ast::Bare(left), Ast::Bare(right)) => {
-                Ast::Bare(Cow::Owned(format!("{} {}", left, right)))
-            }
+            (Ast::Bare(left), Ast::Bare(right)) => Ast::Bare(Cow::Owned(format!("{left} {right}"))),
             (left, right) => Ast::And { exprs: vec![left, right] },
         }
     }
@@ -359,7 +349,7 @@ fn parse_emoji_name(emoji: &str) -> &str {
     RE_EMOJI_NAME.captures(emoji).unwrap().get(1).unwrap().as_str()
 }
 
-lalrpop_util::lalrpop_mod!(#[allow(clippy::all)] pub parser, "/commands/quote.rs");
+lalrpop_util::lalrpop_mod!(#[allow(clippy::all, clippy::pedantic)] pub parser, "/commands/quote.rs");
 
 async fn report_parse_error(
     discord: &DiscordClient,
@@ -368,10 +358,11 @@ async fn report_parse_error(
     err: ParseError<usize, parser::Token<'_>, Infallible>,
 ) -> Result<(), Error> {
     let (start, end) = match &err {
-        ParseError::InvalidToken { location } => (*location, *location),
-        ParseError::UnrecognizedEof { location, .. } => (*location, *location),
-        ParseError::UnrecognizedToken { token: (start, _, end), .. } => (*start, *end),
-        ParseError::ExtraToken { token: (start, _, end) } => (*start, *end),
+        ParseError::InvalidToken { location } | ParseError::UnrecognizedEof { location, .. } => {
+            (*location, *location)
+        }
+        ParseError::UnrecognizedToken { token: (start, _, end), .. }
+        | ParseError::ExtraToken { token: (start, _, end) } => (*start, *end),
         ParseError::User { error } => match *error {},
     };
 
@@ -590,7 +581,7 @@ impl CommandHandler for QueryDebugger {
                 .content(if query.is_empty() {
                     "Query: pick a random quote"
                 } else if let Ok(id) = query.parse::<i32>() {
-                    content = format!("Query: fetch quote #{}", id);
+                    content = format!("Query: fetch quote #{id}");
                     &content
                 } else {
                     let parser = parser::QueryParser::new();
@@ -674,19 +665,17 @@ impl CommandHandler for Details {
                 }
             };
 
-            let quote = quote::Entity::find_by_id(quote_id)
+            let Some(quote) = quote::Entity::find_by_id(quote_id)
                 .filter(Expr::col(quote::Column::Deleted).not())
                 .one(&self.db)
                 .await
-                .context("failed to load the quote")?;
-            let quote = if let Some(quote) = quote {
-                quote
-            } else {
+                .context("failed to load the quote")?
+            else {
                 discord
                     .create_message(message.channel_id)
                     .reply(message.id)
                     .flags(MessageFlags::SUPPRESS_EMBEDS)
-                    .content(&format!("Could not find quote #{}", quote_id))
+                    .content(&format!("Could not find quote #{quote_id}"))
                     .context("error report invalid")?
                     .await
                     .context("failed to report the parse error")?;

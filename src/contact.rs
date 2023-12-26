@@ -63,7 +63,7 @@ fn extract_timestamp(cell: &CellData, tz: &Tz) -> Option<Timestamp> {
     let timestamp = EPOCH + offset;
     let timestamp =
         timestamp.assume_timezone(tz).take_first().unwrap_or_else(|| timestamp.assume_utc());
-    Timestamp::from_micros((timestamp.unix_timestamp_nanos() / 1_000) as i64).ok()
+    Timestamp::from_micros(i64::try_from(timestamp.unix_timestamp_nanos() / 1_000).ok()?).ok()
 }
 
 fn extract_string(cell: &CellData) -> Option<&str> {
@@ -96,7 +96,7 @@ fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(i32, Vec<Entry>)> {
 
             if let Some(meta) = meta.developer_metadata.as_ref() {
                 for entry in meta {
-                    if entry.metadata_key.as_ref().map(|s| s == SENT_KEY).unwrap_or(false) {
+                    if entry.metadata_key.as_ref().is_some_and(|s| s == SENT_KEY) {
                         continue 'row;
                     }
                 }

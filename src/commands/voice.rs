@@ -72,7 +72,7 @@ impl CommandHandler for Voice {
         Box::pin(async move {
             let content = match self.exec(config, discord, args.get(0).unwrap()).await {
                 Ok(channel) => format!("Created a temporary voice channel {}", channel.mention()),
-                Err(error) => format!("Failed to create a temporary voice channel: {}", error),
+                Err(error) => format!("Failed to create a temporary voice channel: {error}"),
             };
 
             discord

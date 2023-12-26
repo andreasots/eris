@@ -79,10 +79,11 @@ impl Access {
                 .map(|permissions| permissions.contains(Permissions::ADMINISTRATOR))
                 .unwrap_or(false),
             Access::OwnerOnly => {
+                #[allow(clippy::unreadable_literal)]
                 const OWNERS: [Id<UserMarker>; 3] = [
-                    Id::new(101919755132227584), // Defrost#0001
-                    Id::new(153674140019064832), // phlip#6324
-                    Id::new(144128240389324800), // qrpth#6704
+                    Id::new(101919755132227584), // defrost
+                    Id::new(153674140019064832), // mrphlip
+                    Id::new(144128240389324800), // qrpth
                 ];
                 // TODO: transfer LRRbot to a team and check against team members
                 OWNERS.into_iter().any(|id| id == user_id)
@@ -109,7 +110,7 @@ impl Args {
         Self { matches: vec![] }
     }
 
-    fn from_captures(captures: Captures) -> Self {
+    fn from_captures(captures: &Captures) -> Self {
         Self { matches: captures.iter().skip(1).map(|c| c.map(|c| c.as_str().into())).collect() }
     }
 
@@ -202,8 +203,9 @@ impl CommandParser {
                             let args = (pattern.captures_len() > 1)
                                 .then_some(())
                                 .and_then(|()| pattern.captures(&message.content))
-                                .map(Args::from_captures)
-                                .unwrap_or_else(Args::empty);
+                                .map_or_else(Args::empty, |captures| {
+                                    Args::from_captures(&captures)
+                                });
 
                             let cmds = Commands { handlers: &handlers };
 
@@ -223,7 +225,7 @@ impl CommandParser {
                             }
                         }
                         .instrument(span)
-                        .await
+                        .await;
                     }
                 }))
                 .await;

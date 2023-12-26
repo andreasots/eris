@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::fmt::Write;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -81,13 +82,12 @@ impl Help {
             cleaned
         };
 
-        match commands.iter().filter_map(|cmd| cmd.help()).find(|help| help.name == command) {
+        match commands.iter().filter_map(CommandHandler::help).find(|help| help.name == command) {
             Some(help) => {
-                let examples = help
-                    .examples
-                    .iter()
-                    .map(|example| format!("`{}{example}`\n", config.command_prefix))
-                    .collect::<String>();
+                let examples = help.examples.iter().fold(String::new(), |mut examples, example| {
+                    writeln!(examples, "`{}{example}`", config.command_prefix).unwrap();
+                    examples
+                });
                 let mut embed = EmbedBuilder::new()
                     .title(format!("`{}{}`", config.command_prefix, help.usage))
                     .description(help.description);

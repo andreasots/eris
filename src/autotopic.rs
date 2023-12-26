@@ -149,10 +149,7 @@ impl Autotopic {
                 levenshtein::levenshtein(old_topic_static_prefix, new_topic_static_prefix);
             if distance == 0
                 || distance < SIMILARITY_THRESHOLD
-                    && self
-                        .last_updated
-                        .map(|t| (now - t) < SIMILAR_MIN_UPDATE_INTERVAL)
-                        .unwrap_or(false)
+                    && self.last_updated.is_some_and(|t| (now - t) < SIMILAR_MIN_UPDATE_INTERVAL)
             {
                 return Ok(());
             }
@@ -170,20 +167,17 @@ impl Autotopic {
     }
 
     async fn update_topic(&mut self) -> Result<(), Error> {
-        let header = match self.lrrbot.get_header_info().await {
-            Ok(header) => header,
-            Err(error) => {
-                error!(?error, "failed to fetch header info");
+        let header = self.lrrbot.get_header_info().await.unwrap_or_else(|error| {
+            error!(?error, "failed to fetch header info");
 
-                HeaderInfo {
-                    is_live: false,
-                    channel: self.config.channel.clone(),
-                    current_game: None,
-                    current_show: None,
-                    advice: None,
-                }
+            HeaderInfo {
+                is_live: false,
+                channel: self.config.channel.clone(),
+                current_game: None,
+                current_show: None,
+                advice: None,
             }
-        };
+        });
 
         let mut messages = vec![];
         let mut is_dynamic = false;
@@ -282,13 +276,15 @@ impl Autotopic {
             .context("failed to get the stream")?
             .data
             .first()
-            .map(|stream| {
-                format!(
-                    "The stream started <t:{}:R>.",
-                    stream.started_at.to_fixed_offset().unix_timestamp()
-                )
-            })
-            .unwrap_or_else(|| String::from("The stream is not live.")))
+            .map_or_else(
+                || String::from("The stream is not live."),
+                |stream| {
+                    format!(
+                        "The stream started <t:{}:R>.",
+                        stream.started_at.to_fixed_offset().unix_timestamp()
+                    )
+                },
+            ))
     }
 
     async fn desertbus(
@@ -317,14 +313,16 @@ impl Autotopic {
                     return Ok((messages, is_dynamic));
                 }
             };
-            let total_hours = DesertBus::hours_raised(money_raised) as i64;
+            let total_hours = DesertBus::hours_raised(money_raised);
+            let duration = time::Duration::seconds_f64(total_hours * 3600.0);
+            let end = start + duration;
             if now < start {
                 messages.push(
                     EventDisplay {
                         event: &Event {
                             start,
                             summary: String::from("Desert Bus for Hope"),
-                            end: start + time::Duration::hours(total_hours),
+                            end,
                             location: Some(String::from(
                                 "https://desertbus.org/ or https://twitch.tv/desertbus",
                             )),
@@ -338,9 +336,7 @@ impl Autotopic {
                     money_raised.separated_string_with_fixed_place(2)
                 ));
                 is_dynamic = true;
-            } else if now <= start + time::Duration::hours(total_hours)
-                || self.is_desertbus_live().await?
-            {
+            } else if now <= end || self.is_desertbus_live().await? {
                 messages.push(String::from(
                     "DESERT BUS! (https://desertbus.org/ or https://twitch.tv/desertbus)",
                 ));
@@ -350,10 +346,9 @@ impl Autotopic {
                 ));
                 let bussed = now - start;
                 messages.push(format!(
-                    "{}:{:02} hours of {} so far.",
+                    "{}:{:02} hours of {total_hours} so far.",
                     bussed.whole_hours(),
                     bussed.whole_minutes() % 60,
-                    total_hours
                 ));
                 is_dynamic = true;
             }

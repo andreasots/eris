@@ -184,7 +184,7 @@ async fn main() -> Result<(), Error> {
         let server = {
             if let Err(err) = tokio::fs::remove_file(&config.eris_socket).await {
                 if err.kind() != std::io::ErrorKind::NotFound {
-                    return Err(err).context("failed to remove the socket file")?;
+                    return Err(Error::from(err).context("failed to remove the socket file"));
                 }
             }
 
@@ -385,7 +385,7 @@ async fn main() -> Result<(), Error> {
 
     while let Some(res) = tasks.next().await {
         if let Err(error) = res {
-            error!(?error, "task failed")
+            error!(?error, "task failed");
         }
     }
 

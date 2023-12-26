@@ -200,9 +200,7 @@ impl Config {
     {
         match ini.get_from(Some("lrrbot"), option).map(str::parse) {
             Some(Ok(opt)) => Ok(Some(opt)),
-            Some(Err(err)) => {
-                Err(Error::from(err).context(format!("failed to parse {:?}", option)))
-            }
+            Some(Err(err)) => Err(Error::from(err).context(format!("failed to parse {option:?}"))),
             None => Ok(None),
         }
     }

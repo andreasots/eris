@@ -25,10 +25,8 @@ impl Notify {
                 .get::<unsafe extern "C" fn(c_int, *const c_char) -> c_int>(b"sd_notify")
                 .context("failed to find `sd_notify` in libsystemd")?;
             match sd_notify(0, state.as_ptr()) {
-                error if error < 0 => {
-                    return Err(Error::from(std::io::Error::from_raw_os_error(-error))
-                        .context("`sd_notify(3)` failed"))
-                }
+                error if error < 0 => Err(Error::from(std::io::Error::from_raw_os_error(-error))
+                    .context("`sd_notify(3)` failed")),
                 0 => Ok(false),
                 _ => Ok(true),
             }

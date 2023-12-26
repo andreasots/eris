@@ -23,10 +23,10 @@ pub struct Event {
 impl Event {
     fn from_api_event(event: google_calendar3::api::Event, timezone: &Tz) -> Result<Self, Error> {
         Ok(Self {
-            start: parse_timestamp(event.start.context("no event start time")?, timezone)
+            start: parse_timestamp(&event.start.context("no event start time")?, timezone)
                 .context("failed to parse the event start time")?,
             summary: event.summary.context("event summary missing")?,
-            end: parse_timestamp(event.end.context("no event end time")?, timezone)
+            end: parse_timestamp(&event.end.context("no event end time")?, timezone)
                 .context("failed to parse the event end time")?,
             location: event.location,
             description: event.description,
@@ -34,9 +34,9 @@ impl Event {
     }
 }
 
-fn parse_timestamp(timestamp: EventDateTime, timezone: &Tz) -> Result<OffsetDateTime, Error> {
+fn parse_timestamp(timestamp: &EventDateTime, timezone: &Tz) -> Result<OffsetDateTime, Error> {
     if let Some(timestamp) = timestamp.date_time {
-        crate::time::chrono_to_time(timestamp)
+        crate::time::chrono_to_time(&timestamp)
     } else if let Some(date) = timestamp.date {
         Date::from_ordinal_date(date.year(), date.ordinal0() as u16)
             .context("failed to convert date to `Date`")?
@@ -59,9 +59,9 @@ pub fn format_description(description: &str) -> String {
         if game == "-" {
             lines[1].into()
         } else if description.ends_with(|c: char| c.is_ascii_punctuation()) {
-            format!("{} Game: {}", description, game)
+            format!("{description} Game: {game}")
         } else {
-            format!("{}. Game: {}", description, game)
+            format!("{description}. Game: {game}")
         }
     } else {
         lines.join(" / ")

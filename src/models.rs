@@ -98,13 +98,13 @@ pub mod quote {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             write!(f, "#{}: \"{}\"", self.id, self.quote)?;
             if let Some(ref name) = self.attrib_name {
-                write!(f, " —{}", name)?;
+                write!(f, " —{name}")?;
             }
             if let Some(ref context) = self.context {
-                write!(f, ", {}", context)?;
+                write!(f, ", {context}")?;
             }
             if let Some(ref date) = self.attrib_date {
-                write!(f, " [{}]", date)?;
+                write!(f, " [{date}]")?;
             }
             Ok(())
         }

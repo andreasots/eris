@@ -83,23 +83,27 @@ impl<'a> Measurement<'a> {
 }
 
 fn now() -> Timestamp {
-    Timestamp::Nanoseconds(OffsetDateTime::now_utc().unix_timestamp_nanos() as u128)
+    Timestamp::Nanoseconds(
+        u128::try_from(OffsetDateTime::now_utc().unix_timestamp_nanos()).unwrap_or(0),
+    )
 }
 
 fn is_guild_text_channel(kind: ChannelType) -> bool {
     match kind {
-        ChannelType::GuildText => true,
-        ChannelType::Private => false,
-        ChannelType::GuildVoice => true,
-        ChannelType::Group => false,
-        ChannelType::GuildCategory => false,
-        ChannelType::GuildAnnouncement => true,
-        ChannelType::AnnouncementThread => true,
-        ChannelType::PublicThread => true,
-        ChannelType::PrivateThread => true,
-        ChannelType::GuildStageVoice => false,
-        ChannelType::GuildDirectory => false,
-        ChannelType::GuildForum => true,
+        ChannelType::GuildText
+        | ChannelType::GuildVoice
+        | ChannelType::GuildAnnouncement
+        | ChannelType::AnnouncementThread
+        | ChannelType::PublicThread
+        | ChannelType::PrivateThread
+        | ChannelType::GuildForum => true,
+
+        ChannelType::Private
+        | ChannelType::Group
+        | ChannelType::GuildCategory
+        | ChannelType::GuildStageVoice
+        | ChannelType::GuildDirectory => false,
+
         kind => {
             error!(?kind, "unknown channel type");
             false
@@ -109,18 +113,19 @@ fn is_guild_text_channel(kind: ChannelType) -> bool {
 
 fn is_guild_voice_channel(kind: ChannelType) -> bool {
     match kind {
-        ChannelType::GuildText => false,
-        ChannelType::Private => false,
-        ChannelType::GuildVoice => true,
-        ChannelType::Group => false,
-        ChannelType::GuildCategory => false,
-        ChannelType::GuildAnnouncement => false,
-        ChannelType::AnnouncementThread => false,
-        ChannelType::PublicThread => false,
-        ChannelType::PrivateThread => false,
-        ChannelType::GuildStageVoice => true,
-        ChannelType::GuildDirectory => false,
-        ChannelType::GuildForum => false,
+        ChannelType::GuildVoice | ChannelType::GuildStageVoice => true,
+
+        ChannelType::GuildText
+        | ChannelType::Private
+        | ChannelType::Group
+        | ChannelType::GuildCategory
+        | ChannelType::GuildAnnouncement
+        | ChannelType::AnnouncementThread
+        | ChannelType::PublicThread
+        | ChannelType::PrivateThread
+        | ChannelType::GuildDirectory
+        | ChannelType::GuildForum => false,
+
         kind => {
             error!(?kind, "unknown channel type");
             false
@@ -173,7 +178,7 @@ pub async fn on_event(
             }
 
             for thread in &guild.threads {
-                if thread.thread_metadata.as_ref().map(|meta| meta.archived).unwrap_or(false) {
+                if thread.thread_metadata.as_ref().is_some_and(|meta| meta.archived) {
                     continue;
                 }
 

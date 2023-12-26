@@ -197,7 +197,7 @@ impl Server {
                         let tx = tx.clone();
                         let future = match methods.get(&method) {
                             Some(handler) => handler.handle(args, kwargs),
-                            None => async move { Err(format!("no such method: {}", method)) }.boxed(),
+                            None => async move { Err(format!("no such method: {method}")) }.boxed(),
                         };
 
                         let _ = handler_tx

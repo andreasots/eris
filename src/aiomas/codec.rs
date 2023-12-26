@@ -39,7 +39,7 @@ impl<'de> Deserialize<'de> for FrameType {
                     0 => Ok(FrameType::Request),
                     1 => Ok(FrameType::Result),
                     2 => Ok(FrameType::Exception),
-                    n => Err(DeserializationError::custom(format!("unknown frame type {}", n))),
+                    n => Err(DeserializationError::custom(format!("unknown frame type {n}"))),
                 }
             }
         }

@@ -121,7 +121,7 @@ impl TootAnnouncer {
 
     async fn post_toots(&self) -> Result<(), Error> {
         for (user_id, channels) in &self.users {
-            let state_key = format!("eris.announcements.mastodon.{}.last_toot_id", user_id);
+            let state_key = format!("eris.announcements.mastodon.{user_id}.last_toot_id");
             let last_toot_id = state::get::<String>(&state_key, &self.db)
                 .await
                 .context("failed to get the last toot ID")?;
@@ -147,15 +147,11 @@ impl TootAnnouncer {
             // Don't send an avalanche of toots when first activated.
             if last_toot_id.is_some() {
                 for toot in &toots {
-                    // (Non-reply toot or a reply to an account we're watching) and (a boost or ~~doesn't start with a user mention~~)
-                    // TODO: figure out where user mentions are in the HTML soup
-                    // NOTE: unlike Twitter Mastodon does show toots that start with a mention under posts instead of replies...
+                    // Non-reply toot or a reply to an account we're watching
                     if toot
                         .in_reply_to_account_id
                         .as_deref()
-                        .map(|user_id| self.users.contains_key(user_id))
-                        .unwrap_or(true)
-                        && (toot.reblog.is_some() || true)
+                        .map_or(true, |user_id| self.users.contains_key(user_id))
                     {
                         let message = if let Some(ref boosted_toot) = toot.reblog {
                             format!(
@@ -210,7 +206,7 @@ impl TootAnnouncer {
                         .context("failed to set the new last toot ID")?;
                 }
             } else {
-                let last_toot_id = toots.last().map(|toot| toot.id.as_str()).unwrap_or("0");
+                let last_toot_id = toots.last().map_or("0", |toot| toot.id.as_str());
                 state::set(state_key, last_toot_id, &self.db)
                     .await
                     .context("failed to set the new last toot ID")?;

@@ -429,7 +429,7 @@ impl TryFrom<google_youtube3::api::Video> for Video {
             title: snippet.title.context("`title` is missing")?,
             description: snippet.description.context("`description` is missing")?,
             published_at: crate::time::chrono_to_time(
-                snippet.published_at.context("`published_at` is missing")?,
+                &snippet.published_at.context("`published_at` is missing")?,
             )
             .context("failed to convert `published_at`")?,
         })
@@ -452,7 +452,7 @@ impl TryFrom<PlaylistItem> for Video {
             title: snippet.title.context("`title` is missing")?,
             description: snippet.description.context("`description` is missing")?,
             published_at: crate::time::chrono_to_time(
-                snippet.published_at.context("`published_at` is missing")?,
+                &snippet.published_at.context("`published_at` is missing")?,
             )
             .context("failed to convert `published_at`")?,
         })

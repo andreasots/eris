@@ -60,7 +60,7 @@ pub async fn channel_reaper(
                     }
 
                     let member_count =
-                        cache.voice_channel_states(channel_id).map(|states| states.count()).unwrap_or(0);
+                        cache.voice_channel_states(channel_id).map_or(0, Iterator::count);
                     if member_count > 0 {
                         continue;
                     }
