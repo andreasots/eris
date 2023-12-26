@@ -49,8 +49,8 @@ impl Connector {
 #[cfg(not(unix))]
 impl Connector {
     pub fn new(
-        running: Receiver<bool>,
-        handler_tx: Sender<JoinHandle<()>>,
+        running: watch::Receiver<bool>,
+        handler_tx: mpsc::Sender<JoinHandle<()>>,
         port: u16,
     ) -> Connector {
         Connector { running, handler_tx, port }

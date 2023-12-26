@@ -16,7 +16,7 @@ impl Tz {
 
         #[cfg(not(unix))]
         {
-            Ok(Self(name.parse()?))
+            Ok(Self(name.parse().map_err(Error::msg)?))
         }
     }
 
@@ -51,7 +51,7 @@ impl Tz {
 
         #[cfg(not(unix))]
         {
-            Ok(Self(chrono_tz::Tz::from_str_insensitive(name)?))
+            Ok(Self(chrono_tz::Tz::from_str_insensitive(name).map_err(Error::msg)?))
         }
     }
 
@@ -166,18 +166,18 @@ impl<'a> TimeZone for &'a Tz {
     }
 
     fn offset_from_local_date(&self, local: &NaiveDate) -> LocalResult<Self::Offset> {
-        self.0.offset_from_local_date(local)
+        self.0.offset_from_local_date(local).map(|offset| Self::Offset { offset, tz: self })
     }
 
     fn offset_from_local_datetime(&self, local: &NaiveDateTime) -> LocalResult<Self::Offset> {
-        self.0.offset_from_local_datetime(local)
+        self.0.offset_from_local_datetime(local).map(|offset| Self::Offset { offset, tz: self })
     }
 
     fn offset_from_utc_date(&self, utc: &NaiveDate) -> Self::Offset {
-        self.0.offset_from_utc_date(utc)
+        Self::Offset { offset: self.0.offset_from_utc_date(utc), tz: self }
     }
 
     fn offset_from_utc_datetime(&self, utc: &NaiveDateTime) -> Self::Offset {
-        self.0.offset_from_utc_datetime(utc)
+        Self::Offset { offset: self.0.offset_from_utc_datetime(utc), tz: self }
     }
 }
