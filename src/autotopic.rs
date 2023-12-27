@@ -9,13 +9,13 @@ use separator::FixedPlaceSeparatable;
 use tokio::sync::watch::Receiver;
 use tokio::sync::RwLock;
 use tracing::error;
-use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client as DiscordClient;
 use twitch_api::helix::streams::GetStreamsRequest;
 use twitch_api::twitch_oauth2::AppAccessToken;
 use twitch_api::types::UserNameRef;
 use twitch_api::HelixClient;
 
+use crate::cache::Cache;
 use crate::calendar::{CalendarHub, Event};
 use crate::config::Config;
 use crate::desertbus::DesertBus;
@@ -57,7 +57,7 @@ impl<'a> fmt::Display for EventDisplay<'a> {
 
 pub async fn autotopic(
     mut running: Receiver<bool>,
-    cache: Arc<InMemoryCache>,
+    cache: Arc<Cache>,
     calendar: CalendarHub,
     config: Arc<Config>,
     db: DatabaseConnection,
@@ -86,7 +86,7 @@ pub async fn autotopic(
 struct Autotopic {
     last_updated: Option<DateTime<Utc>>,
 
-    cache: Arc<InMemoryCache>,
+    cache: Arc<Cache>,
     calendar: CalendarHub,
     config: Arc<Config>,
     db: DatabaseConnection,
@@ -99,7 +99,7 @@ struct Autotopic {
 
 impl Autotopic {
     fn new(
-        cache: Arc<InMemoryCache>,
+        cache: Arc<Cache>,
         calendar: CalendarHub,
         config: Arc<Config>,
         db: DatabaseConnection,
@@ -124,20 +124,23 @@ impl Autotopic {
     }
 
     async fn set_topic(&mut self, new_topic: &str, is_dynamic: bool) -> Result<(), Error> {
+        self.cache.wait_until_ready().await;
+
         let new_topic = shorten(new_topic, TOPIC_MAX_LEN);
         let new_topic = new_topic.as_ref();
 
-        let channel = self
+        let old_topic = self
             .cache
-            .channel(self.config.general_channel)
-            .context("announcement channel not in cache")?;
-
-        let old_topic = channel.topic.as_deref().unwrap_or_default();
+            .with(|cache| {
+                cache.channel(self.config.general_channel).map(|channel| channel.topic.clone())
+            })
+            .context("announcement channel not in cache")?
+            .unwrap_or_default();
 
         let new_topic_static_prefix =
             new_topic.rsplit_once(DYNAMIC_TAIL_SEPARATOR).unwrap_or((new_topic, "")).0;
         let old_topic_static_prefix =
-            old_topic.rsplit_once(DYNAMIC_TAIL_SEPARATOR).unwrap_or((old_topic, "")).0;
+            old_topic.rsplit_once(DYNAMIC_TAIL_SEPARATOR).unwrap_or((&old_topic, "")).0;
 
         let now = Utc::now();
 

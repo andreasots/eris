@@ -4,12 +4,12 @@ use std::future::Future;
 use std::pin::Pin;
 
 use anyhow::{Context, Error};
-use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client as DiscordClient;
 use twilight_model::channel::message::embed::EmbedField;
 use twilight_model::channel::Message;
 use twilight_util::builder::embed::EmbedBuilder;
 
+use crate::cache::Cache;
 use crate::command_parser::{Args, CommandHandler, Commands};
 use crate::config::Config;
 
@@ -22,7 +22,7 @@ impl Help {
 
     async fn listing(
         &self,
-        cache: &InMemoryCache,
+        cache: &Cache,
         config: &Config,
         discord: &DiscordClient,
         commands: Commands<'_>,
@@ -143,7 +143,7 @@ impl CommandHandler for Help {
 
     fn handle<'a>(
         &'a self,
-        cache: &'a InMemoryCache,
+        cache: &'a Cache,
         config: &'a Config,
         discord: &'a DiscordClient,
         commands: Commands<'a>,

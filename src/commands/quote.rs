@@ -15,13 +15,13 @@ use sea_orm::{
     ModelTrait, QueryFilter, QuerySelect, QueryTrait, Statement,
 };
 use tokio::sync::OnceCell;
-use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client as DiscordClient;
 use twilight_model::channel::message::MessageFlags;
 use twilight_model::channel::Message;
 use twilight_util::builder::embed::{EmbedBuilder, EmbedFieldBuilder};
 use unicode_width::UnicodeWidthStr;
 
+use crate::cache::Cache;
 use crate::command_parser::{Access, Args, CommandHandler, Commands, Help};
 use crate::config::Config;
 use crate::models::{game, game_entry, quote, show};
@@ -479,7 +479,7 @@ impl CommandHandler for Find {
 
     fn handle<'a>(
         &'a self,
-        _: &'a InMemoryCache,
+        _: &'a Cache,
         _: &'a Config,
         discord: &'a DiscordClient,
         _: Commands<'a>,
@@ -562,7 +562,7 @@ impl CommandHandler for QueryDebugger {
 
     fn handle<'a>(
         &'a self,
-        _: &'a InMemoryCache,
+        _: &'a Cache,
         _: &'a Config,
         discord: &'a DiscordClient,
         _: Commands<'a>,
@@ -641,7 +641,7 @@ impl CommandHandler for Details {
 
     fn handle<'a>(
         &'a self,
-        _: &'a InMemoryCache,
+        _: &'a Cache,
         _: &'a Config,
         discord: &'a DiscordClient,
         _: Commands<'a>,

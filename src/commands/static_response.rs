@@ -8,11 +8,11 @@ use rand::seq::SliceRandom;
 use serde::{Deserialize, Deserializer};
 use tracing::info;
 use twilight_cache_inmemory::model::CachedMember;
-use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client as DiscordClient;
 use twilight_model::channel::message::MessageFlags;
 use twilight_model::channel::Message;
 
+use crate::cache::Cache;
 use crate::command_parser::{Access, Args, CommandHandler, Commands};
 use crate::config::Config;
 use crate::rpc::LRRbot;
@@ -38,7 +38,7 @@ impl CommandHandler for Static {
 
     fn handle<'a>(
         &'a self,
-        cache: &'a InMemoryCache,
+        cache: &'a Cache,
         config: &'a Config,
         discord: &'a DiscordClient,
         _: Commands<'a>,
@@ -63,13 +63,15 @@ impl CommandHandler for Static {
                     if let Some(response) = response {
                         let vars = HashMap::from([(
                             "user".to_string(),
-                            message
-                                .guild_id
-                                .and_then(|guild_id| cache.member(guild_id, message.author.id))
-                                .as_deref()
-                                .and_then(CachedMember::nick)
-                                .unwrap_or(&message.author.name)
-                                .to_string(),
+                            cache.with(|cache| {
+                                message
+                                    .guild_id
+                                    .and_then(|guild_id| cache.member(guild_id, message.author.id))
+                                    .as_deref()
+                                    .and_then(CachedMember::nick)
+                                    .unwrap_or(&message.author.name)
+                                    .to_string()
+                            }),
                         )]);
 
                         let response = strfmt::strfmt(response, &vars)

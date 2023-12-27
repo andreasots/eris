@@ -4,11 +4,11 @@ use std::pin::Pin;
 use anyhow::{Context, Error};
 use tracing_subscriber::reload::Handle;
 use tracing_subscriber::EnvFilter;
-use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client as DiscordClient;
 use twilight_model::channel::message::MessageFlags;
 use twilight_model::channel::Message;
 
+use crate::cache::Cache;
 use crate::command_parser::{Access, Args, CommandHandler, Commands};
 use crate::config::Config;
 
@@ -37,7 +37,7 @@ impl<S> CommandHandler for TracingFilter<S> {
 
     fn handle<'a>(
         &'a self,
-        _: &'a InMemoryCache,
+        _: &'a Cache,
         _: &'a Config,
         discord: &'a DiscordClient,
         _: Commands<'a>,

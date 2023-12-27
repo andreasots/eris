@@ -5,13 +5,13 @@ use std::pin::Pin;
 use anyhow::{Context as _, Error};
 use futures_util::TryStreamExt;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
-use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client as DiscordClient;
 use twilight_model::channel::message::MessageFlags;
 use twilight_model::channel::Message;
 use twitch_api::twitch_oauth2::{AccessToken, UserToken};
 use twitch_api::HelixClient;
 
+use crate::cache::Cache;
 use crate::command_parser::{Args, CommandHandler, Commands, Help};
 use crate::config::Config;
 use crate::models::user;
@@ -44,7 +44,7 @@ impl CommandHandler for Live {
 
     fn handle<'a>(
         &'a self,
-        _: &'a InMemoryCache,
+        _: &'a Cache,
         config: &'a Config,
         discord: &'a DiscordClient,
         _: Commands<'a>,

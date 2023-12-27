@@ -1,10 +1,11 @@
 use tracing::error;
-use twilight_cache_inmemory::InMemoryCache;
 use twilight_gateway::Event;
 use twilight_http::Client;
 use twilight_model::gateway::payload::incoming::{GuildCreate, VoiceStateUpdate};
 use twilight_model::id::marker::{GuildMarker, UserMarker};
 use twilight_model::id::Id;
+
+use crate::cache::Cache;
 
 async fn disconnect(discord: &Client, guild: Id<GuildMarker>, user: Id<UserMarker>) {
     if let Err(error) = discord.update_guild_member(guild, user).channel_id(None).await {
@@ -12,7 +13,7 @@ async fn disconnect(discord: &Client, guild: Id<GuildMarker>, user: Id<UserMarke
     }
 }
 
-pub async fn on_event(cache: &InMemoryCache, discord: &Client, event: &Event) {
+pub async fn on_event(cache: &Cache, discord: &Client, event: &Event) {
     match event {
         Event::GuildCreate(event) => {
             let GuildCreate(ref guild) = **event;
@@ -27,8 +28,11 @@ pub async fn on_event(cache: &InMemoryCache, discord: &Client, event: &Event) {
             let VoiceStateUpdate(ref voice_state) = **event;
             let Some(channel_id) = voice_state.channel_id else { return };
             let Some(guild_id) = voice_state.guild_id else { return };
-            let Some(guild) = cache.guild(guild_id) else { return };
-            if guild.afk_channel_id() == Some(channel_id) {
+            let Some(afk_channel) = cache.with(|cache| cache.guild(guild_id)?.afk_channel_id())
+            else {
+                return;
+            };
+            if channel_id == afk_channel {
                 disconnect(discord, guild_id, voice_state.user_id).await;
             }
         }

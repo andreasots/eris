@@ -4,10 +4,10 @@ use std::pin::Pin;
 
 use anyhow::{Context, Error};
 use chrono::Utc;
-use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client;
 use twilight_model::channel::Message;
 
+use crate::cache::Cache;
 use crate::command_parser::{Args, CommandHandler, Commands, Help};
 use crate::config::Config;
 
@@ -58,7 +58,7 @@ impl CommandHandler for Time {
 
     fn handle<'a>(
         &'a self,
-        _: &'a InMemoryCache,
+        _: &'a Cache,
         config: &'a Config,
         discord: &'a Client,
         _: Commands<'a>,

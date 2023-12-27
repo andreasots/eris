@@ -11,20 +11,21 @@ use regex::Regex;
 use sea_orm::DatabaseConnection;
 use tokio::sync::watch::Receiver;
 use tracing::{error, info, warn};
-use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client as DiscordClient;
+use twilight_model::channel::forum::ForumTag;
 use twilight_model::channel::{Channel, ChannelType, Message};
-use twilight_model::id::marker::{ChannelMarker, TagMarker};
+use twilight_model::id::marker::{ChannelMarker, GuildMarker, TagMarker};
 use twilight_model::id::Id;
 use twilight_validate::channel::CHANNEL_NAME_LENGTH_MAX;
 
+use crate::cache::Cache;
 use crate::config::Config;
 use crate::models::state;
 
 pub async fn post_videos(
     mut running: Receiver<bool>,
     db: DatabaseConnection,
-    cache: Arc<InMemoryCache>,
+    cache: Arc<Cache>,
     config: Arc<Config>,
     discord: Arc<DiscordClient>,
     youtube: YouTube<HttpsConnector<HttpConnector>>,
@@ -64,7 +65,7 @@ pub async fn post_videos(
 
 struct VideoPoster {
     db: DatabaseConnection,
-    cache: Arc<InMemoryCache>,
+    cache: Arc<Cache>,
     channel_id: Id<ChannelMarker>,
     playlists: Vec<String>,
     discord: Arc<DiscordClient>,
@@ -76,7 +77,7 @@ struct VideoPoster {
 impl VideoPoster {
     async fn new(
         db: DatabaseConnection,
-        cache: Arc<InMemoryCache>,
+        cache: Arc<Cache>,
         channel_id: Id<ChannelMarker>,
         config: &Config,
         discord: Arc<DiscordClient>,
@@ -112,9 +113,16 @@ impl VideoPoster {
     }
 
     async fn run(&mut self) -> Result<(), Error> {
-        let Some(channel) = self.cache.channel(self.channel_id) else {
-            return Err(Error::msg("video announcements channel not in cache"));
-        };
+        self.cache.wait_until_ready().await;
+
+        let (channel_type, guild_id, available_tags) = self
+            .cache
+            .with(|cache| {
+                let channel = cache.channel(self.channel_id)?;
+                Some((channel.kind, channel.guild_id, channel.available_tags.clone()))
+            })
+            .context("video announcements channel not in cache")?;
+        let guild_id = guild_id.context("video announcements channel not in a guild")?;
 
         let mut videos = vec![];
 
@@ -156,7 +164,7 @@ impl VideoPoster {
             }
 
             let is_announced = if self.check_for_existing_threads {
-                video.is_already_announced(&channel, &self.cache, &self.discord).await
+                video.is_already_announced(self.channel_id, guild_id, &self.cache, &self.discord).await
                     .unwrap_or_else(|error| {
                         error!(
                             ?error,
@@ -182,7 +190,12 @@ impl VideoPoster {
 
             if !is_announced && !is_livestream {
                 video
-                    .announce(&channel, &self.discord)
+                    .announce(
+                        self.channel_id,
+                        channel_type,
+                        available_tags.as_deref(),
+                        &self.discord,
+                    )
                     .await
                     .context("failed to announce video")?;
             }
@@ -218,28 +231,34 @@ impl Video {
 
     async fn is_already_announced(
         &self,
-        channel: &Channel,
-        cache: &InMemoryCache,
+        channel_id: Id<ChannelMarker>,
+        guild_id: Id<GuildMarker>,
+        cache: &Cache,
         discord: &DiscordClient,
     ) -> Result<bool, Error> {
         let mut threads = cache
-            .guild_channels(channel.guild_id.context("channel not in a guild")?)
-            .context("guild channels not in cache")?
-            .iter()
-            .copied()
-            .filter_map(|id| {
-                let channel = cache.channel(id);
-                if channel.is_none() {
-                    error!(
-                        channel.id = id.get(),
-                        "channel referenced by cache but not itself in cache"
-                    );
-                }
-                channel
+            .with(|cache| {
+                Some(
+                    cache
+                        .guild_channels(guild_id)?
+                        .iter()
+                        .copied()
+                        .filter_map(|id| {
+                            let channel = cache.channel(id);
+                            if channel.is_none() {
+                                error!(
+                                    channel.id = id.get(),
+                                    "channel referenced by cache but not itself in cache"
+                                );
+                            }
+                            channel
+                        })
+                        .filter(|thread| thread.parent_id == Some(channel_id))
+                        .map(|thread| thread.id)
+                        .collect::<Vec<_>>(),
+                )
             })
-            .filter(|thread| thread.parent_id == Some(channel.id))
-            .map(|thread| thread.id)
-            .collect::<Vec<_>>();
+            .context("guild channels not in cache")?;
 
         threads.sort_by(|a, b| a.cmp(b).reverse());
         threads.truncate(10);
@@ -323,28 +342,27 @@ impl Video {
         message
     }
 
-    fn tags(&self, channel: &Channel) -> Vec<Id<TagMarker>> {
-        channel
-            .available_tags
-            .as_deref()
-            .into_iter()
-            .flatten()
+    fn tags(&self, available_tags: &[ForumTag]) -> Vec<Id<TagMarker>> {
+        available_tags
+            .iter()
             .filter_map(|tag| (self.channel_title == tag.name).then_some(tag.id))
             .collect::<Vec<_>>()
     }
 
     pub async fn announce(
         &self,
-        channel: &Channel,
+        channel_id: Id<ChannelMarker>,
+        channel_type: ChannelType,
+        available_tags: Option<&[ForumTag]>,
         discord: &DiscordClient,
     ) -> Result<Channel, Error> {
-        if channel.kind == ChannelType::GuildForum {
+        if channel_type == ChannelType::GuildForum {
             let thread = discord
                 .create_forum_thread(
-                    channel.id,
+                    channel_id,
                     &crate::shorten::shorten(&self.title, CHANNEL_NAME_LENGTH_MAX),
                 )
-                .applied_tags(&self.tags(channel))
+                .applied_tags(&available_tags.map(|tags| self.tags(tags)).unwrap_or_default())
                 .message()
                 .content(&self.message_content())
                 .context("video announcement invalid")?
@@ -358,7 +376,7 @@ impl Video {
             Ok(thread)
         } else {
             let message = discord
-                .create_message(channel.id)
+                .create_message(channel_id)
                 .content(&self.message_content())
                 .context("video announcement invalid")?
                 .await
@@ -369,7 +387,7 @@ impl Video {
 
             let thread = discord
                 .create_thread_from_message(
-                    channel.id,
+                    channel_id,
                     message.id,
                     &crate::shorten::shorten(&self.title, CHANNEL_NAME_LENGTH_MAX),
                 )
@@ -387,17 +405,12 @@ impl Video {
     pub async fn edit(
         &self,
         discord: &DiscordClient,
-        channel: &Channel,
         message: &Message,
-        thread: &Channel,
+        available_tags: Option<&[ForumTag]>,
     ) -> Result<(), Error> {
-        let mut req = discord.update_thread(thread.id);
-        let tags;
-        if channel.available_tags.is_some() {
-            tags = self.tags(channel);
-            req = req.applied_tags(Some(&tags));
-        }
-        req.name(&crate::shorten::shorten(&self.title, CHANNEL_NAME_LENGTH_MAX))
+        discord.update_thread(message.channel_id)
+            .applied_tags(available_tags.map(|tags| self.tags(tags)).as_deref())
+            .name(&crate::shorten::shorten(&self.title, CHANNEL_NAME_LENGTH_MAX))
             .context("thread name invalid")?
             .await
             .context("failed to update thread name")?;

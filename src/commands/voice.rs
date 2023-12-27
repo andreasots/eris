@@ -3,12 +3,12 @@ use std::future::Future;
 use std::pin::Pin;
 
 use anyhow::{Context, Error};
-use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client as DiscordClient;
 use twilight_mention::Mention;
 use twilight_model::channel::message::MessageFlags;
 use twilight_model::channel::{Channel, ChannelType, Message};
 
+use crate::cache::Cache;
 use crate::command_parser::{Args, CommandHandler, Commands, Help};
 use crate::config::Config;
 
@@ -62,7 +62,7 @@ impl CommandHandler for Voice {
 
     fn handle<'a>(
         &'a self,
-        _: &'a InMemoryCache,
+        _: &'a Cache,
         config: &'a Config,
         discord: &'a DiscordClient,
         _: Commands<'a>,

@@ -13,7 +13,6 @@ use google_youtube3::YouTube;
 use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
-use twilight_cache_inmemory::InMemoryCache;
 use twilight_gateway::Intents;
 use twilight_http::Client as DiscordClient;
 use twilight_model::channel::message::AllowedMentions;
@@ -23,6 +22,7 @@ use twilight_model::gateway::presence::{ActivityType, MinimalActivity, Status as
 mod aiomas;
 mod announcements;
 mod autotopic;
+mod cache;
 mod calendar;
 mod channel_reaper;
 mod command_parser;
@@ -177,7 +177,7 @@ async fn main() -> Result<(), Error> {
         .build();
     let discord = Arc::new(discord);
 
-    let cache = Arc::new(InMemoryCache::new());
+    let cache = Arc::new(crate::cache::Cache::new(config.guild));
     let lrrbot = Arc::new(crate::rpc::LRRbot::new(running_rx.clone(), handler_tx.clone(), &config));
 
     let mut rpc_server = {

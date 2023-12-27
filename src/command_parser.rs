@@ -8,7 +8,6 @@ use regex::{Captures, Regex, RegexSet};
 use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
 use tracing::{error, info, Instrument};
-use twilight_cache_inmemory::InMemoryCache;
 use twilight_gateway::Event;
 use twilight_http::Client as DiscordClient;
 use twilight_model::channel::message::MessageFlags;
@@ -18,6 +17,7 @@ use twilight_model::guild::Permissions;
 use twilight_model::id::marker::{ChannelMarker, GuildMarker, MessageMarker, UserMarker};
 use twilight_model::id::Id;
 
+use crate::cache::Cache;
 use crate::config::Config;
 
 pub trait CommandHandler: Send + Sync {
@@ -25,7 +25,7 @@ pub trait CommandHandler: Send + Sync {
     fn help(&self) -> Option<Help>;
     fn handle<'a>(
         &'a self,
-        cache: &'a InMemoryCache,
+        cache: &'a Cache,
         config: &'a Config,
         discord: &'a DiscordClient,
         commands: Commands<'a>,
@@ -62,22 +62,26 @@ impl Access {
         self,
         user_id: Id<UserMarker>,
         guild_id: Id<GuildMarker>,
-        cache: &InMemoryCache,
+        cache: &Cache,
     ) -> bool {
         match self {
             Access::All => true,
-            Access::SubOnly => cache
-                .member(guild_id, user_id)
-                .as_deref()
-                .into_iter()
-                .flat_map(|member| member.roles().iter())
-                .filter_map(|&role_id| cache.role(role_id))
-                .any(|role| role.color != 0),
-            Access::ModOnly => cache
-                .permissions()
-                .root(user_id, guild_id)
-                .map(|permissions| permissions.contains(Permissions::ADMINISTRATOR))
-                .unwrap_or(false),
+            Access::SubOnly => cache.with(|cache| {
+                cache
+                    .member(guild_id, user_id)
+                    .as_deref()
+                    .into_iter()
+                    .flat_map(|member| member.roles().iter())
+                    .filter_map(|&role_id| cache.role(role_id))
+                    .any(|role| role.color != 0)
+            }),
+            Access::ModOnly => cache.with(|cache| {
+                cache
+                    .permissions()
+                    .root(user_id, guild_id)
+                    .map(|permissions| permissions.contains(Permissions::ADMINISTRATOR))
+                    .unwrap_or(false)
+            }),
             Access::OwnerOnly => {
                 #[allow(clippy::unreadable_literal)]
                 const OWNERS: [Id<UserMarker>; 3] = [
@@ -140,7 +144,7 @@ pub struct Help {
 
 #[derive(Clone)]
 pub struct CommandParser {
-    cache: Arc<InMemoryCache>,
+    cache: Arc<Cache>,
     config: Arc<Config>,
     discord: Arc<DiscordClient>,
     matcher: Arc<RegexSet>,
@@ -293,7 +297,7 @@ impl Builder {
 
     pub fn build(
         self,
-        cache: Arc<InMemoryCache>,
+        cache: Arc<Cache>,
         config: Arc<Config>,
         discord: Arc<DiscordClient>,
     ) -> Result<CommandParser, Error> {

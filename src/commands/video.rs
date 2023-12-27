@@ -6,7 +6,6 @@ use anyhow::{Context, Error};
 use google_youtube3::hyper::client::HttpConnector;
 use google_youtube3::hyper_rustls::HttpsConnector;
 use google_youtube3::YouTube;
-use twilight_cache_inmemory::InMemoryCache;
 use twilight_http::Client;
 use twilight_mention::Mention;
 use twilight_model::channel::message::MessageFlags;
@@ -15,6 +14,7 @@ use twilight_model::id::marker::ChannelMarker;
 use twilight_model::id::Id;
 
 use crate::announcements::youtube::Video;
+use crate::cache::Cache;
 use crate::command_parser::{Access, Args, CommandHandler, Commands, Help};
 use crate::config::Config;
 
@@ -50,7 +50,7 @@ impl CommandHandler for New {
 
     fn handle<'a>(
         &'a self,
-        cache: &'a InMemoryCache,
+        cache: &'a Cache,
         _: &'a Config,
         discord: &'a Client,
         _: Commands<'a>,
@@ -58,7 +58,13 @@ impl CommandHandler for New {
         args: &'a Args,
     ) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send + 'a>> {
         Box::pin(async move {
-            let channel = cache.channel(self.channel_id).context("channel not in cache")?;
+            let (channel_type, available_tags) = cache
+                .with(|cache| {
+                    let channel = cache.channel(self.channel_id)?;
+                    Some((channel.kind, channel.available_tags.clone()))
+                })
+                .context("channel not in cache")?;
+
             let video_id = args.get(0).context("video ID missing")?;
             let (_, videos) = self
                 .youtube
@@ -74,7 +80,7 @@ impl CommandHandler for New {
                 for video in videos {
                     let thread = Video::try_from(video)
                         .context("failed to deserialize the video")?
-                        .announce(&channel, discord)
+                        .announce(self.channel_id, channel_type, available_tags.as_deref(), discord)
                         .await
                         .context("failed to create the video thread")?;
                     discord
@@ -141,7 +147,7 @@ impl CommandHandler for Refresh {
 
     fn handle<'a>(
         &'a self,
-        cache: &'a InMemoryCache,
+        cache: &'a Cache,
         _: &'a Config,
         discord: &'a Client,
         _: Commands<'a>,
@@ -149,14 +155,17 @@ impl CommandHandler for Refresh {
         args: &'a Args,
     ) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send + 'a>> {
         Box::pin(async move {
-            let bot = cache.current_user().ok_or_else(|| Error::msg("bot not in cache"))?;
+            let bot_id = cache
+                .with(|cache| Some(cache.current_user()?.id))
+                .ok_or_else(|| Error::msg("bot not in cache"))?;
 
-            let channel =
-                cache.channel(self.channel_id).ok_or_else(|| Error::msg("channel not in cache"))?;
-            let thread = cache
-                .channel(message.channel_id)
+            let available_tags = cache
+                .with(|cache| Some(cache.channel(self.channel_id)?.available_tags.clone()))
+                .ok_or_else(|| Error::msg("channel not in cache"))?;
+            let thread_parent_id = cache
+                .with(|cache| Some(cache.channel(message.channel_id)?.parent_id))
                 .ok_or_else(|| Error::msg("thread not in cache"))?;
-            if thread.parent_id != Some(self.channel_id) {
+            if thread_parent_id != Some(self.channel_id) {
                 discord
                     .create_message(message.channel_id)
                     .reply(message.id)
@@ -171,7 +180,7 @@ impl CommandHandler for Refresh {
             }
 
             let mut messages = discord
-                .channel_messages(thread.id)
+                .channel_messages(message.channel_id)
                 .after(Id::new(1))
                 .limit(1)
                 .context("limit invalid")?
@@ -188,7 +197,7 @@ impl CommandHandler for Refresh {
                 original_message
             };
 
-            if original_message.author.id != bot.id {
+            if original_message.author.id != bot_id {
                 discord
                     .create_message(message.channel_id)
                     .reply(message.id)
@@ -231,7 +240,7 @@ impl CommandHandler for Refresh {
                 for video in videos {
                     Video::try_from(video)
                         .context("failed to deserialize the video")?
-                        .edit(discord, &channel, &original_message, &thread)
+                        .edit(discord, &original_message, available_tags.as_deref())
                         .await
                         .context("failed to update the video thread")?;
 
