@@ -17,8 +17,10 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
+            exe-suffix: ''
           - target: x86_64-pc-windows-msvc
             os: windows-latest
+            exe-suffix: .exe
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
@@ -29,5 +31,5 @@ jobs:
       run: cargo test --verbose --release --all --target ${{ matrix.target }}
     - uses: actions/upload-artifact@v4
       with:
-        name: eris-${{ matrix.target }}
-        path: ${{ github.workspace }}/target/${{ matrix.target }}/release/eris
+        name: eris-${{ matrix.target }}${{ matrix.exe-suffix }}
+        path: ${{ github.workspace }}/target/${{ matrix.target }}/release/eris${{ matrix.exe-suffix }}
