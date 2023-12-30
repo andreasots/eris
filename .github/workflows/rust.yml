@@ -21,7 +21,7 @@ jobs:
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             exe-suffix: .exe
-    name: 'Build: ${{ matrix.os }}'
+    name: 'Build: ${{ matrix.target }}'
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
