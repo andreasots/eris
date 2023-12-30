@@ -12,28 +12,22 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
     - name: Build
-      run: cargo build --verbose --release --all --target x86_64-unknown-linux-gnu
+      run: cargo build --verbose --release --all --target ${{ matrix.target }}
     - name: Run tests
-      run: cargo test --verbose --release --all --target x86_64-unknown-linux-gnu
+      run: cargo test --verbose --release --all --target ${{ matrix.target }}
     - uses: actions/upload-artifact@v4
       with:
-        name: eris-x86_64-unknown-linux-gnu
-        path: target/x86_64-unknown-linux-gnu/release/eris
-  windows:
-    runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v4
-    - uses: Swatinem/rust-cache@v2
-    - name: Build
-      run: cargo build --verbose --release --all --target x86_64-pc-windows-msvc
-    - name: Run tests
-      run: cargo test --verbose --release --all --target x86_64-pc-windows-msvc
-    - uses: actions/upload-artifact@v4
-      with:
-        name: eris-x86_64-pc-windows-msvc
-        path: target/x86_64-pc-windows-msvc/release/eris
+        name: eris-${{ matrix.target }}
+        path: target/${{ matrix.target }}/release/eris
