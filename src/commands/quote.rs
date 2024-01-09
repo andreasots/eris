@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::convert::Infallible;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::OnceLock;
 
 use anyhow::{Context as _, Error};
 use chrono::NaiveDate;
@@ -72,12 +73,14 @@ pub enum Ast<'input> {
 }
 
 fn as_ilike(s: &str) -> String {
-    lazy_static::lazy_static! {
-        static ref RE_BOUNDARY: Regex = Regex::new(r"^|\s+|$").unwrap();
-        static ref RE_METACHARS: Regex = Regex::new(r"([\\%_])").unwrap();
-    }
-    let s = RE_METACHARS.replace_all(s, "\\$1");
-    RE_BOUNDARY.replace_all(&s, "%").into_owned()
+    static RE_BOUNDARY: OnceLock<Regex> = OnceLock::new();
+    static RE_METACHARS: OnceLock<Regex> = OnceLock::new();
+
+    let re_boundary = RE_BOUNDARY.get_or_init(|| Regex::new(r"^|\s+|$").unwrap());
+    let re_metachars = RE_METACHARS.get_or_init(|| Regex::new(r"([\\%_])").unwrap());
+
+    let s = re_metachars.replace_all(s, "\\$1");
+    re_boundary.replace_all(&s, "%").into_owned()
 }
 
 fn single_predicate<C: ColumnTrait, T: Into<sea_orm::Value>>(
@@ -311,9 +314,8 @@ impl<'a> Ast<'a> {
 }
 
 fn unescape(s: &str) -> Cow<str> {
-    lazy_static::lazy_static! {
-        static ref RE_ESCAPE: Regex = Regex::new(r"\\(.)").unwrap();
-    }
+    static RE_ESCAPE: OnceLock<Regex> = OnceLock::new();
+    let re_escape = RE_ESCAPE.get_or_init(|| Regex::new(r"\\(.)").unwrap());
 
     struct Expander;
 
@@ -329,23 +331,21 @@ fn unescape(s: &str) -> Cow<str> {
     }
 
     assert!(s.starts_with('\"') && s.ends_with('\"'));
-    RE_ESCAPE.replace_all(&s[1..s.len() - 1], Expander)
+    re_escape.replace_all(&s[1..s.len() - 1], Expander)
 }
 
 fn parse_emoji(emoji: &str) -> &str {
-    lazy_static::lazy_static! {
-        static ref RE_EMOJI: Regex = Regex::new(r"^<:(\w+):\d+>$").unwrap();
-    }
+    static RE_EMOJI: OnceLock<Regex> = OnceLock::new();
+    let re_emoji = RE_EMOJI.get_or_init(|| Regex::new(r"^<:(\w+):\d+>$").unwrap());
 
-    RE_EMOJI.captures(emoji).unwrap().get(1).unwrap().as_str()
+    re_emoji.captures(emoji).unwrap().get(1).unwrap().as_str()
 }
 
 fn parse_emoji_name(emoji: &str) -> &str {
-    lazy_static::lazy_static! {
-        static ref RE_EMOJI_NAME: Regex = Regex::new(r"^:(\w+):$").unwrap();
-    }
+    static RE_EMOJI_NAME: OnceLock<Regex> = OnceLock::new();
+    let re_emoji_name = RE_EMOJI_NAME.get_or_init(|| Regex::new(r"^:(\w+):$").unwrap());
 
-    RE_EMOJI_NAME.captures(emoji).unwrap().get(1).unwrap().as_str()
+    re_emoji_name.captures(emoji).unwrap().get(1).unwrap().as_str()
 }
 
 lalrpop_util::lalrpop_mod!(#[allow(clippy::all, clippy::pedantic)] pub parser, "/commands/quote.rs");

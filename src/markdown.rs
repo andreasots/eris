@@ -1,13 +1,13 @@
 use std::borrow::Cow;
+use std::sync::OnceLock;
 
 use regex::{Captures, Regex};
 
 pub fn escape(text: &str) -> Cow<str> {
-    lazy_static::lazy_static! {
-        static ref RE_META: Regex = Regex::new(r"(https?://\S+)|([_`*~|])").unwrap();
-    }
+    static RE_META: OnceLock<Regex> = OnceLock::new();
+    let re_meta = RE_META.get_or_init(|| Regex::new(r"(https?://\S+)|([_`*~|])").unwrap());
 
-    RE_META.replace_all(text, |caps: &Captures| {
+    re_meta.replace_all(text, |caps: &Captures| {
         if let Some(m) = caps.get(1) {
             format!("<{}>", m.as_str())
         } else if let Some(m) = caps.get(2) {
@@ -23,9 +23,8 @@ pub fn escape_code_block(text: &str) -> String {
 }
 
 pub fn suppress_embeds(text: &str) -> Cow<str> {
-    lazy_static::lazy_static! {
-        static ref RE_URL: Regex = Regex::new(r"(https?://\S+)").unwrap();
-    }
+    static RE_URL: OnceLock<Regex> = OnceLock::new();
+    let re_url = RE_URL.get_or_init(|| Regex::new(r"(https?://\S+)").unwrap());
 
-    RE_URL.replace_all(text, "<$1>")
+    re_url.replace_all(text, "<$1>")
 }

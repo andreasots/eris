@@ -1,8 +1,8 @@
 use tokio::sync::watch;
 use twilight_cache_inmemory::InMemoryCache;
 use twilight_model::gateway::event::Event;
-use twilight_model::id::Id;
 use twilight_model::id::marker::GuildMarker;
+use twilight_model::id::Id;
 
 /// A wrapper around [InMemoryCache] to prevent holding on to references to the cached data across
 /// yield points.

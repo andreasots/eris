@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use anyhow::{Context, Error};
@@ -222,11 +222,11 @@ pub struct Video {
 
 impl Video {
     pub fn video_id_from_message(message: &str) -> Option<&str> {
-        lazy_static::lazy_static! {
-            static ref RE_VIDEO_ID: Regex = Regex::new(r"(?m)^Video: https://youtu.be/(\S+)$").unwrap();
-        }
+        static RE_VIDEO_ID: OnceLock<Regex> = OnceLock::new();
+        let re_video_id =
+            RE_VIDEO_ID.get_or_init(|| Regex::new(r"(?m)^Video: https://youtu.be/(\S+)$").unwrap());
 
-        Some(RE_VIDEO_ID.captures(message)?.get(1)?.as_str())
+        Some(re_video_id.captures(message)?.get(1)?.as_str())
     }
 
     async fn is_already_announced(
@@ -408,7 +408,8 @@ impl Video {
         message: &Message,
         available_tags: Option<&[ForumTag]>,
     ) -> Result<(), Error> {
-        discord.update_thread(message.channel_id)
+        discord
+            .update_thread(message.channel_id)
             .applied_tags(available_tags.map(|tags| self.tags(tags)).as_deref())
             .name(&crate::shorten::shorten(&self.title, CHANNEL_NAME_LENGTH_MAX))
             .context("thread name invalid")?
