@@ -35,7 +35,6 @@ mod markdown;
 mod metrics;
 mod models;
 mod rpc;
-mod service;
 mod shorten;
 mod shutdown;
 mod systemd;

@@ -1,76 +1,82 @@
 use std::collections::HashMap;
+use std::future::{ready, Future, Ready};
+use std::net::Ipv6Addr;
 #[cfg(unix)]
 use std::path::PathBuf;
+use std::pin::Pin;
+use std::task::Poll;
 
-use anyhow::{Context, Error};
-use futures_util::{Sink, SinkExt, Stream, StreamExt};
+use anyhow::Error;
+use futures_util::future::{Either, ErrInto};
+use futures_util::{Sink, SinkExt, Stream, StreamExt, TryFutureExt};
 use serde_json::Value;
-#[cfg(not(unix))]
 use tokio::net::TcpStream;
 #[cfg(unix)]
 use tokio::net::UnixStream;
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
+use tokio_util::sync::PollSender;
+use tower::Service;
 use tracing::error;
 
 use super::codec::{self, Exception, Request};
 
-pub struct Connector {
+#[derive(Clone)]
+pub struct MakeClient {
     running: watch::Receiver<bool>,
     handler_tx: mpsc::Sender<JoinHandle<()>>,
-
-    #[cfg(unix)]
-    path: PathBuf,
-
-    #[cfg(not(unix))]
-    port: u16,
 }
 
-#[cfg(unix)]
-impl Connector {
-    pub fn new<P: Into<PathBuf>>(
-        running: watch::Receiver<bool>,
-        handler_tx: mpsc::Sender<JoinHandle<()>>,
-        path: P,
-    ) -> Connector {
-        Connector { running, handler_tx, path: path.into() }
-    }
-
-    pub async fn connect(&self) -> Result<Client, Error> {
-        Ok(Client::from_stream(
-            self.running.clone(),
-            self.handler_tx.clone(),
-            UnixStream::connect(&self.path).await?,
-        )
-        .await)
-    }
-}
-
-#[cfg(not(unix))]
-impl Connector {
+impl MakeClient {
     pub fn new(
         running: watch::Receiver<bool>,
         handler_tx: mpsc::Sender<JoinHandle<()>>,
-        port: u16,
-    ) -> Connector {
-        Connector { running, handler_tx, port }
+    ) -> MakeClient {
+        MakeClient { running, handler_tx }
+    }
+}
+
+#[cfg(unix)]
+impl Service<PathBuf> for MakeClient {
+    type Response = Client;
+    type Error = Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + Sync>>;
+
+    fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
-    pub async fn connect(&self) -> Result<Client, Error> {
-        use std::net::{IpAddr, Ipv6Addr, SocketAddr};
+    fn call(&mut self, path: PathBuf) -> Self::Future {
+        let this = self.clone();
+        Box::pin(async move {
+            let connection = UnixStream::connect(&path).await?;
 
-        let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), self.port);
-        Ok(Client::from_stream(
-            self.running.clone(),
-            self.handler_tx.clone(),
-            TcpStream::connect(&addr).await?,
-        )
-        .await)
+            Ok(Client::from_stream(this.running.clone(), this.handler_tx.clone(), connection).await)
+        })
+    }
+}
+
+impl Service<u16> for MakeClient {
+    type Response = Client;
+    type Error = Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + Sync>>;
+
+    fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, port: u16) -> Self::Future {
+        let this = self.clone();
+        Box::pin(async move {
+            let connection = TcpStream::connect(&(Ipv6Addr::LOCALHOST, port)).await?;
+
+            Ok(Client::from_stream(this.running.clone(), this.handler_tx.clone(), connection).await)
+        })
     }
 }
 
 pub struct Client {
-    channel: mpsc::Sender<(Request, oneshot::Sender<Result<Value, Exception>>)>,
+    channel: PollSender<(Request, oneshot::Sender<Result<Value, Exception>>)>,
 }
 
 impl Client {
@@ -85,7 +91,7 @@ impl Client {
             .send(tokio::spawn(Client::dispatch(running, rx, codec::client(stream))))
             .await;
 
-        Client { channel: tx }
+        Client { channel: PollSender::new(tx) }
     }
 
     async fn dispatch<T>(
@@ -137,16 +143,32 @@ impl Client {
             }
         }
     }
+}
 
-    pub async fn call(
-        &mut self,
-        req: Request,
-    ) -> Result<oneshot::Receiver<Result<Value, Exception>>, Error> {
+impl Service<Request> for Client {
+    type Response = Result<Value, Exception>;
+    type Error = Error;
+    type Future = Either<
+        Ready<Result<Self::Response, Self::Error>>,
+        ErrInto<oneshot::Receiver<Self::Response>, Self::Error>,
+    >;
+
+    fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.channel.poll_reserve(cx).map_err(|error| {
+            Error::from(error).context("failed to reserve a slot on the request queue")
+        })
+    }
+
+    fn call(&mut self, req: Request) -> Self::Future {
         let (tx, rx) = oneshot::channel();
 
-        self.channel.send((req, tx)).await.context("failed to queue the request")?;
+        if let Err(error) = self.channel.send_item((req, tx)) {
+            return Either::Left(ready(Err(
+                Error::from(error).context("failed to queue the request")
+            )));
+        };
 
-        Ok(rx)
+        Either::Right(rx.err_into())
     }
 }
 
@@ -158,6 +180,7 @@ mod tests {
     use serde_json::Value;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::UnixStream;
+    use tower::Service;
 
     use super::Client;
 
@@ -174,12 +197,11 @@ mod tests {
 
         let mut client = Client::from_stream(running_rx, handles_tx, read).await;
 
-        let first =
-            client.call((String::from("test"), vec![], HashMap::new())).await.expect("queue first");
-        let second = client
-            .call((String::from("test"), vec![], HashMap::new()))
-            .await
-            .expect("queue second");
+        std::future::poll_fn(|cx| client.poll_ready(cx)).await.unwrap();
+        let first = client.call((String::from("test"), vec![], HashMap::new()));
+
+        std::future::poll_fn(|cx| client.poll_ready(cx)).await.unwrap();
+        let second = client.call((String::from("test"), vec![], HashMap::new()));
 
         let mut buf = [0; REQUEST.len()];
         write.read_exact(&mut buf[..]).await.expect("failed to read request");

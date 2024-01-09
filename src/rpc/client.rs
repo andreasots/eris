@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use anyhow::{Context, Error};
 use serde::de::DeserializeOwned;
@@ -6,11 +7,13 @@ use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::watch::Receiver;
+use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
+use tower::reconnect::Reconnect;
+use tower::Service;
 
-use crate::aiomas::Connector;
+use crate::aiomas::{Client, MakeClient, Request};
 use crate::config::Config;
-use crate::service::{Reconnect, Retry};
 
 #[derive(Copy, Clone, Debug, Deserialize)]
 pub struct GameId {
@@ -42,7 +45,10 @@ pub struct HeaderInfo {
 }
 
 pub struct LRRbot {
-    service: Retry,
+    #[cfg(unix)]
+    service: Mutex<Reconnect<MakeClient, PathBuf>>,
+    #[cfg(not(unix))]
+    service: Mutex<Reconnect<MakeClient, u16>>,
 }
 
 impl LRRbot {
@@ -51,12 +57,14 @@ impl LRRbot {
         handler_tx: Sender<JoinHandle<()>>,
         config: &Config,
     ) -> LRRbot {
-        #[cfg(unix)]
-        let client = Connector::new(running, handler_tx, &config.lrrbot_socket);
-        #[cfg(not(unix))]
-        let client = Connector::new(running, handler_tx, config.lrrbot_port);
+        let make_client = MakeClient::new(running, handler_tx);
 
-        LRRbot { service: Retry::new(Reconnect::new(client), 3) }
+        #[cfg(unix)]
+        let addr = config.lrrbot_socket.clone();
+        #[cfg(not(unix))]
+        let addr = config.lrrbot_port;
+
+        LRRbot { service: Mutex::new(Reconnect::new::<Client, Request>(make_client, addr)) }
     }
 
     async fn call(
@@ -65,7 +73,33 @@ impl LRRbot {
         args: Vec<Value>,
         kwargs: HashMap<String, Value>,
     ) -> Result<Value, Error> {
-        self.service.call((name, args, kwargs)).await?.map_err(Error::msg)
+        // Implement retry logic here because `tower::retry::Retry` requires the service to be `Clone` which
+        // `Reconnect<...>` never is.
+        let mut last_error = None;
+
+        for _ in 0..3 {
+            let future = {
+                let mut service = self.service.lock().await;
+                if let Err(error) = std::future::poll_fn(|cx| service.poll_ready(cx)).await {
+                    last_error = Some(
+                        anyhow::anyhow!(error)
+                            .context("failed to wait for the service to be ready"),
+                    );
+                    continue;
+                }
+                service.call((name.clone(), args.clone(), kwargs.clone()))
+            };
+            match future.await {
+                Ok(Ok(value)) => return Ok(value),
+                Ok(Err(exc)) => return Err(Error::msg(exc)),
+                Err(error) => {
+                    last_error = Some(anyhow::anyhow!(error).context("failed to send the request"));
+                    continue;
+                }
+            }
+        }
+
+        Err(last_error.unwrap())
     }
 
     pub async fn get_header_info(&self) -> Result<HeaderInfo, Error> {
