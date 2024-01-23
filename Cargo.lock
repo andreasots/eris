@@ -2299,9 +2299,9 @@ dependencies = [
 
 [[package]]
 name = "sea-orm-macros"
-version = "0.12.11"
+version = "0.12.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b03da1864306242678ac3b6567e69f70dd1252a72742baa23a4d92d2d45da3fc"
+checksum = "e0dbc880d47aa53c6a572e39c99402c7fad59b50766e51e0b0fc1306510b0555"
 dependencies = [
  "heck",
  "proc-macro2",
