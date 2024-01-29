@@ -305,11 +305,14 @@ impl Video {
     ) -> Result<bool, Error> {
         let (_, list) = youtube
             .videos()
-            .list(&vec!["liveStreamingDetails".into()])
+            .list(&vec![
+                "liveStreamingDetails".into(),
+                "contentDetails".into(),
+            ])
             .add_id(&self.id)
             .doit()
             .await
-            .context("failed to fetch livestreaming details")?;
+            .context("failed to fetch video details")?;
 
         let video = list
             .items
@@ -318,7 +321,19 @@ impl Video {
             .find(|video| video.id.as_deref() == Some(&self.id))
             .context("video query didn't return this video")?;
 
-        Ok(video.live_streaming_details.is_some())
+        let duration = video
+            .content_details
+            .context("`contentDetails` is missing")?
+            .duration
+            .context("`contentDetails.duration` is missing")?;
+        let duration = iso8601::duration(&duration)
+            .map_err(|error| Error::msg(error))
+            .context("failed to parse the video duration")?;
+
+        // Livestreams and premieres both have `liveStreamingDetails` set but livestreams don't have a non-zero duration
+        // until it becomes a VOD. There doesn't seem to be a way to differentiate between a VOD and a premiere.
+
+        Ok(video.live_streaming_details.is_some() && duration.is_zero())
     }
 
     fn message_content(&self) -> String {
