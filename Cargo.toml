@@ -56,4 +56,4 @@ walkdir = "2.4.0"
 tzfile = "0.1.3"
 
 [target.'cfg(not(unix))'.dependencies]
-chrono-tz = { version = "0.8.5", features = ["case-insensitive"] }
+chrono-tz = { version = "0.8.6", features = ["case-insensitive"] }
