@@ -162,7 +162,6 @@ impl Autotopic {
         self.discord
             .update_channel(self.config.general_channel)
             .topic(new_topic)
-            .context("new topic is invalid")?
             .await
             .context("failed to update the topic")?;
         self.last_updated = Some(now);

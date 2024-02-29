@@ -186,7 +186,6 @@ impl TootAnnouncer {
                                 .discord
                                 .create_message(channel)
                                 .content(&message)
-                                .context("announcement message is invalid")?
                                 .await
                                 .context("failed to send the announcement message")?
                                 .model()

@@ -82,7 +82,6 @@ impl CommandHandler for Static {
                             .reply(message.id)
                             .flags(MessageFlags::SUPPRESS_EMBEDS)
                             .content(&response)
-                            .context("reply message invalid")?
                             .await
                             .context("failed to reply to command")?;
                     }

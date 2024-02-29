@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{Context as _, Error};
-use futures_util::stream::{FuturesUnordered, StreamExt};
+use futures_util::stream::{FuturesUnordered, StreamExt as _};
 use google_calendar3::hyper::client::{Client as HyperClient, HttpConnector};
 use google_calendar3::hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use google_calendar3::oauth2::authenticator::{Authenticator, ServiceAccountAuthenticator};
@@ -13,7 +13,7 @@ use google_youtube3::YouTube;
 use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
-use twilight_gateway::Intents;
+use twilight_gateway::{EventTypeFlags, Intents, StreamExt as _};
 use twilight_http::Client as DiscordClient;
 use twilight_model::channel::message::AllowedMentions;
 use twilight_model::gateway::payload::outgoing::update_presence::UpdatePresencePayload;
@@ -303,12 +303,11 @@ async fn main() -> Result<(), Error> {
         PresenceStatus::Online,
     )
     .context("failed to construct the presence")?;
-    let shards =
-        twilight_gateway::stream::create_recommended(&discord, shard_config, |_, builder| {
-            builder.presence(presence.clone()).build()
-        })
-        .await
-        .context("failed to create the shards")?;
+    let shards = twilight_gateway::create_recommended(&discord, shard_config, |_, builder| {
+        builder.presence(presence.clone()).build()
+    })
+    .await
+    .context("failed to create the shards")?;
 
     for mut shard in shards {
         let cache = cache.clone();
@@ -325,8 +324,8 @@ async fn main() -> Result<(), Error> {
             loop {
                 tokio::select! {
                     _ = running_rx.changed() => break,
-                    res = shard.next_event() => match res {
-                        Ok(event) => {
+                    res = shard.next_event(EventTypeFlags::all()) => match res {
+                        Some(Ok(event)) => {
                             if let Some(sd_notify) = sd_notify.as_ref() {
                                 if let Err(error) = sd_notify.feed_watchdog() {
                                     warn!(?error, "failed to feed the systemd watchdog");
@@ -347,17 +346,14 @@ async fn main() -> Result<(), Error> {
 
                             command_parser.on_event(&handler_tx, &event).await;
                         }
-                        Err(error) => {
+                        Some(Err(error)) => {
                             error!(
                                 ?error,
                                 shard.id = ?shard_id,
                                 "failed to receive an event from the shard"
                             );
-
-                            if error.is_fatal() {
-                                break;
-                            }
                         }
+                        None => break,
                     }
                 }
             }

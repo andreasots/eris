@@ -57,7 +57,6 @@ impl Help {
             .create_message(message.channel_id)
             .reply(message.id)
             .embeds(&[embed.build()])
-            .context("command listing invalid")?
             .await
             .context("failed to reply to command")?;
         Ok(())
@@ -102,7 +101,6 @@ impl Help {
                     .create_message(message.channel_id)
                     .reply(message.id)
                     .embeds(&[embed.build()])
-                    .context("detailed command help invalid")?
                     .await
                     .context("failed to reply to command")?;
             }
@@ -111,7 +109,6 @@ impl Help {
                     .create_message(message.channel_id)
                     .reply(message.id)
                     .content(&format!("No such command: {}", crate::markdown::escape(&command)))
-                    .context("error message invalid")?
                     .await
                     .context("failed to reply to command")?;
             }

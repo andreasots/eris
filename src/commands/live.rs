@@ -103,7 +103,6 @@ impl CommandHandler for Live {
                     }
                     &content
                 })
-                .context("response message content invalid")?
                 .flags(MessageFlags::SUPPRESS_EMBEDS)
                 .await
                 .context("failed to reply to command")?;

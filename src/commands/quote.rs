@@ -387,7 +387,6 @@ async fn report_parse_error(
             crate::markdown::escape(&err.to_string()),
             crate::markdown::escape_code_block(&query),
         ))
-        .context("error report invalid")?
         .await
         .context("failed to report the parse error")?;
 
@@ -530,7 +529,6 @@ impl CommandHandler for Find {
                     }
                     None => "Could not find any matching quotes.",
                 })
-                .context("command response invalid")?
                 .await
                 .context("failed to reply to command")?;
 
@@ -605,7 +603,6 @@ impl CommandHandler for QueryDebugger {
                     );
                     &content
                 })
-                .context("command response invalid")?
                 .await
                 .context("failed to reply to command")?;
 
@@ -657,7 +654,6 @@ impl CommandHandler for Details {
                         .reply(message.id)
                         .flags(MessageFlags::SUPPRESS_EMBEDS)
                         .content(&format!("Failed to parse the quote ID: {error}"))
-                        .context("error report invalid")?
                         .await
                         .context("failed to report the parse error")?;
                     return Ok(());
@@ -675,7 +671,6 @@ impl CommandHandler for Details {
                     .reply(message.id)
                     .flags(MessageFlags::SUPPRESS_EMBEDS)
                     .content(&format!("Could not find quote #{quote_id}"))
-                    .context("error report invalid")?
                     .await
                     .context("failed to report the parse error")?;
                 return Ok(());
@@ -732,9 +727,7 @@ impl CommandHandler for Details {
                 .create_message(message.channel_id)
                 .reply(message.id)
                 .content(&format!("Quote {}", crate::markdown::escape(&quote.to_string())))
-                .context("command response invalid")?
                 .embeds(&[embed.build()])
-                .context("quote details embed invalid")?
                 .await
                 .context("failed to reply to command")?;
 

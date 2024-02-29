@@ -85,7 +85,6 @@ async fn stream_up_inner(
         .create_message(config.announcements)
         .flags(MessageFlags::SUPPRESS_EMBEDS)
         .content(&message)
-        .context("stream up message is invalid")?
         .await
         .context("failed to send the announcement message request")?
         .model()

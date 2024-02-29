@@ -147,8 +147,7 @@ async fn inner(
         for (i, part) in parts.into_iter().enumerate() {
             let mut req = discord.create_message(config.mods_channel);
             if i == 0 {
-                req =
-                    req.content("New message from the contact form:").context("invalid message")?;
+                req = req.content("New message from the contact form:");
             }
             let mut embed = EmbedBuilder::new()
                 .description(part)
@@ -160,10 +159,7 @@ async fn inner(
             if let Some(timestamp) = message.timestamp {
                 embed = embed.timestamp(timestamp);
             }
-            req.embeds(&[embed.build()])
-                .context("invalid embed")?
-                .await
-                .context("failed to forward the message")?;
+            req.embeds(&[embed.build()]).await.context("failed to forward the message")?;
         }
 
         let req = BatchUpdateSpreadsheetRequest {

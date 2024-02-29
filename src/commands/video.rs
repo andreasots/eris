@@ -88,7 +88,6 @@ impl CommandHandler for New {
                         .reply(message.id)
                         .flags(MessageFlags::SUPPRESS_EMBEDS)
                         .content(&format!("Created {}.", thread.mention()))
-                        .context("message invalid")?
                         .await
                         .context("failed to reply to command")?;
                 }
@@ -98,7 +97,6 @@ impl CommandHandler for New {
                     .reply(message.id)
                     .flags(MessageFlags::SUPPRESS_EMBEDS)
                     .content("No such video.")
-                    .context("message invalid")?
                     .await
                     .context("failed to reply to command")?;
             }
@@ -174,7 +172,6 @@ impl CommandHandler for Refresh {
                         "Command must be used in a thread in {}.",
                         self.channel_id.mention()
                     ))
-                    .context("error message invalid")?
                     .await
                     .context("failed to report an error")?;
             }
@@ -183,7 +180,6 @@ impl CommandHandler for Refresh {
                 .channel_messages(message.channel_id)
                 .after(Id::new(1))
                 .limit(1)
-                .context("limit invalid")?
                 .await
                 .context("failed to get the messages")?
                 .models()
@@ -203,7 +199,6 @@ impl CommandHandler for Refresh {
                     .reply(message.id)
                     .flags(MessageFlags::SUPPRESS_EMBEDS)
                     .content("Can't edit the first post in thread because it was created by someone else.")
-                    .context("error message invalid")?
                     .await
                     .context("failed to report an error")?;
 
@@ -220,7 +215,6 @@ impl CommandHandler for Refresh {
                     .reply(message.id)
                     .flags(MessageFlags::SUPPRESS_EMBEDS)
                     .content("Could not find a YouTube video ID in the first message of the thread")
-                    .context("error message invalid")?
                     .await
                     .context("failed to report an error")?;
                 return Ok(());
@@ -249,7 +243,6 @@ impl CommandHandler for Refresh {
                         .reply(message.id)
                         .flags(MessageFlags::SUPPRESS_EMBEDS)
                         .content("Message updated.")
-                        .context("message invalid")?
                         .await
                         .context("failed to reply to command")?;
                 }
@@ -259,7 +252,6 @@ impl CommandHandler for Refresh {
                     .reply(message.id)
                     .flags(MessageFlags::SUPPRESS_EMBEDS)
                     .content("No such video.")
-                    .context("message invalid")?
                     .await
                     .context("failed to reply to command")?;
             }

@@ -68,7 +68,6 @@ impl<S> CommandHandler for TracingFilter<S> {
                     crate::markdown::escape(&old_filter),
                     crate::markdown::escape(directives)
                 ))
-                .context("response message invalid")?
                 .await
                 .context("failed to reply to command")?;
 

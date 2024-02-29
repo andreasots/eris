@@ -190,7 +190,6 @@ impl CommandHandler for Next {
                 .reply(message.id)
                 .flags(MessageFlags::SUPPRESS_EMBEDS)
                 .content(&self.get_response(config, args).await?)
-                .context("reply message invalid")?
                 .await
                 .context("failed to reply to command")?;
             Ok(())

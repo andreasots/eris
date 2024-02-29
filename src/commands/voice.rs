@@ -28,7 +28,6 @@ impl Voice {
         let name = format!("{} {name}", config.temp_channel_prefix);
         let channel = discord
             .create_guild_channel(config.guild, &name)
-            .context("invalid channel name")?
             .kind(ChannelType::GuildVoice)
             .parent_id(config.voice_category)
             .await
@@ -80,7 +79,6 @@ impl CommandHandler for Voice {
                 .reply(message.id)
                 .flags(MessageFlags::SUPPRESS_EMBEDS)
                 .content(&content)
-                .context("invalid response message")?
                 .await
                 .context("failed to respond to command")?;
 

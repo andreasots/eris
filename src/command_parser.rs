@@ -248,7 +248,6 @@ async fn error_feedback(
         .reply(message_id)
         .flags(MessageFlags::SUPPRESS_EMBEDS)
         .content(&format!("Command resulted in an unexpected error: {error}"))
-        .context("error message failed validation")?
         .await
         .context("failed to send the error message")?;
     Ok(())
@@ -264,7 +263,6 @@ pub async fn refuse_access(
         .create_message(channel_id)
         .reply(message_id)
         .content(access.refuse_reason())
-        .context("reply message invalid")?
         .await
         .context("failed to reply to command")?;
     Ok(())

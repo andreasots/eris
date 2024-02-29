@@ -268,7 +268,6 @@ impl Video {
                 .channel_messages(thread_id)
                 .after(Id::new(1))
                 .limit(1)
-                .context("limit invalid")?
                 .await
                 .context("failed to get the messages")?
                 .models()
@@ -305,10 +304,7 @@ impl Video {
     ) -> Result<bool, Error> {
         let (_, list) = youtube
             .videos()
-            .list(&vec![
-                "liveStreamingDetails".into(),
-                "contentDetails".into(),
-            ])
+            .list(&vec!["liveStreamingDetails".into(), "contentDetails".into()])
             .add_id(&self.id)
             .doit()
             .await
@@ -380,7 +376,6 @@ impl Video {
                 .applied_tags(&available_tags.map(|tags| self.tags(tags)).unwrap_or_default())
                 .message()
                 .content(&self.message_content())
-                .context("video announcement invalid")?
                 .await
                 .context("failed to create the video thread")?
                 .model()
@@ -393,7 +388,6 @@ impl Video {
             let message = discord
                 .create_message(channel_id)
                 .content(&self.message_content())
-                .context("video announcement invalid")?
                 .await
                 .context("failed to send video announcement")?
                 .model()
@@ -406,7 +400,6 @@ impl Video {
                     message.id,
                     &crate::shorten::shorten(&self.title, CHANNEL_NAME_LENGTH_MAX),
                 )
-                .context("thread name invalid")?
                 .await
                 .context("failed to create the thread")?
                 .model()
@@ -427,14 +420,12 @@ impl Video {
             .update_thread(message.channel_id)
             .applied_tags(available_tags.map(|tags| self.tags(tags)).as_deref())
             .name(&crate::shorten::shorten(&self.title, CHANNEL_NAME_LENGTH_MAX))
-            .context("thread name invalid")?
             .await
             .context("failed to update thread name")?;
 
         discord
             .update_message(message.channel_id, message.id)
             .content(Some(&self.message_content()))
-            .context("video announcement invalid")?
             .await
             .context("failed to update the video announcement")?;
         Ok(())
