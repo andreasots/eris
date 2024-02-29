@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Error};
 use regex::{Captures, Regex, RegexSet};
+use sea_orm::{DeriveActiveEnum, EnumIter};
 use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
 use tracing::{error, info, Instrument};
@@ -41,19 +42,24 @@ pub trait CommandHandler: Send + Sync {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, DeriveActiveEnum, EnumIter, Eq, PartialEq)]
+#[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum Access {
     /// Allow anyone to use the command
+    #[sea_orm(num_value = 0)]
     All,
     /// Allow only the subscribers to use the command
     ///
     /// A 'subscriber' is someone with a coloured role.
+    #[sea_orm(num_value = 1)]
     SubOnly,
     /// Allow only the moderators to use the command
     ///
     /// A 'moderator' is someone with the `ADMINISTRATOR` permission in the guild.
+    #[sea_orm(num_value = 2)]
     ModOnly,
     /// Allow only the bot owners to use the command
+    #[sea_orm(num_value = -1)]
     OwnerOnly,
 }
 

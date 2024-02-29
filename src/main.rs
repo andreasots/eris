@@ -270,7 +270,7 @@ async fn main() -> Result<(), Error> {
         // this command is after all other quote commands to avoid conflicts
         .command(crate::commands::quote::Find::new(db.clone()))
         // this is the last command on purpose to avoid conflicts
-        .command(crate::commands::static_response::Static::new(lrrbot.clone()))
+        .command(crate::commands::static_response::Static::new(db.clone()))
         .build(cache.clone(), config.clone(), discord.clone())
         .context("failed to build the command parser")?;
 

@@ -1,3 +1,101 @@
+pub mod command {
+    use sea_orm::entity::prelude::*;
+
+    use crate::command_parser::Access;
+
+    #[derive(Debug, Clone, DeriveEntityModel)]
+    #[sea_orm(table_name = "commands")]
+    pub struct Model {
+        #[sea_orm(primary_key)]
+        pub id: i32,
+        pub access: Access,
+    }
+
+    #[derive(Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        #[sea_orm(has_many = "super::command_alias::Entity")]
+        Alias,
+        #[sea_orm(has_many = "super::command_response::Entity")]
+        Response,
+    }
+
+    impl Related<super::command_alias::Entity> for Entity {
+        fn to() -> RelationDef {
+            Relation::Alias.def()
+        }
+    }
+
+    impl Related<super::command_response::Entity> for Entity {
+        fn to() -> RelationDef {
+            Relation::Response.def()
+        }
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod command_alias {
+    use sea_orm::entity::prelude::*;
+
+    #[derive(Debug, Clone, DeriveEntityModel)]
+    #[sea_orm(table_name = "commands_aliases")]
+    pub struct Model {
+        #[sea_orm(primary_key)]
+        pub id: i32,
+        pub command_id: i32,
+        pub alias: String,
+    }
+
+    #[derive(Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        #[sea_orm(
+            belongs_to = "super::command::Entity",
+            from = "Column::CommandId",
+            to = "super::command::Column::Id"
+        )]
+        Command,
+    }
+
+    impl Related<super::command::Entity> for Entity {
+        fn to() -> RelationDef {
+            Relation::Command.def()
+        }
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod command_response {
+    use sea_orm::entity::prelude::*;
+
+    #[derive(Debug, Clone, DeriveEntityModel)]
+    #[sea_orm(table_name = "commands_responses")]
+    pub struct Model {
+        #[sea_orm(primary_key)]
+        pub id: i32,
+        pub command_id: i32,
+        pub response: String,
+    }
+
+    #[derive(Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        #[sea_orm(
+            belongs_to = "super::command::Entity",
+            from = "Column::CommandId",
+            to = "super::command::Column::Id"
+        )]
+        Command,
+    }
+
+    impl Related<super::command::Entity> for Entity {
+        fn to() -> RelationDef {
+            Relation::Command.def()
+        }
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
 pub mod game_entry {
     use std::convert::TryInto;
 

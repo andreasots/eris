@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use anyhow::{Context, Error};
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 use tokio::sync::mpsc::Sender;
@@ -114,17 +113,6 @@ impl LRRbot {
 
     pub async fn get_show_id(&self) -> Result<i32, Error> {
         let value = self.call("get_show_id".into(), vec![], HashMap::new()).await?;
-        serde_json::from_value(value).context("failed to deserialize the response")
-    }
-
-    pub async fn get_data<T: DeserializeOwned>(&self, path: Vec<String>) -> Result<T, Error> {
-        let value = self
-            .call(
-                "get_data".into(),
-                vec![Value::Array(path.into_iter().map(Value::String).collect())],
-                HashMap::new(),
-            )
-            .await?;
         serde_json::from_value(value).context("failed to deserialize the response")
     }
 }
