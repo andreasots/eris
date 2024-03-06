@@ -19,7 +19,7 @@ clap = { version = "4.5.1", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.30", default-features = false, features = ["std", "sink"] }
 google-calendar3 = "5.0.4"
 google-sheets4 = "5.0.3"
-google-youtube3 = "5.0.3"
+google-youtube3 = "5.0.4"
 influxdb = { version = "0.7.2", default-features = false, features = ["derive", "reqwest-client-rustls"] }
 iso8601 = "0.6.1"
 lalrpop-util = { version = "0.20.2", features = ["std", "lexer", "unicode"], default-features = false }

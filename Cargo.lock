@@ -980,9 +980,9 @@ dependencies = [
 
 [[package]]
 name = "google-youtube3"
-version = "5.0.3+20230123"
+version = "5.0.4+20240303"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0cc9f8224e313ba4aec79da6c23daad67023337ab9b117b2dde65f86a8002e24"
+checksum = "364abff75c73c32e16bdeb4af1b2b01b8719df2960a1922653bfedd9b53511f5"
 dependencies = [
  "anyhow",
  "google-apis-common",
