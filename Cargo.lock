@@ -960,9 +960,9 @@ dependencies = [
 
 [[package]]
 name = "google-sheets4"
-version = "5.0.3+20230119"
+version = "5.0.4+20240229"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "380e1cd4fe2c975c3b79c6e6548abf06ce67968d6faf3e19111697cdebf6dead"
+checksum = "58cee3dbdba1d65321181bbc9bda348ed60fa7d2b58a3e381069eda9fbf46bbf"
 dependencies = [
  "anyhow",
  "google-apis-common",
