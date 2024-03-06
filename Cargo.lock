@@ -940,9 +940,9 @@ dependencies = [
 
 [[package]]
 name = "google-calendar3"
-version = "5.0.3+20221229"
+version = "5.0.4+20240223"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c34ab87fa230d2b54e29863a60fa8150f232300cdcf0e2fba860fd5a5c2f90ed"
+checksum = "9472d0354452879ca1b5f77fc9401289acb3106b46eae28552979252385dd39b"
 dependencies = [
  "anyhow",
  "google-apis-common",
