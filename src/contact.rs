@@ -64,7 +64,7 @@ fn extract_timestamp(cell: &CellData, tz: &Tz) -> Option<Timestamp> {
     let micros = timestamp
         .and_local_timezone(tz)
         .earliest()
-        .map_or_else(|| timestamp.timestamp_micros(), |ts| ts.timestamp_micros());
+        .map_or_else(|| timestamp.and_utc().timestamp_micros(), |ts| ts.timestamp_micros());
     Timestamp::from_micros(micros).ok()
 }
 

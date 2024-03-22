@@ -1,5 +1,5 @@
 use anyhow::{Context, Error};
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use google_calendar3::api::EventDateTime;
 use google_calendar3::hyper::client::HttpConnector;
 use google_calendar3::hyper_rustls::HttpsConnector;
@@ -9,6 +9,11 @@ use crate::tz::Tz;
 
 pub const LRR: &str = "loadingreadyrun.com_72jmf1fn564cbbr84l048pv1go@group.calendar.google.com";
 pub const FANSTREAMS: &str = "caffeinatedlemur@gmail.com";
+
+const ONE_HOUR: TimeDelta = match TimeDelta::try_hours(1) {
+    Some(delta) => delta,
+    None => panic!("1 hour is not a valid `chrono::TimeDelta`"),
+};
 
 pub type CalendarHub = google_calendar3::CalendarHub<HttpsConnector<HttpConnector>>;
 
@@ -104,7 +109,7 @@ pub async fn get_next_event(
     let mut first_future_event = None;
 
     for (i, event) in events.iter().enumerate() {
-        let relevant_duration = std::cmp::min(event.end - event.start, Duration::hours(1));
+        let relevant_duration = std::cmp::min(event.end - event.start, ONE_HOUR);
         let relevant_until = event.start + relevant_duration;
         if relevant_until >= at {
             first_future_event = Some(i);
@@ -114,7 +119,7 @@ pub async fn get_next_event(
 
     let Some(first_future_event) = first_future_event else { return Ok(vec![]) };
 
-    let current_events_end = events[first_future_event].start + Duration::hours(1);
+    let current_events_end = events[first_future_event].start + ONE_HOUR;
 
     Ok(events
         .into_iter()

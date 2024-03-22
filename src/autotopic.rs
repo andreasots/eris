@@ -30,8 +30,20 @@ const DYNAMIC_TAIL_SEPARATOR: &str = " \u{2009}\u{200A}\u{200B}";
 // Don't update the topic if the old and new topics have a Levenshtein distance below `SIMILARITY_THRESHOLD`.
 const SIMILARITY_THRESHOLD: usize = 5;
 // But even then update the topic every `SIMILAR_MIN_UPDATE_INTERVAL`.
-const SIMILAR_MIN_UPDATE_INTERVAL: chrono::Duration =
-    chrono::Duration::milliseconds(30 * 60 * 1000);
+const SIMILAR_MIN_UPDATE_INTERVAL: chrono::TimeDelta = match chrono::TimeDelta::try_minutes(30) {
+    Some(delta) => delta,
+    None => panic!("SIMILAR_MIN_UPDATE_INTERVAL is invalid"),
+};
+// Start announcing Desert Bus `DESERT_BUS_ANNOUNCE_START` before the start.
+const DESERT_BUS_ANNOUNCE_START: chrono::TimeDelta = match chrono::TimeDelta::try_days(2) {
+    Some(delta) => delta,
+    None => panic!("DESERT_BUS_ANNOUNCE_START is invalid"),
+};
+// Assume that Desert Bus is never longer than `DESERT_BUS_MAX_DURATION`.
+const DESERT_BUS_MAX_DURATION: chrono::TimeDelta = match chrono::TimeDelta::try_days(9) {
+    Some(delta) => delta,
+    None => panic!("DESERT_BUS_MAX_DURATION is invalid"),
+};
 
 struct EventDisplay<'a> {
     event: &'a Event,
@@ -296,8 +308,8 @@ impl Autotopic {
         events: &[Event],
     ) -> Result<(Vec<String>, bool), Error> {
         let start = DesertBus::start_time();
-        let announce_start = start - chrono::Duration::days(2);
-        let announce_end = start + chrono::Duration::days(9);
+        let announce_start = start - DESERT_BUS_ANNOUNCE_START;
+        let announce_end = start + DESERT_BUS_MAX_DURATION;
         let mut messages = vec![];
         let mut is_dynamic = false;
 
