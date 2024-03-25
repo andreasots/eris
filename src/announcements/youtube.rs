@@ -55,7 +55,6 @@ pub async fn post_videos(
             _ = running.changed() => break,
             _ = interval.tick() => {
                 if let Err(error) = poster.run().await {
-                    poster.check_for_existing_threads = true;
                     error!(?error, "failed to post videos");
                 }
             },
@@ -70,8 +69,6 @@ struct VideoPoster {
     playlists: Vec<String>,
     discord: Arc<DiscordClient>,
     youtube: YouTube<HttpsConnector<HttpConnector>>,
-
-    check_for_existing_threads: bool,
 }
 
 impl VideoPoster {
@@ -88,9 +85,9 @@ impl VideoPoster {
             req = req.add_id(channel);
         }
         let (_, channel_list) = req.doit().await.context("failed to list the channels")?;
-        let mut channels = Vec::with_capacity(config.youtube_channels.len());
+        let mut playlists = Vec::with_capacity(config.youtube_channels.len());
         for channel in channel_list.items.context("Youtube returned no channels")? {
-            channels.push(
+            playlists.push(
                 channel
                     .content_details
                     .context("requested `contentDetails` but `content_details` is missing")?
@@ -101,15 +98,7 @@ impl VideoPoster {
             );
         }
 
-        Ok(Self {
-            db,
-            cache,
-            channel_id,
-            playlists: channels,
-            discord,
-            youtube,
-            check_for_existing_threads: true,
-        })
+        Ok(Self { db, cache, channel_id, playlists, discord, youtube })
     }
 
     async fn run(&mut self) -> Result<(), Error> {
@@ -163,7 +152,7 @@ impl VideoPoster {
                 continue;
             }
 
-            let is_announced = if self.check_for_existing_threads {
+            let is_announced =
                 video.is_already_announced(self.channel_id, guild_id, &self.cache, &self.discord).await
                     .unwrap_or_else(|error| {
                         error!(
@@ -173,10 +162,7 @@ impl VideoPoster {
                         );
 
                         false
-                    })
-            } else {
-                false
-            };
+                    });
 
             let is_livestream = video.is_livestream(&self.youtube).await.unwrap_or_else(|error| {
                 error!(
@@ -204,8 +190,6 @@ impl VideoPoster {
                 .await
                 .context("failed to set the last video published timestamp")?;
         }
-
-        self.check_for_existing_threads = false;
 
         Ok(())
     }
