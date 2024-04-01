@@ -37,6 +37,7 @@ mod models;
 mod rpc;
 mod shorten;
 mod shutdown;
+#[cfg(target_os = "linux")]
 mod systemd;
 mod time;
 mod token_renewal;
@@ -270,6 +271,7 @@ async fn main() -> Result<(), Error> {
         .build(cache.clone(), config.clone(), discord.clone())
         .context("failed to build the command parser")?;
 
+    #[cfg(target_os = "linux")]
     let sd_notify = match crate::systemd::Notify::new() {
         Ok(notify) => Some(Arc::new(notify)),
         Err(error) => {
@@ -312,6 +314,7 @@ async fn main() -> Result<(), Error> {
         let influxdb = influxdb.clone();
         let mut running_rx = running_rx.clone();
         let handler_tx = handler_tx.clone();
+        #[cfg(target_os = "linux")]
         let sd_notify = sd_notify.clone();
 
         tasks.push(tokio::spawn(async move {
@@ -322,8 +325,9 @@ async fn main() -> Result<(), Error> {
                     _ = running_rx.changed() => break,
                     res = shard.next_event(EventTypeFlags::all()) => match res {
                         Some(Ok(event)) => {
+                            #[cfg(target_os = "linux")]
                             if let Some(sd_notify) = sd_notify.as_ref() {
-                                if let Err(error) = sd_notify.feed_watchdog() {
+                                if let Err(error) = sd_notify.feed_watchdog().await {
                                     warn!(?error, "failed to feed the systemd watchdog");
                                 }
                             }
@@ -363,8 +367,9 @@ async fn main() -> Result<(), Error> {
         }
     }));
 
+    #[cfg(target_os = "linux")]
     if let Some(sd_notify) = sd_notify.as_ref() {
-        if let Err(error) = sd_notify.ready() {
+        if let Err(error) = sd_notify.ready().await {
             warn!(?error, "failed to notify systemd that the bot is up");
         }
     }
