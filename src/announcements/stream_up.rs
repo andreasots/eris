@@ -2,30 +2,25 @@ use std::sync::Arc;
 
 use anyhow::{Context as _, Error};
 use sea_orm::{DatabaseConnection, EntityTrait};
-use serde::Deserialize;
+use tokio::sync::RwLock;
 use tracing::error;
 use twilight_http::Client as DiscordClient;
 use twilight_model::channel::message::MessageFlags;
+use twitch_api::twitch_oauth2::AppAccessToken;
+use twitch_api::HelixClient;
 
 use crate::aiomas::Route;
 use crate::config::Config;
 use crate::models::{game, game_entry, show};
 use crate::rpc::LRRbot;
 
-#[derive(Deserialize)]
-pub struct Channel {
-    display_name: Option<String>,
-    login: String,
-    title: Option<String>,
-}
-
 async fn stream_up_inner(
     config: &Config,
     db: &DatabaseConnection,
     discord: &DiscordClient,
+    helix: &HelixClient<'static, reqwest::Client>,
+    helix_token: &RwLock<AppAccessToken>,
     lrrbot: &LRRbot,
-
-    channel: Channel,
 ) -> Result<(), Error> {
     let game_id = lrrbot.get_game_id().await.context("failed to get the game ID")?;
     let show_id = lrrbot.get_show_id().await.context("failed to get the show ID")?;
@@ -51,8 +46,14 @@ async fn stream_up_inner(
         (game, show, game_entry)
     };
 
+    let channel = helix
+        .get_channel_from_login(&config.channel, &*helix_token.read().await)
+        .await
+        .context("failed to get the channel")?
+        .context("channel does not exist")?;
+
     let mut message = String::new();
-    message.push_str(channel.display_name.as_ref().unwrap_or(&channel.login));
+    message.push_str(channel.broadcaster_name.as_str());
     message.push_str(" is live with ");
     {
         let game = game.as_ref();
@@ -72,13 +73,13 @@ async fn stream_up_inner(
             (None, None) => message.push_str("nothing"),
         }
     }
-    if let Some(title) = channel.title.as_deref().filter(|s| !s.is_empty()) {
+    if !channel.title.is_empty() {
         message.push_str(" (");
-        message.push_str(&crate::markdown::escape(title));
+        message.push_str(&crate::markdown::escape(&channel.title));
         message.push(')');
     }
     message.push_str("! <https://twitch.tv/");
-    message.push_str(&channel.login);
+    message.push_str(&channel.broadcaster_login.as_str());
     message.push('>');
 
     let message = discord
@@ -102,21 +103,22 @@ pub fn stream_up(
     config: Arc<Config>,
     db: DatabaseConnection,
     discord: Arc<DiscordClient>,
+    helix: HelixClient<'static, reqwest::Client>,
+    helix_token: Arc<RwLock<AppAccessToken>>,
     lrrbot: Arc<LRRbot>,
-) -> impl Route<(Channel,)> {
-    move |data| {
+) -> impl Route<()> {
+    move || {
         let config = config.clone();
         let db = db.clone();
         let discord = discord.clone();
+        let helix = helix.clone();
+        let helix_token = helix_token.clone();
         let lrrbot = lrrbot.clone();
 
         async move {
-            let ret = stream_up_inner(&config, &db, &discord, &lrrbot, data).await;
-            // `Result::inspect_err` is unstable :(
-            if let Err(ref error) = ret {
-                error!(?error, "Failed to post a stream up announcement");
-            }
-            ret
+            stream_up_inner(&config, &db, &discord, &helix, &helix_token, &lrrbot)
+                .await
+                .inspect_err(|error| error!(?error, "Failed to post a stream up announcement"))
         }
     }
 }

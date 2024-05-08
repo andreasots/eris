@@ -201,6 +201,8 @@ async fn main() -> Result<(), Error> {
             config.clone(),
             db.clone(),
             discord.clone(),
+            helix.clone(),
+            helix_token.clone(),
             lrrbot.clone(),
         ),
     );

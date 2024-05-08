@@ -32,6 +32,42 @@ pub trait Route<Args> {
     ) -> Pin<Box<dyn Future<Output = Result<Value, Exception>> + Send + 'static>>;
 }
 
+impl<Fun, Fut, R, E> Route<()> for Fun
+where
+    Fun: Fn() -> Fut + Sync,
+    Fut: Future<Output = Result<R, E>> + Send + 'static,
+    R: Serialize + Send + 'static,
+    E: Debug + Send + 'static,
+{
+    fn handle(
+        &self,
+        args: Vec<Value>,
+        kwargs: HashMap<String, Value>,
+    ) -> Pin<Box<dyn Future<Output = Result<Value, Exception>> + Send + 'static>> {
+        if !kwargs.is_empty() {
+            return future::ready(Err(String::from("function takes no keyword arguments"))).boxed();
+        }
+
+        if args.len() != 0 {
+            return future::ready(Err(format!(
+                "function takes no arguments ({} given)",
+                args.len()
+            )))
+            .boxed();
+        }
+
+        self()
+            .then(|res| async move {
+                match res {
+                    Ok(val) => serde_json::to_value(val)
+                        .map_err(|err| format!("failed to serialize the return value: {err:?}")),
+                    Err(err) => Err(format!("function returned an error: {err:?}")),
+                }
+            })
+            .boxed()
+    }
+}
+
 impl<Fun, Fut, R, E, T0> Route<(T0,)> for Fun
 where
     Fun: Fn(T0) -> Fut + Sync,
