@@ -903,7 +903,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "http 0.2.12",
- "hyper 0.14.28",
+ "hyper 0.14.29",
  "itertools 0.12.1",
  "mime",
  "percent-encoding 2.3.1",
@@ -925,7 +925,7 @@ dependencies = [
  "anyhow",
  "google-apis-common",
  "http 0.2.12",
- "hyper 0.14.28",
+ "hyper 0.14.29",
  "hyper-rustls 0.24.2",
  "itertools 0.10.5",
  "mime",
@@ -945,7 +945,7 @@ dependencies = [
  "anyhow",
  "google-apis-common",
  "http 0.2.12",
- "hyper 0.14.28",
+ "hyper 0.14.29",
  "hyper-rustls 0.24.2",
  "itertools 0.10.5",
  "mime",
@@ -965,7 +965,7 @@ dependencies = [
  "anyhow",
  "google-apis-common",
  "http 0.2.12",
- "hyper 0.14.28",
+ "hyper 0.14.29",
  "hyper-rustls 0.24.2",
  "itertools 0.10.5",
  "mime",
@@ -1157,9 +1157,9 @@ checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 
 [[package]]
 name = "hyper"
-version = "0.14.28"
+version = "0.14.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf96e135eb83a2a8ddf766e426a841d8ddd7449d5f00d34ea02b41d2f19eef80"
+checksum = "f361cde2f109281a220d4307746cdfd5ee3f410da58a70377762396775634b33"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -1207,7 +1207,7 @@ checksum = "ec3efd23720e2049821a693cbc7e65ea87c72f1c58ff2f9522ff332b1491e590"
 dependencies = [
  "futures-util",
  "http 0.2.12",
- "hyper 0.14.28",
+ "hyper 0.14.29",
  "log",
  "rustls 0.21.12",
  "rustls-native-certs 0.6.3",
@@ -1223,7 +1223,7 @@ checksum = "399c78f9338483cb7e630c8474b07268983c6bd5acee012e4211f9f7bb21b070"
 dependencies = [
  "futures-util",
  "http 0.2.12",
- "hyper 0.14.28",
+ "hyper 0.14.29",
  "log",
  "rustls 0.22.2",
  "rustls-native-certs 0.7.0",
@@ -2125,7 +2125,7 @@ dependencies = [
  "h2 0.3.26",
  "http 0.2.12",
  "http-body 0.4.6",
- "hyper 0.14.28",
+ "hyper 0.14.29",
  "hyper-rustls 0.24.2",
  "ipnet",
  "js-sys",
@@ -3463,7 +3463,7 @@ dependencies = [
  "futures",
  "hmac",
  "http 0.2.12",
- "hyper 0.14.28",
+ "hyper 0.14.29",
  "once_cell",
  "reqwest",
  "serde",
@@ -3966,7 +3966,7 @@ dependencies = [
  "base64 0.21.7",
  "futures",
  "http 0.2.12",
- "hyper 0.14.28",
+ "hyper 0.14.29",
  "hyper-rustls 0.25.0",
  "itertools 0.12.1",
  "log",
