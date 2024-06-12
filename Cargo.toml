@@ -48,7 +48,7 @@ twilight-validate = "0.16.0-rc.1"
 twitch_api = { version = "0.7.0-rc.7", features = ["all", "reqwest"] }
 unicode-segmentation = "1.11.0"
 unicode-width = { version = "0.1.13", default-features = false }
-url = { version = "2.5.0", default-features = false, features = ["serde"] }
+url = { version = "2.5.1", default-features = false, features = ["serde"] }
 
 [target.'cfg(unix)'.dependencies]
 walkdir = "2.5.0"
