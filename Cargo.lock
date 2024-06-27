@@ -918,15 +918,15 @@ dependencies = [
 
 [[package]]
 name = "google-calendar3"
-version = "5.0.4+20240223"
+version = "5.0.5+20240328"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9472d0354452879ca1b5f77fc9401289acb3106b46eae28552979252385dd39b"
+checksum = "b6ac9bbbfb836b85f0dafb43de5b39837569c48df9a4f68e4bf63bf99795ddb4"
 dependencies = [
  "anyhow",
  "google-apis-common",
  "http 0.2.12",
  "hyper 0.14.29",
- "hyper-rustls 0.24.2",
+ "hyper-rustls 0.25.0",
  "itertools 0.10.5",
  "mime",
  "serde",
