@@ -938,16 +938,16 @@ dependencies = [
 
 [[package]]
 name = "google-sheets4"
-version = "5.0.4+20240229"
+version = "5.0.5+20240621"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58cee3dbdba1d65321181bbc9bda348ed60fa7d2b58a3e381069eda9fbf46bbf"
+checksum = "c826fbdbd030b5dcddb78f3155d5c046251feff30c9062e68f8323c85731f118"
 dependencies = [
  "anyhow",
  "google-apis-common",
  "http 0.2.12",
  "hyper 0.14.29",
- "hyper-rustls 0.24.2",
- "itertools 0.10.5",
+ "hyper-rustls 0.25.0",
+ "itertools 0.13.0",
  "mime",
  "serde",
  "serde_json",
@@ -1418,6 +1418,15 @@ name = "itertools"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
 ]
