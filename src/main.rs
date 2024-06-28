@@ -11,7 +11,6 @@ use google_calendar3::CalendarHub;
 use google_sheets4::Sheets;
 use google_youtube3::YouTube;
 use tokio::sync::RwLock;
-use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 use twilight_gateway::{EventTypeFlags, Intents, StreamExt as _};
 use twilight_http::Client as DiscordClient;
@@ -281,7 +280,7 @@ async fn main() -> Result<(), Error> {
     let sd_notify = match crate::systemd::Notify::new() {
         Ok(notify) => Some(Arc::new(notify)),
         Err(error) => {
-            warn!(?error, "failed to create the systemd notifier");
+            tracing::warn!(?error, "failed to create the systemd notifier");
             None
         }
     };
@@ -334,7 +333,7 @@ async fn main() -> Result<(), Error> {
                             #[cfg(target_os = "linux")]
                             if let Some(sd_notify) = sd_notify.as_ref() {
                                 if let Err(error) = sd_notify.feed_watchdog().await {
-                                    warn!(?error, "failed to feed the systemd watchdog");
+                                    tracing::warn!(?error, "failed to feed the systemd watchdog");
                                 }
                             }
 
@@ -342,7 +341,7 @@ async fn main() -> Result<(), Error> {
                                 if let Err(error) =
                                     crate::metrics::on_event(&cache, influxdb, &event).await
                                 {
-                                    error!(?error, "failed to collect metrics");
+                                    tracing::error!(?error, "failed to collect metrics");
                                 }
                             }
 
@@ -353,7 +352,7 @@ async fn main() -> Result<(), Error> {
                             command_parser.on_event(&handler_tx, &event).await;
                         }
                         Some(Err(error)) => {
-                            error!(
+                            tracing::error!(
                                 ?error,
                                 shard.id = ?shard_id,
                                 "failed to receive an event from the shard"
@@ -376,19 +375,19 @@ async fn main() -> Result<(), Error> {
     #[cfg(target_os = "linux")]
     if let Some(sd_notify) = sd_notify.as_ref() {
         if let Err(error) = sd_notify.ready().await {
-            warn!(?error, "failed to notify systemd that the bot is up");
+            tracing::warn!(?error, "failed to notify systemd that the bot is up");
         }
     }
 
     if let Some(Err(error)) = tasks.next().await {
-        error!(?error, "task failed");
+        tracing::error!(?error, "task failed");
     }
-    info!("stopping bot");
+    tracing::info!("stopping bot");
     running_tx.send_replace(false);
 
     while let Some(res) = tasks.next().await {
         if let Err(error) = res {
-            error!(?error, "task failed");
+            tracing::error!(?error, "task failed");
         }
     }
 
