@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+#[cfg(unix)]
 use std::path::PathBuf;
 
 use anyhow::{Context, Error};
@@ -17,13 +18,11 @@ use crate::config::Config;
 #[derive(Copy, Clone, Debug, Deserialize)]
 pub struct GameId {
     pub id: i32,
-    pub is_override: bool,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize)]
 pub struct ShowId {
     pub id: i32,
-    pub is_override: bool,
 }
 
 fn option_bool_as_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>

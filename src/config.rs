@@ -30,18 +30,12 @@ pub struct Config {
     #[cfg(unix)]
     pub lrrbot_socket: PathBuf,
     #[cfg(unix)]
-    pub event_socket: PathBuf,
-    #[cfg(unix)]
     pub eris_socket: PathBuf,
 
     #[cfg(not(unix))]
     pub lrrbot_port: u16,
     #[cfg(not(unix))]
-    pub event_port: u16,
-    #[cfg(not(unix))]
     pub eris_port: u16,
-
-    pub google_key: String,
 
     pub twitch_client_id: ClientId,
     pub twitch_client_secret: ClientSecret,
@@ -95,21 +89,12 @@ impl Config {
                 .unwrap_or("lrrbot.sock")
                 .into(),
             #[cfg(unix)]
-            event_socket: ini
-                .get_from(Some("lrrbot"), "eventsocket")
-                .unwrap_or("/tmp/eventserver.sock")
-                .into(),
-            #[cfg(unix)]
             eris_socket: ini.get_from(Some("lrrbot"), "eris_socket").unwrap_or("eris.sock").into(),
 
             #[cfg(not(unix))]
             lrrbot_port: Config::get_option_parsed(&ini, "socket_port")?.unwrap_or(49601),
             #[cfg(not(unix))]
-            event_port: Config::get_option_parsed(&ini, "event_port")?.unwrap_or(49602),
-            #[cfg(not(unix))]
             eris_port: Config::get_option_parsed(&ini, "eris_port")?.unwrap_or(49603),
-
-            google_key: Config::get_option_required(&ini, "google_key")?,
 
             twitch_client_id: ClientId::new(Config::get_option_required(&ini, "twitch_clientid")?),
             twitch_client_secret: ClientSecret::new(Config::get_option_required(
