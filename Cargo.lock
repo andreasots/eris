@@ -958,16 +958,16 @@ dependencies = [
 
 [[package]]
 name = "google-youtube3"
-version = "5.0.4+20240303"
+version = "5.0.5+20240626"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "364abff75c73c32e16bdeb4af1b2b01b8719df2960a1922653bfedd9b53511f5"
+checksum = "d2b0afbd194da6ad73070da0d5fa9f7f95c28053b29e932c373d76199156234d"
 dependencies = [
  "anyhow",
  "google-apis-common",
  "http 0.2.12",
  "hyper 0.14.29",
- "hyper-rustls 0.24.2",
- "itertools 0.10.5",
+ "hyper-rustls 0.25.0",
+ "itertools 0.13.0",
  "mime",
  "serde",
  "serde_json",
@@ -1418,6 +1418,15 @@ name = "itertools"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
 ]
