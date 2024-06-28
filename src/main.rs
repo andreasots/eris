@@ -58,8 +58,12 @@ async fn create_google_client(
     (HyperClient<HttpsConnector<HttpConnector>>, Authenticator<HttpsConnector<HttpConnector>>),
     Error,
 > {
-    let connector =
-        HttpsConnectorBuilder::new().with_native_roots().https_or_http().enable_http1().build();
+    let connector = HttpsConnectorBuilder::new()
+        .with_native_roots()
+        .context("failed to set the TLS configuration")?
+        .https_or_http()
+        .enable_http1()
+        .build();
 
     let client = HyperClient::builder().build(connector);
 
