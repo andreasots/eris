@@ -188,11 +188,11 @@ async fn main() -> Result<(), Error> {
                 }
             }
 
-            crate::aiomas::Server::new(&config.eris_socket)
+            crate::aiomas::server::Server::new(&config.eris_socket)
         };
 
         #[cfg(not(unix))]
-        let server = crate::aiomas::Server::new(config.eris_port).await;
+        let server = crate::aiomas::server::Server::new(config.eris_port).await;
 
         server
     }

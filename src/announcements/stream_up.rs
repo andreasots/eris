@@ -9,7 +9,7 @@ use twilight_model::channel::message::MessageFlags;
 use twitch_api::twitch_oauth2::AppAccessToken;
 use twitch_api::HelixClient;
 
-use crate::aiomas::Route;
+use crate::aiomas::server::Route;
 use crate::config::Config;
 use crate::models::{game, game_entry, show};
 use crate::rpc::LRRbot;

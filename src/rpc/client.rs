@@ -12,7 +12,7 @@ use tokio::task::JoinHandle;
 use tower::reconnect::Reconnect;
 use tower::Service;
 
-use crate::aiomas::{Client, MakeClient, Request};
+use crate::aiomas::client::MakeClient;
 use crate::config::Config;
 
 #[derive(Copy, Clone, Debug, Deserialize)]
@@ -62,7 +62,7 @@ impl LRRbot {
         #[cfg(not(unix))]
         let addr = config.lrrbot_port;
 
-        LRRbot { service: Mutex::new(Reconnect::new::<Client, Request>(make_client, addr)) }
+        LRRbot { service: Mutex::new(Reconnect::new(make_client, addr)) }
     }
 
     async fn call(
