@@ -289,7 +289,8 @@ impl Video {
     ) -> Result<bool, Error> {
         let (_, list) = youtube
             .videos()
-            .list(&vec!["contentDetails".into(), "liveStreamingDetails".into(), "snippet".into()])
+            .list(&vec!["contentDetails".into(), "liveStreamingDetails".into(), "player".into()])
+            .max_width(720) // need to specify something to get the player height
             .add_id(&self.id)
             .doit()
             .await
@@ -357,26 +358,16 @@ impl Video {
         video: &google_youtube3::api::Video,
         duration: Duration,
     ) -> Result<bool, Error> {
-        // The API doesn't tell if something is a short so we need to implement the logic ourselves.
+        // The API doesn't tell you if something is a short so we need to implement the logic ourselves.
         // A short is:
         //  * up to 60 seconds long
-        //  * with a square or vertical aspect ration.
-        // The API also doesn't tell the aspect ration of a video so attempt to divine it from the `maxres` thumbnail.
-        let thumbnail = video
-            .snippet
-            .as_ref()
-            .context("`snippet` is missing")?
-            .thumbnails
-            .as_ref()
-            .context("`thumbnails` are missing")?
-            .maxres
-            .as_ref()
-            .context("`maxres` thumbnail is missing")?;
+        //  * with a square or vertical aspect ratio.
+        // The API also doesn't tell you the aspect ratio or the video size so divine it from the embed player size.
+        let player = video.player.as_ref().context("`player` is missing")?;
+        let embed_width = player.embed_width.context("`player.embed_width` is missing")?;
+        let embed_height = player.embed_height.context("`player.embed_height` is missing")?;
 
-        let thumbnail_width = thumbnail.width.context("`maxres` thumbnail width is missing")?;
-        let thumbnail_height = thumbnail.height.context("`maxres` thumbnail height is missing")?;
-
-        Ok(duration <= Duration::from_secs(60) && thumbnail_width <= thumbnail_height)
+        Ok(duration <= Duration::from_secs(60) && embed_width <= embed_height)
     }
 
     fn message_content(&self) -> String {
