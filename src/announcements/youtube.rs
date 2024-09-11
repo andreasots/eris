@@ -22,6 +22,8 @@ use crate::cache::Cache;
 use crate::config::Config;
 use crate::models::state;
 
+const SHORTS_MAX_DURATION: Duration = Duration::from_secs(60);
+
 pub async fn post_videos(
     mut running: Receiver<bool>,
     db: DatabaseConnection,
@@ -164,17 +166,18 @@ impl VideoPoster {
                         false
                     });
 
-            let is_livestream = video.is_livestream(&self.youtube).await.unwrap_or_else(|error| {
-                error!(
-                    ?error,
-                    video.id,
-                    "failed to determine if the video is a livestream, assuming that it is not"
-                );
+            let should_announce =
+                video.should_announce(&self.youtube).await.unwrap_or_else(|error| {
+                    error!(
+                        ?error,
+                        video.id,
+                        "failed to determine if the video should be announced, assuming that it does"
+                    );
 
-                false
-            });
+                    true
+                });
 
-            if !is_announced && !is_livestream {
+            if !is_announced && should_announce {
                 video
                     .announce(
                         self.channel_id,
@@ -282,7 +285,7 @@ impl Video {
         Ok(false)
     }
 
-    async fn is_livestream(
+    async fn should_announce(
         &self,
         youtube: &YouTube<HttpsConnector<HttpConnector>>,
     ) -> Result<bool, Error> {
@@ -310,10 +313,23 @@ impl Video {
             .map_err(|error| Error::msg(error))
             .context("failed to parse the video duration")?;
 
+        // Don't announce livestreams.
         // Livestreams and premieres both have `liveStreamingDetails` set but livestreams don't have a non-zero duration
         // until it becomes a VOD. There doesn't seem to be a way to differentiate between a VOD and a premiere.
+        if video.live_streaming_details.is_some() && duration.is_zero() {
+            return Ok(false);
+        }
 
-        Ok(video.live_streaming_details.is_some() && duration.is_zero())
+        // Don't announce shorts. The API doesn't tell if something is a short so we need to implement the logic ourselves.
+        // A short is:
+        //  * up to 60 seconds long
+        //  * with a square or vertical aspect ration.
+        // The API also doesn't tell the aspect ration of a video.
+        if Duration::from(duration) <= SHORTS_MAX_DURATION {
+            return Ok(false);
+        }
+
+        Ok(true)
     }
 
     fn message_content(&self) -> String {
