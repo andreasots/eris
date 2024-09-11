@@ -22,8 +22,6 @@ use crate::cache::Cache;
 use crate::config::Config;
 use crate::models::state;
 
-const SHORTS_MAX_DURATION: Duration = Duration::from_secs(60);
-
 pub async fn post_videos(
     mut running: Receiver<bool>,
     db: DatabaseConnection,
@@ -291,7 +289,7 @@ impl Video {
     ) -> Result<bool, Error> {
         let (_, list) = youtube
             .videos()
-            .list(&vec!["liveStreamingDetails".into(), "contentDetails".into()])
+            .list(&vec!["contentDetails".into(), "liveStreamingDetails".into(), "snippet".into()])
             .add_id(&self.id)
             .doit()
             .await
@@ -306,30 +304,79 @@ impl Video {
 
         let duration = video
             .content_details
+            .as_ref()
             .context("`contentDetails` is missing")?
             .duration
+            .as_ref()
             .context("`contentDetails.duration` is missing")?;
         let duration = iso8601::duration(&duration)
             .map_err(|error| Error::msg(error))
             .context("failed to parse the video duration")?;
+        let duration = Duration::from(duration);
 
         // Don't announce livestreams.
-        // Livestreams and premieres both have `liveStreamingDetails` set but livestreams don't have a non-zero duration
-        // until it becomes a VOD. There doesn't seem to be a way to differentiate between a VOD and a premiere.
-        if video.live_streaming_details.is_some() && duration.is_zero() {
-            return Ok(false);
+        match self.is_livestream(&video, duration) {
+            Ok(true) => return Ok(false),
+            Ok(false) => (),
+            Err(error) => {
+                error!(
+                    ?error,
+                    video.id,
+                    "failed to determine if a video is a livestream, assuming that it is not"
+                );
+            }
         }
 
-        // Don't announce shorts. The API doesn't tell if something is a short so we need to implement the logic ourselves.
-        // A short is:
-        //  * up to 60 seconds long
-        //  * with a square or vertical aspect ration.
-        // The API also doesn't tell the aspect ration of a video.
-        if Duration::from(duration) <= SHORTS_MAX_DURATION {
-            return Ok(false);
+        // Don't announce shorts.
+        match self.is_short(&video, duration) {
+            Ok(true) => return Ok(false),
+            Ok(false) => (),
+            Err(error) => {
+                error!(
+                    ?error,
+                    video.id, "failed to determine if a video is a short, assuming that it is not"
+                );
+            }
         }
 
         Ok(true)
+    }
+
+    fn is_livestream(
+        &self,
+        video: &google_youtube3::api::Video,
+        duration: Duration,
+    ) -> Result<bool, Error> {
+        // Livestreams and premieres both have `liveStreamingDetails` set but livestreams don't have a non-zero duration
+        // until it becomes a VOD. There doesn't seem to be a way to differentiate between a VOD and a premiere.
+        Ok(video.live_streaming_details.is_some() && duration.is_zero())
+    }
+
+    fn is_short(
+        &self,
+        video: &google_youtube3::api::Video,
+        duration: Duration,
+    ) -> Result<bool, Error> {
+        // The API doesn't tell if something is a short so we need to implement the logic ourselves.
+        // A short is:
+        //  * up to 60 seconds long
+        //  * with a square or vertical aspect ration.
+        // The API also doesn't tell the aspect ration of a video so attempt to divine it from the `maxres` thumbnail.
+        let thumbnail = video
+            .snippet
+            .as_ref()
+            .context("`snippet` is missing")?
+            .thumbnails
+            .as_ref()
+            .context("`thumbnails` are missing")?
+            .maxres
+            .as_ref()
+            .context("`maxres` thumbnail is missing")?;
+
+        let thumbnail_width = thumbnail.width.context("`maxres` thumbnail width is missing")?;
+        let thumbnail_height = thumbnail.height.context("`maxres` thumbnail height is missing")?;
+
+        Ok(duration <= Duration::from_secs(60) && thumbnail_width <= thumbnail_height)
     }
 
     fn message_content(&self) -> String {
