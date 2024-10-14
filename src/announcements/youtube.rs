@@ -360,14 +360,14 @@ impl Video {
     ) -> Result<bool, Error> {
         // The API doesn't tell you if something is a short so we need to implement the logic ourselves.
         // A short is:
-        //  * up to 60 seconds long
+        //  * up to 3 minutes long
         //  * with a square or vertical aspect ratio.
         // The API also doesn't tell you the aspect ratio or the video size so divine it from the embed player size.
         let player = video.player.as_ref().context("`player` is missing")?;
         let embed_width = player.embed_width.context("`player.embed_width` is missing")?;
         let embed_height = player.embed_height.context("`player.embed_height` is missing")?;
 
-        Ok(duration <= Duration::from_secs(60) && embed_width <= embed_height)
+        Ok(duration <= Duration::from_secs(3 * 60) && embed_width <= embed_height)
     }
 
     fn message_content(&self) -> String {
