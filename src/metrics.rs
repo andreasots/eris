@@ -1,9 +1,10 @@
 use std::fmt::Write;
 
 use anyhow::{Context, Error};
-use chrono::Utc;
-use influxdb::{Client as InfluxDb, InfluxDbWriteable, Timestamp};
-use tracing::error;
+use bytes::BufMut;
+use chrono::{DateTime, Utc};
+use influxdb_line_protocol::LineProtocolBuilder;
+use tracing::{error, warn};
 use twilight_gateway::Event;
 use twilight_model::channel::{Channel, ChannelType};
 use twilight_model::gateway::payload::incoming::{
@@ -14,27 +15,20 @@ use twilight_model::id::marker::UserMarker;
 use twilight_model::id::Id;
 
 use crate::cache::Cache;
+use crate::influxdb::InfluxDb;
 
 const TEXT_CHANNELS_MEASUREMENT: &str = "text_channels";
 const VOICE_CHANNELS_MEASUREMENT: &str = "voice_channels";
 
-#[derive(InfluxDbWriteable)]
 struct Measurement<'a> {
-    time: Timestamp,
+    time: DateTime<Utc>,
 
-    #[influxdb(tag)]
     event: &'a str,
-    #[influxdb(tag)]
     channel_id: Option<u64>,
-    #[influxdb(tag)]
     channel_name: Option<&'a str>,
-    #[influxdb(tag)]
     category_id: Option<u64>,
-    #[influxdb(tag)]
     thread_id: Option<u64>,
-    #[influxdb(tag)]
     thread_name: Option<&'a str>,
-    #[influxdb(tag)]
     user_id: Option<u64>,
 
     count: f64,
@@ -43,7 +37,7 @@ struct Measurement<'a> {
 
 impl<'a> Measurement<'a> {
     fn new(
-        time: Timestamp,
+        time: DateTime<Utc>,
         event: &'a str,
         channel: Option<&'a Channel>,
         thread: Option<&'a Channel>,
@@ -80,6 +74,58 @@ impl<'a> Measurement<'a> {
 
     fn user_id(self, user_id: Id<UserMarker>) -> Self {
         Self { user_id: Some(user_id.get()), ..self }
+    }
+}
+
+trait LineProtocolBuilderExt {
+    fn append(&mut self, name: &str, measurement: Measurement);
+}
+
+impl<B: BufMut + Default> LineProtocolBuilderExt for LineProtocolBuilder<B> {
+    fn append(&mut self, name: &str, measurement: Measurement) {
+        let builder = std::mem::take(self).measurement(name).tag("event", measurement.event);
+        let builder = if let Some(channel_id) = measurement.channel_id {
+            builder.tag("channel_id", &channel_id.to_string())
+        } else {
+            builder
+        };
+        let builder = if let Some(channel_name) = measurement.channel_name {
+            builder.tag("channel_name", channel_name)
+        } else {
+            builder
+        };
+        let builder = if let Some(category_id) = measurement.category_id {
+            builder.tag("category_id", &category_id.to_string())
+        } else {
+            builder
+        };
+        let builder = if let Some(thread_id) = measurement.thread_id {
+            builder.tag("thread_id", &thread_id.to_string())
+        } else {
+            builder
+        };
+        let builder = if let Some(thread_name) = measurement.thread_name {
+            builder.tag("thread_name", thread_name)
+        } else {
+            builder
+        };
+        let builder = if let Some(user_id) = measurement.user_id {
+            builder.tag("user_id", &user_id.to_string())
+        } else {
+            builder
+        };
+        let builder = builder.field("count", measurement.count);
+        let builder = if let Some(users) = measurement.users.as_deref() {
+            builder.field("users", users)
+        } else {
+            builder
+        };
+        *self = if let Some(ts) = measurement.time.timestamp_nanos_opt() {
+            builder.timestamp(ts).close_line()
+        } else {
+            warn!(timestamp = measurement.time.to_rfc3339(), "timestamp out of i64 range");
+            builder.close_line()
+        };
     }
 }
 
@@ -129,22 +175,24 @@ fn is_guild_voice_channel(kind: ChannelType) -> bool {
 }
 
 pub async fn on_event(cache: &Cache, influxdb: &InfluxDb, event: &Event) -> Result<(), Error> {
+    let mut measurements = LineProtocolBuilder::new();
+    let time = Utc::now();
+
     match event {
         Event::GuildCreate(event) => {
             let GuildCreate(ref guild) = **event;
-            let time = Timestamp::from(Utc::now());
-            let mut measurements = vec![];
 
             for channel in &guild.channels {
                 if is_guild_text_channel(channel.kind) {
-                    measurements.push(
-                        Measurement::new(time, "guild_create", Some(channel), None, 0)
-                            .into_query(TEXT_CHANNELS_MEASUREMENT),
+                    measurements.append(
+                        TEXT_CHANNELS_MEASUREMENT,
+                        Measurement::new(time, "guild_create", Some(channel), None, 0),
                     );
                 }
 
                 if is_guild_voice_channel(channel.kind) {
-                    measurements.push(
+                    measurements.append(
+                        VOICE_CHANNELS_MEASUREMENT,
                         Measurement::new(
                             time,
                             "guild_create",
@@ -162,8 +210,7 @@ pub async fn on_event(cache: &Cache, influxdb: &InfluxDb, event: &Event) -> Resu
                                 .iter()
                                 .filter(|vs| vs.channel_id == Some(channel.id))
                                 .map(|state| state.user_id),
-                        )
-                        .into_query(VOICE_CHANNELS_MEASUREMENT),
+                        ),
                     );
                 }
             }
@@ -175,60 +222,44 @@ pub async fn on_event(cache: &Cache, influxdb: &InfluxDb, event: &Event) -> Resu
 
                 let channel = guild.channels.iter().find(|c| Some(c.id) == thread.parent_id);
 
-                measurements.push(
-                    Measurement::new(time, "guild_create", channel, Some(thread), 0)
-                        .into_query(TEXT_CHANNELS_MEASUREMENT),
+                measurements.append(
+                    TEXT_CHANNELS_MEASUREMENT,
+                    Measurement::new(time, "guild_create", channel, Some(thread), 0),
                 );
             }
-
-            influxdb
-                .query(measurements)
-                .await
-                .context("failed to write the user count to InfluxDB")?;
         }
 
         Event::ChannelCreate(event) => {
             let ChannelCreate(ref channel) = **event;
-            let time = Timestamp::from(Utc::now());
-            let mut measurements = vec![];
 
             if is_guild_text_channel(channel.kind) {
-                measurements.push(
-                    Measurement::new(time, "channel_create", Some(channel), None, 0)
-                        .into_query(TEXT_CHANNELS_MEASUREMENT),
+                measurements.append(
+                    TEXT_CHANNELS_MEASUREMENT,
+                    Measurement::new(time, "channel_create", Some(channel), None, 0),
                 );
             }
 
             if is_guild_voice_channel(channel.kind) {
-                measurements.push(
-                    Measurement::new(time, "channel_create", Some(channel), None, 0)
-                        .into_query(VOICE_CHANNELS_MEASUREMENT),
+                measurements.append(
+                    VOICE_CHANNELS_MEASUREMENT,
+                    Measurement::new(time, "channel_create", Some(channel), None, 0),
                 );
-            }
-
-            if !measurements.is_empty() {
-                influxdb
-                    .query(measurements)
-                    .await
-                    .context("failed to write the user count to InfluxDB")?;
             }
         }
         Event::ChannelUpdate(event) => {
             let ChannelUpdate(ref channel) = **event;
 
-            let measurements = cache.with(|cache| {
-                let time = Timestamp::from(Utc::now());
-                let mut measurements = vec![];
-
+            cache.with(|cache| {
                 if is_guild_text_channel(channel.kind) {
-                    measurements.push(
-                        Measurement::new(time, "channel_update", Some(channel), None, 0)
-                            .into_query(TEXT_CHANNELS_MEASUREMENT),
+                    measurements.append(
+                        TEXT_CHANNELS_MEASUREMENT,
+                        Measurement::new(time, "channel_update", Some(channel), None, 0),
                     );
                 }
 
                 if is_guild_voice_channel(channel.kind) {
-                    measurements.push(
+                    measurements.append(
+                        VOICE_CHANNELS_MEASUREMENT,
                         Measurement::new(
                             time,
                             "channel_update",
@@ -242,105 +273,78 @@ pub async fn on_event(cache: &Cache, influxdb: &InfluxDb, event: &Event) -> Resu
                                 .into_iter()
                                 .flatten()
                                 .map(|state| state.user_id()),
-                        )
-                        .into_query(VOICE_CHANNELS_MEASUREMENT),
+                        ),
                     );
                 }
-
-                measurements
             });
-
-            if !measurements.is_empty() {
-                influxdb
-                    .query(measurements)
-                    .await
-                    .context("failed to write the user count to InfluxDB")?;
-            }
         }
         Event::ChannelDelete(event) => {
             let ChannelDelete(ref channel) = **event;
-            let time = Timestamp::from(Utc::now());
-            let mut measurements = vec![];
 
             if is_guild_text_channel(channel.kind) {
-                measurements.push(
-                    Measurement::new(time, "channel_delete", Some(channel), None, 0)
-                        .into_query(TEXT_CHANNELS_MEASUREMENT),
+                measurements.append(
+                    TEXT_CHANNELS_MEASUREMENT,
+                    Measurement::new(time, "channel_delete", Some(channel), None, 0),
                 );
             }
 
             if is_guild_voice_channel(channel.kind) {
-                measurements.push(
-                    Measurement::new(time, "channel_delete", Some(channel), None, 0)
-                        .into_query(VOICE_CHANNELS_MEASUREMENT),
+                measurements.append(
+                    VOICE_CHANNELS_MEASUREMENT,
+                    Measurement::new(time, "channel_delete", Some(channel), None, 0),
                 );
-            }
-
-            if !measurements.is_empty() {
-                influxdb
-                    .query(measurements)
-                    .await
-                    .context("failed to write the user count to InfluxDB")?;
             }
         }
 
         Event::ThreadCreate(event) => {
             let ThreadCreate(ref thread) = **event;
 
-            influxdb
-                .query(cache.with(|cache| {
-                    let time = Timestamp::from(Utc::now());
-                    let channel = thread.parent_id.and_then(|id| cache.channel(id));
+            cache.with(|cache| {
+                let channel = thread.parent_id.and_then(|id| cache.channel(id));
 
-                    Measurement::new(time, "thread_create", channel.as_deref(), Some(thread), 0)
-                        .into_query(TEXT_CHANNELS_MEASUREMENT)
-                }))
-                .await
-                .context("failed to write the thread creation to InfluxDB")?;
+                measurements.append(
+                    TEXT_CHANNELS_MEASUREMENT,
+                    Measurement::new(time, "thread_create", channel.as_deref(), Some(thread), 0),
+                );
+            });
         }
         Event::ThreadUpdate(event) => {
             let ThreadUpdate(ref thread) = **event;
 
-            influxdb
-                .query(cache.with(|cache| {
-                    let channel = thread.parent_id.and_then(|id| cache.channel(id));
-                    let time = Timestamp::from(Utc::now());
+            cache.with(|cache| {
+                let channel = thread.parent_id.and_then(|id| cache.channel(id));
 
-                    Measurement::new(time, "thread_update", channel.as_deref(), Some(thread), 0)
-                        .into_query(TEXT_CHANNELS_MEASUREMENT)
-                }))
-                .await
-                .context("failed to write the thread update to InfluxDB")?;
+                measurements.append(
+                    TEXT_CHANNELS_MEASUREMENT,
+                    Measurement::new(time, "thread_update", channel.as_deref(), Some(thread), 0),
+                );
+            });
         }
         &Event::ThreadDelete(ThreadDelete { id, parent_id, .. }) => {
-            influxdb
-                .query(cache.with(|cache| {
-                    let thread = cache.channel(id);
-                    let channel = cache.channel(parent_id);
-                    let time = Timestamp::from(Utc::now());
+            cache.with(|cache| {
+                let thread = cache.channel(id);
+                let channel = cache.channel(parent_id);
 
+                measurements.append(
+                    TEXT_CHANNELS_MEASUREMENT,
                     Measurement::new(
                         time,
                         "thread_delete",
                         channel.as_deref(),
                         thread.as_deref(),
                         0,
-                    )
-                    .into_query(TEXT_CHANNELS_MEASUREMENT)
-                }))
-                .await
-                .context("failed to write the thread deletion to InfluxDB")?;
+                    ),
+                );
+            });
         }
 
         Event::VoiceStateUpdate(event) => {
-            let measurements = cache.with(|cache| {
+            cache.with(|cache| {
                 // NOTE: voice state counts are off by one because this event hasn't been processed yet
                 let VoiceStateUpdate(ref new_state) = **event;
                 let old_state = new_state
                     .guild_id
                     .and_then(|guild_id| cache.voice_state(new_state.user_id, guild_id));
-                let time = Timestamp::from(Utc::now());
-                let mut measurements = vec![];
 
                 let old_channel_id = old_state.map(|state| state.channel_id());
 
@@ -349,7 +353,8 @@ pub async fn on_event(cache: &Cache, influxdb: &InfluxDb, event: &Event) -> Resu
                     (Some(old), Some(new)) if old == new => (),
                     // user moved voice channels
                     (Some(old_channel_id), Some(new_channel_id)) => {
-                        measurements.push(
+                        measurements.append(
+                            VOICE_CHANNELS_MEASUREMENT,
                             Measurement::new(
                                 time,
                                 "state_update",
@@ -364,11 +369,11 @@ pub async fn on_event(cache: &Cache, influxdb: &InfluxDb, event: &Event) -> Resu
                                     .flatten()
                                     .map(|state| state.user_id())
                                     .filter(|&id| id != new_state.user_id),
-                            )
-                            .into_query(VOICE_CHANNELS_MEASUREMENT),
+                            ),
                         );
 
-                        measurements.push(
+                        measurements.append(
+                            VOICE_CHANNELS_MEASUREMENT,
                             Measurement::new(
                                 time,
                                 "state_update",
@@ -383,12 +388,12 @@ pub async fn on_event(cache: &Cache, influxdb: &InfluxDb, event: &Event) -> Resu
                                     .flatten()
                                     .map(|state| state.user_id())
                                     .chain(Some(new_state.user_id)),
-                            )
-                            .into_query(VOICE_CHANNELS_MEASUREMENT),
+                            ),
                         );
                     }
                     // user joined a voice channel
-                    (None, Some(channel_id)) => measurements.push(
+                    (None, Some(channel_id)) => measurements.append(
+                        VOICE_CHANNELS_MEASUREMENT,
                         Measurement::new(
                             time,
                             "state_update",
@@ -403,11 +408,11 @@ pub async fn on_event(cache: &Cache, influxdb: &InfluxDb, event: &Event) -> Resu
                                 .flatten()
                                 .map(|state| state.user_id())
                                 .chain(Some(new_state.user_id)),
-                        )
-                        .into_query(VOICE_CHANNELS_MEASUREMENT),
+                        ),
                     ),
                     // user left a voice channel
-                    (Some(channel_id), None) => measurements.push(
+                    (Some(channel_id), None) => measurements.append(
+                        VOICE_CHANNELS_MEASUREMENT,
                         Measurement::new(
                             time,
                             "state_update",
@@ -422,34 +427,22 @@ pub async fn on_event(cache: &Cache, influxdb: &InfluxDb, event: &Event) -> Resu
                                 .flatten()
                                 .map(|state| state.user_id())
                                 .filter(|&id| id != new_state.user_id),
-                        )
-                        .into_query(VOICE_CHANNELS_MEASUREMENT),
+                        ),
                     ),
                     // Nothing happened, probably unreachable
                     (None, None) => (),
                 }
-
-                measurements
             });
-
-            if !measurements.is_empty() {
-                influxdb
-                    .query(measurements)
-                    .await
-                    .context("failed to write the user count to InfluxDB")?;
-            }
         }
 
         Event::MessageCreate(event) => {
             let MessageCreate(ref message) = **event;
 
-            let measurement = cache.with(|cache| {
-                let time = Timestamp::from(Utc::now());
-
+            cache.with(|cache| {
                 let (channel, thread) = if let Some(channel) = cache.channel(message.channel_id) {
                     if let ChannelType::Private | ChannelType::Group = channel.kind {
                         // don't collect stats on direct messages
-                        return None;
+                        return;
                     }
 
                     if channel.kind.is_guild() && channel.kind.is_thread() {
@@ -461,23 +454,18 @@ pub async fn on_event(cache: &Cache, influxdb: &InfluxDb, event: &Event) -> Resu
                     (None, None)
                 };
 
-                Some(
+                measurements.append(
+                    TEXT_CHANNELS_MEASUREMENT,
                     Measurement::new(time, "message", channel.as_deref(), thread.as_deref(), 1)
-                        .user_id(message.author.id)
-                        .into_query(TEXT_CHANNELS_MEASUREMENT),
-                )
+                        .user_id(message.author.id),
+                );
             });
-
-            if let Some(measurement) = measurement {
-                influxdb
-                    .query(measurement)
-                    .await
-                    .context("failed to write the message count to InfluxDB")?;
-            }
         }
 
         _ => (),
     }
+
+    influxdb.write(measurements).await.context("failed to write the user count to InfluxDB")?;
 
     Ok(())
 }

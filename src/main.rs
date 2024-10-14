@@ -30,6 +30,7 @@ mod config;
 mod contact;
 mod desertbus;
 mod disconnect_afk;
+mod influxdb;
 mod markdown;
 mod metrics;
 mod models;
@@ -163,9 +164,12 @@ async fn main() -> Result<(), Error> {
     let mut youtube = YouTube::new(google_client.clone(), google_auth.clone());
     youtube.user_agent(USER_AGENT.into());
 
-    let influxdb = config.influxdb.as_ref().map(|(url, database)| {
-        influxdb::Client::new(url, database).with_http_client(http_client.clone())
-    });
+    let influxdb = config
+        .influxdb
+        .as_ref()
+        .map(|(url, database)| crate::influxdb::InfluxDb::new(http_client.clone(), url, database))
+        .transpose()
+        .context("failed to create the InfluxDB client")?;
 
     let desertbus = crate::desertbus::DesertBus::new(http_client.clone());
 
