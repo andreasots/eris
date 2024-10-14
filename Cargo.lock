@@ -3500,9 +3500,9 @@ dependencies = [
 
 [[package]]
 name = "twitch_types"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15ebccdc5907cf895c4624502df6e21e38faf4c55d722bd60ceae48178d9f0e9"
+checksum = "1722305b7285f2427f369bde3ee34c007b9eb0c0bd87b000b2ccdb5168b6e829"
 dependencies = [
  "serde",
  "serde_derive",
