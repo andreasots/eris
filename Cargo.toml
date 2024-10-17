@@ -18,7 +18,7 @@ chrono = { version = "0.4.38", default-features = false, features = ["std", "clo
 clap = { version = "4.5.20", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.31", default-features = false, features = ["std", "sink"] }
 google-calendar3 = "5.0.5"
-google-sheets4 = "5.0.5"
+google-sheets4 = "6.0.0"
 google-youtube3 = "5.0.5"
 influxdb-line-protocol = "2.0.0"
 iso8601 = "0.6.1"

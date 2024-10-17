@@ -914,7 +914,30 @@ dependencies = [
  "tokio",
  "tower-service",
  "url 2.5.2",
- "yup-oauth2",
+ "yup-oauth2 9.0.0",
+]
+
+[[package]]
+name = "google-apis-common"
+version = "7.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7530ee92a7e9247c3294ae1b84ea98474dbc27563c49a14d3938e816499bf38f"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "http 1.1.0",
+ "http-body-util",
+ "hyper 1.4.1",
+ "hyper-util",
+ "itertools 0.13.0",
+ "mime",
+ "percent-encoding 2.3.1",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "tokio",
+ "url 2.5.2",
+ "yup-oauth2 11.0.0",
 ]
 
 [[package]]
@@ -924,7 +947,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6ac9bbbfb836b85f0dafb43de5b39837569c48df9a4f68e4bf63bf99795ddb4"
 dependencies = [
  "anyhow",
- "google-apis-common",
+ "google-apis-common 6.0.4",
  "http 0.2.12",
  "hyper 0.14.31",
  "hyper-rustls 0.25.0",
@@ -939,22 +962,22 @@ dependencies = [
 
 [[package]]
 name = "google-sheets4"
-version = "5.0.5+20240621"
+version = "6.0.0+20240621"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c826fbdbd030b5dcddb78f3155d5c046251feff30c9062e68f8323c85731f118"
+checksum = "e4f8ccfc6418e81d1e2ed66fad49d0487526281505b8a0ed8ee770dc7d6bb1e5"
 dependencies = [
- "anyhow",
- "google-apis-common",
- "http 0.2.12",
- "hyper 0.14.31",
- "hyper-rustls 0.25.0",
- "itertools 0.13.0",
+ "chrono",
+ "google-apis-common 7.0.0",
+ "hyper 1.4.1",
+ "hyper-rustls 0.27.3",
+ "hyper-util",
  "mime",
  "serde",
  "serde_json",
+ "serde_with",
  "tokio",
- "tower-service",
- "url 1.7.2",
+ "url 2.5.2",
+ "yup-oauth2 11.0.0",
 ]
 
 [[package]]
@@ -964,7 +987,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2b0afbd194da6ad73070da0d5fa9f7f95c28053b29e932c373d76199156234d"
 dependencies = [
  "anyhow",
- "google-apis-common",
+ "google-apis-common 6.0.4",
  "http 0.2.12",
  "hyper 0.14.31",
  "hyper-rustls 0.25.0",
@@ -1202,6 +1225,7 @@ dependencies = [
  "http 1.1.0",
  "http-body 1.0.1",
  "httparse",
+ "httpdate",
  "itoa",
  "pin-project-lite",
  "smallvec",
@@ -1220,7 +1244,7 @@ dependencies = [
  "hyper 0.14.31",
  "log",
  "rustls 0.22.4",
- "rustls-native-certs",
+ "rustls-native-certs 0.7.3",
  "rustls-pki-types",
  "tokio",
  "tokio-rustls 0.25.0",
@@ -1237,7 +1261,7 @@ dependencies = [
  "hyper 1.4.1",
  "hyper-util",
  "rustls 0.22.4",
- "rustls-native-certs",
+ "rustls-native-certs 0.7.3",
  "rustls-pki-types",
  "tokio",
  "tokio-rustls 0.25.0",
@@ -1255,6 +1279,7 @@ dependencies = [
  "hyper 1.4.1",
  "hyper-util",
  "rustls 0.23.14",
+ "rustls-native-certs 0.8.0",
  "rustls-pki-types",
  "tokio",
  "tokio-rustls 0.26.0",
@@ -2304,6 +2329,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls-native-certs"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcaf18a4f2be7326cd874a5fa579fae794320a0f388d365dca7e480e55f83f8a"
+dependencies = [
+ "openssl-probe",
+ "rustls-pemfile 2.2.0",
+ "rustls-pki-types",
+ "schannel",
+ "security-framework",
+]
+
+[[package]]
 name = "rustls-pemfile"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3241,7 +3279,7 @@ dependencies = [
  "http 1.1.0",
  "httparse",
  "ring",
- "rustls-native-certs",
+ "rustls-native-certs 0.7.3",
  "rustls-pki-types",
  "sha1_smol",
  "simdutf8",
@@ -4039,6 +4077,33 @@ dependencies = [
  "time",
  "tokio",
  "tower-service",
+ "url 2.5.2",
+]
+
+[[package]]
+name = "yup-oauth2"
+version = "11.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ed5f19242090128c5809f6535cc7b8d4e2c32433f6c6005800bbc20a644a7f0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.22.1",
+ "futures",
+ "http 1.1.0",
+ "http-body-util",
+ "hyper 1.4.1",
+ "hyper-rustls 0.27.3",
+ "hyper-util",
+ "log",
+ "percent-encoding 2.3.1",
+ "rustls 0.23.14",
+ "rustls-pemfile 2.2.0",
+ "seahash",
+ "serde",
+ "serde_json",
+ "time",
+ "tokio",
  "url 2.5.2",
 ]
 
