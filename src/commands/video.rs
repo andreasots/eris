@@ -3,8 +3,8 @@ use std::future::Future;
 use std::pin::Pin;
 
 use anyhow::{Context, Error};
-use google_youtube3::hyper::client::HttpConnector;
 use google_youtube3::hyper_rustls::HttpsConnector;
+use google_youtube3::hyper_util::client::legacy::connect::HttpConnector;
 use google_youtube3::YouTube;
 use twilight_http::Client;
 use twilight_mention::Mention;

@@ -1,8 +1,8 @@
 use anyhow::{Context, Error};
 use chrono::{DateTime, TimeDelta, Utc};
 use google_calendar3::api::EventDateTime;
-use google_calendar3::hyper::client::HttpConnector;
 use google_calendar3::hyper_rustls::HttpsConnector;
+use google_calendar3::hyper_util::client::legacy::connect::HttpConnector;
 use tracing::info;
 
 use crate::tz::Tz;

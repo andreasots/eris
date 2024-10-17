@@ -7,8 +7,8 @@ use google_sheets4::api::{
     BatchUpdateSpreadsheetRequest, CellData, CreateDeveloperMetadataRequest, DeveloperMetadata,
     DeveloperMetadataLocation, DimensionRange, Request, Spreadsheet,
 };
-use google_sheets4::hyper::client::HttpConnector;
 use google_sheets4::hyper_rustls::HttpsConnector;
+use google_sheets4::hyper_util::client::legacy::connect::HttpConnector;
 use google_sheets4::Sheets;
 use tokio::sync::watch::Receiver;
 use tracing::{error, info};

@@ -4,9 +4,12 @@ use std::sync::Arc;
 
 use anyhow::{Context as _, Error};
 use futures_util::stream::{FuturesUnordered, StreamExt as _};
-use google_calendar3::hyper::client::{Client as HyperClient, HttpConnector};
+use google_calendar3::common::Client as HyperClient;
 use google_calendar3::hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
-use google_calendar3::oauth2::authenticator::{Authenticator, ServiceAccountAuthenticator};
+use google_calendar3::hyper_util::client::legacy::connect::HttpConnector;
+use google_calendar3::hyper_util::client::legacy::Builder as HyperClientBuilder;
+use google_calendar3::hyper_util::rt::TokioExecutor;
+use google_calendar3::yup_oauth2::authenticator::{Authenticator, ServiceAccountAuthenticator};
 use google_calendar3::CalendarHub;
 use google_sheets4::Sheets;
 use google_youtube3::YouTube;
@@ -65,17 +68,18 @@ async fn create_google_client(
         .enable_http1()
         .build();
 
-    let client = HyperClient::builder().build(connector);
+    let builder = HyperClientBuilder::new(TokioExecutor::new());
 
-    let auth = google_calendar3::oauth2::read_service_account_key(service_account_path)
-        .await
-        .context("failed to read the Google service account key")?;
-    let auth = ServiceAccountAuthenticator::with_client(auth, client.clone())
+    let auth: google_sheets4::yup_oauth2::ServiceAccountKey =
+        google_calendar3::yup_oauth2::read_service_account_key(service_account_path)
+            .await
+            .context("failed to read the Google service account key")?;
+    let auth = ServiceAccountAuthenticator::with_client(auth, builder.build(connector.clone()))
         .build()
         .await
         .context("failed to create the Google service account authenticator")?;
 
-    Ok((client, auth))
+    Ok((builder.build(connector), auth))
 }
 
 #[tokio::main]
