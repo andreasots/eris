@@ -117,21 +117,24 @@ impl VideoPoster {
 
         for playlist_id in &self.playlists {
             // Hopefully all the new videos are on the first page of results...
-            let (_, playlist) = self
+            let res = self
                 .youtube
                 .playlist_items()
                 .list(&vec!["snippet".into()])
                 .playlist_id(playlist_id)
                 .doit()
-                .await
-                .context("playlist request failed")?;
-            if let Some(items) = playlist.items {
-                for video in items {
-                    videos
-                        .push(Video::try_from(video).with_context(|| {
-                            format!("invalid item in playlist {playlist_id:?}")
-                        })?);
+                .await;
+            match res {
+                Ok((_, playlist)) => {
+                    if let Some(items) = playlist.items {
+                        for video in items {
+                            videos.push(Video::try_from(video).with_context(|| {
+                                format!("invalid item in playlist {playlist_id:?}")
+                            })?);
+                        }
+                    }
                 }
+                Err(error) => error!(?error, "playlist request failed"),
             }
         }
 
