@@ -962,22 +962,22 @@ dependencies = [
 
 [[package]]
 name = "google-sheets4"
-version = "5.0.5+20240621"
+version = "6.0.0+20240621"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c826fbdbd030b5dcddb78f3155d5c046251feff30c9062e68f8323c85731f118"
+checksum = "e4f8ccfc6418e81d1e2ed66fad49d0487526281505b8a0ed8ee770dc7d6bb1e5"
 dependencies = [
- "anyhow",
- "google-apis-common 6.0.4",
- "http 0.2.12",
- "hyper 0.14.31",
- "hyper-rustls 0.25.0",
- "itertools 0.13.0",
+ "chrono",
+ "google-apis-common 7.0.0",
+ "hyper 1.4.1",
+ "hyper-rustls 0.27.3",
+ "hyper-util",
  "mime",
  "serde",
  "serde_json",
+ "serde_with",
  "tokio",
- "tower-service",
- "url 1.7.2",
+ "url 2.5.2",
+ "yup-oauth2 11.0.0",
 ]
 
 [[package]]
