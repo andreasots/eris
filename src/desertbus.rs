@@ -1,15 +1,22 @@
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 
 use anyhow::{Context, Error};
 use chrono::{DateTime, TimeZone, Utc};
 use reqwest::Client;
+use scraper::{Html, Selector};
 use serde::Deserialize;
 
 use crate::tz::Tz;
 
 #[derive(Deserialize)]
-struct Init {
-    total: f64,
+struct HeaderProps {
+    #[serde(rename = "currentEvent")]
+    current_event: (f64, Event),
+}
+
+#[derive(Deserialize)]
+struct Event {
+    total: (f64, f64),
 }
 
 #[derive(Clone)]
@@ -26,18 +33,16 @@ impl DesertBus {
     }
 
     pub fn start_time() -> DateTime<Utc> {
-        static START_TIME: OnceLock<DateTime<Utc>> = OnceLock::new();
+        static START_TIME: LazyLock<DateTime<Utc>> = LazyLock::new(|| {
+            let tz =
+                &Tz::from_name("America/Vancouver").expect("no timezone named `America/Vancouver`");
+            tz.with_ymd_and_hms(2024, 11, 8, 15, 0, 0)
+                .single()
+                .expect("ambiguous timestamp")
+                .with_timezone(&Utc)
+        });
 
-        START_TIME
-            .get_or_init(|| {
-                let tz = &Tz::from_name("America/Vancouver")
-                    .expect("no timezone named `America/Vancouver`");
-                tz.with_ymd_and_hms(2024, 11, 8, 15, 0, 0)
-                    .single()
-                    .expect("ambiguous timestamp")
-                    .with_timezone(&Utc)
-            })
-            .clone()
+        *START_TIME
     }
 
     pub fn hours_raised(money_raised: f64) -> f64 {
@@ -54,15 +59,28 @@ impl DesertBus {
     }
 
     pub async fn money_raised(&self) -> Result<f64, Error> {
-        Ok(self
+        static HEADER_SELECTOR: LazyLock<Selector> =
+            LazyLock::new(|| Selector::parse("astro-island[component-export='Header']").unwrap());
+
+        let html = self
             .client
-            .get("https://desertbus.org/wapi/init")
+            .get("https://desertbus.org/")
             .send()
             .await
-            .context("failed to get the current Desert Bus total")?
-            .json::<Init>()
+            .context("failed to request the Desert Bus homepage")?
+            .text()
             .await
-            .context("failed to parse the current Desert Bus total")?
-            .total)
+            .context("failed to read the Desert Bus homepage")?;
+
+        let html = Html::parse_document(&html);
+
+        for element in html.select(&HEADER_SELECTOR) {
+            let Some(props) = element.attr("props") else { continue };
+            let props = serde_json::from_str::<HeaderProps>(props)
+                .context("failed to parse header props")?;
+            return Ok(props.current_event.1.total.1);
+        }
+
+        anyhow::bail!("failed to find the header component")
     }
 }
