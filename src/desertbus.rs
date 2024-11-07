@@ -32,7 +32,7 @@ impl DesertBus {
             .get_or_init(|| {
                 let tz = &Tz::from_name("America/Vancouver")
                     .expect("no timezone named `America/Vancouver`");
-                tz.with_ymd_and_hms(2023, 11, 11, 14, 0, 0)
+                tz.with_ymd_and_hms(2024, 11, 8, 15, 0, 0)
                     .single()
                     .expect("ambiguous timestamp")
                     .with_timezone(&Utc)
