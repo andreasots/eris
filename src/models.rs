@@ -295,7 +295,7 @@ pub mod state {
     use anyhow::{Context, Error};
     use sea_orm::entity::prelude::*;
     use sea_orm::sea_query::OnConflict;
-    use sea_orm::Insert;
+    use sea_orm::{DbBackend, Insert, Statement};
     use serde::de::DeserializeOwned;
     use serde::Serialize;
 
@@ -341,6 +341,33 @@ pub mod state {
         })
         .on_conflict(OnConflict::column(Column::Key).update_columns([Column::Value]).to_owned())
         .exec(conn)
+        .await
+        .context("failed to update the state")?;
+
+        Ok(())
+    }
+
+    pub async fn insert_fifo_cache<T: Serialize>(
+        key: String,
+        value: T,
+        max_entries: u32,
+        conn: &DatabaseConnection,
+    ) -> Result<(), Error> {
+        // TODO: do this with sea-orm. Currently there is no way to reference `EXCLUDED.value`.
+        conn.execute(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "
+                    INSERT INTO state(key, value)
+                    VALUES ($1, $2)
+                    ON CONFLICT (key) DO UPDATE
+                    SET value = jsonb_path_query_array(EXCLUDED.value || state.value, $3::jsonpath)
+                ",
+            [
+                key.into(),
+                serde_json::to_value([value]).context("failed to serialize value")?.into(),
+                format!("$[0 to {}]", max_entries - 1).into(),
+            ],
+        ))
         .await
         .context("failed to update the state")?;
 
