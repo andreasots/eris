@@ -1,9 +1,10 @@
+use std::collections::HashSet;
+use std::fmt::Write;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use anyhow::{Context, Error};
 use chrono::{DateTime, Utc};
-use google_youtube3::api::PlaylistItem;
 use google_youtube3::hyper_rustls::HttpsConnector;
 use google_youtube3::hyper_util::client::legacy::connect::HttpConnector;
 use google_youtube3::YouTube;
@@ -21,6 +22,10 @@ use twilight_validate::channel::CHANNEL_NAME_LENGTH_MAX;
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::models::state;
+
+const MAX_RESULTS: u32 = 10;
+const MAX_STATE_ENTRIES: u32 = MAX_RESULTS * 2;
+const MAX_THREADS_TO_CHECK: usize = MAX_STATE_ENTRIES as usize * 2;
 
 pub async fn post_videos(
     mut running: Receiver<bool>,
@@ -66,7 +71,7 @@ struct VideoPoster {
     db: DatabaseConnection,
     cache: Arc<Cache>,
     channel_id: Id<ChannelMarker>,
-    playlists: Vec<String>,
+    playlists: Vec<(String, String)>,
     discord: Arc<DiscordClient>,
     youtube: YouTube<HttpsConnector<HttpConnector>>,
 }
@@ -87,7 +92,8 @@ impl VideoPoster {
         let (_, channel_list) = req.doit().await.context("failed to list the channels")?;
         let mut playlists = Vec::with_capacity(config.youtube_channels.len());
         for channel in channel_list.items.context("Youtube returned no channels")? {
-            playlists.push(
+            playlists.push((
+                channel.id.context("channel ID is missing")?,
                 channel
                     .content_details
                     .context("requested `contentDetails` but `content_details` is missing")?
@@ -95,10 +101,14 @@ impl VideoPoster {
                     .context("related playlists is empty")?
                     .uploads
                     .context("no uploads playlist")?,
-            );
+            ));
         }
 
         Ok(Self { db, cache, channel_id, playlists, discord, youtube })
+    }
+
+    fn state_key(&self, channel_id: &str) -> String {
+        format!("eris.announcements.youtube.{channel_id}.announced_videos")
     }
 
     async fn run(&mut self) -> Result<(), Error> {
@@ -113,48 +123,49 @@ impl VideoPoster {
             .context("video announcements channel not in cache")?;
         let guild_id = guild_id.context("video announcements channel not in a guild")?;
 
-        let mut videos = vec![];
+        let mut video_ids = vec![];
 
-        for playlist_id in &self.playlists {
+        for (channel_id, playlist_id) in &self.playlists {
             // Hopefully all the new videos are on the first page of results...
             let res = self
                 .youtube
                 .playlist_items()
-                .list(&vec!["snippet".into()])
+                .list(&vec!["contentDetails".into()])
                 .playlist_id(playlist_id)
+                .max_results(MAX_RESULTS)
                 .doit()
                 .await;
             match res {
                 Ok((_, playlist)) => {
                     if let Some(items) = playlist.items {
-                        for video in items {
-                            videos.push(Video::try_from(video).with_context(|| {
-                                format!("invalid item in playlist {playlist_id:?}")
-                            })?);
-                        }
+                        let announced =
+                            state::get::<HashSet<String>>(&self.state_key(channel_id), &self.db)
+                                .await
+                                .with_context(|| {
+                                    format!(
+                                        "failed to get announced videos for channel {channel_id}"
+                                    )
+                                })?
+                                .unwrap_or_default();
+
+                        video_ids.extend(
+                            items
+                                .into_iter()
+                                .filter_map(|item| item.content_details.and_then(|cd| cd.video_id))
+                                .filter(|video_id| !announced.contains(video_id)),
+                        );
                     }
                 }
                 Err(error) => error!(?error, "playlist request failed"),
             }
         }
 
+        let mut videos =
+            Video::fetch(&self.youtube, &video_ids).await.context("failed to fetch videos")?;
+
         videos.sort_by(|a, b| a.published_at.cmp(&b.published_at));
 
         for video in videos {
-            let state_key =
-                format!("eris.announcements.youtube.{}.last_video_published_at", video.channel_id);
-            let last_published_at = state::get::<String>(&state_key, &self.db)
-                .await
-                .context("failed to get the last video published timestamp")?
-                .map(|ts| DateTime::parse_from_rfc3339(&ts))
-                .transpose()
-                .context("failed to parse the last video published timestamp")?
-                .map_or(DateTime::UNIX_EPOCH, |ts| ts.with_timezone(&Utc));
-
-            if last_published_at >= video.published_at {
-                continue;
-            }
-
             let is_announced =
                 video.is_already_announced(self.channel_id, guild_id, &self.cache, &self.discord).await
                     .unwrap_or_else(|error| {
@@ -167,18 +178,7 @@ impl VideoPoster {
                         false
                     });
 
-            let should_announce =
-                video.should_announce(&self.youtube).await.unwrap_or_else(|error| {
-                    error!(
-                        ?error,
-                        video.id,
-                        "failed to determine if the video should be announced, assuming that it does"
-                    );
-
-                    true
-                });
-
-            if !is_announced && should_announce {
+            if !is_announced && video.should_announce() {
                 video
                     .announce(
                         self.channel_id,
@@ -190,9 +190,14 @@ impl VideoPoster {
                     .context("failed to announce video")?;
             }
 
-            state::set(state_key, &video.published_at.to_rfc3339(), &self.db)
-                .await
-                .context("failed to set the last video published timestamp")?;
+            state::insert_fifo_cache(
+                self.state_key(&video.channel_id),
+                &video.id,
+                MAX_STATE_ENTRIES,
+                &self.db,
+            )
+            .await
+            .context("failed to append video ID to state")?;
         }
 
         Ok(())
@@ -200,15 +205,53 @@ impl VideoPoster {
 }
 
 pub struct Video {
+    // snippet
     channel_title: String,
     channel_id: String,
     id: String,
     title: String,
     description: String,
     published_at: DateTime<Utc>,
+
+    // contentDetails
+    duration: Option<Duration>,
+
+    // liveStreamingDetails
+    has_live_streaming_details: bool,
+    scheduled_start_time: Option<DateTime<Utc>>,
+
+    // player
+    player_size: Option<(i64, i64)>,
 }
 
 impl Video {
+    pub async fn fetch(
+        youtube: &YouTube<HttpsConnector<HttpConnector>>,
+        ids: &[impl AsRef<str>],
+    ) -> Result<Vec<Self>, Error> {
+        if ids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let mut req = youtube
+            .videos()
+            .list(&vec![
+                "snippet".into(),
+                "contentDetails".into(),
+                "liveStreamingDetails".into(),
+                "player".into(),
+            ])
+            .max_height(720); // need to specify something to get the player size
+
+        for id in ids {
+            req = req.add_id(id.as_ref());
+        }
+
+        let (_, list) = req.doit().await.context("failed to fetch video details")?;
+
+        list.items.unwrap_or_default().into_iter().map(Self::try_from).collect()
+    }
+
     pub fn video_id_from_message(message: &str) -> Option<&str> {
         static RE_VIDEO_ID: OnceLock<Regex> = OnceLock::new();
         let re_video_id =
@@ -249,7 +292,7 @@ impl Video {
             .context("guild channels not in cache")?;
 
         threads.sort_by(|a, b| a.cmp(b).reverse());
-        threads.truncate(10);
+        threads.truncate(MAX_THREADS_TO_CHECK);
 
         for thread_id in threads {
             let mut messages = discord
@@ -286,91 +329,38 @@ impl Video {
         Ok(false)
     }
 
-    async fn should_announce(
-        &self,
-        youtube: &YouTube<HttpsConnector<HttpConnector>>,
-    ) -> Result<bool, Error> {
-        let (_, list) = youtube
-            .videos()
-            .list(&vec!["contentDetails".into(), "liveStreamingDetails".into(), "player".into()])
-            .max_width(720) // need to specify something to get the player height
-            .add_id(&self.id)
-            .doit()
-            .await
-            .context("failed to fetch video details")?;
-
-        let video = list
-            .items
-            .context("video query returned no videos")?
-            .into_iter()
-            .find(|video| video.id.as_deref() == Some(&self.id))
-            .context("video query didn't return this video")?;
-
-        let duration = video
-            .content_details
-            .as_ref()
-            .context("`contentDetails` is missing")?
-            .duration
-            .as_ref()
-            .context("`contentDetails.duration` is missing")?;
-        let duration = iso8601::duration(&duration)
-            .map_err(|error| Error::msg(error))
-            .context("failed to parse the video duration")?;
-        let duration = Duration::from(duration);
-
+    fn should_announce(&self) -> bool {
         // Don't announce livestreams.
-        match self.is_livestream(&video, duration) {
-            Ok(true) => return Ok(false),
-            Ok(false) => (),
-            Err(error) => {
-                error!(
-                    ?error,
-                    video.id,
-                    "failed to determine if a video is a livestream, assuming that it is not"
-                );
-            }
+        if self.is_livestream() {
+            info!(video.id = self.id, video.title = self.title, "video is a livestream");
+            return false;
         }
 
         // Don't announce shorts.
-        match self.is_short(&video, duration) {
-            Ok(true) => return Ok(false),
-            Ok(false) => (),
-            Err(error) => {
-                error!(
-                    ?error,
-                    video.id, "failed to determine if a video is a short, assuming that it is not"
-                );
-            }
+        if self.is_short() {
+            info!(video.id = self.id, video.title = self.title, "video is a short");
+            return false;
         }
 
-        Ok(true)
+        true
     }
 
-    fn is_livestream(
-        &self,
-        video: &google_youtube3::api::Video,
-        duration: Duration,
-    ) -> Result<bool, Error> {
-        // Livestreams and premieres both have `liveStreamingDetails` set but livestreams don't have a non-zero duration
+    fn is_livestream(&self) -> bool {
+        // Livestreams and premieres both have `liveStreamingDetails` set but livestreams have the duration set to zero
         // until it becomes a VOD. There doesn't seem to be a way to differentiate between a VOD and a premiere.
-        Ok(video.live_streaming_details.is_some() && duration.is_zero())
+        self.has_live_streaming_details
+            && self.duration.map(|duration| duration.is_zero()).unwrap_or(false)
     }
 
-    fn is_short(
-        &self,
-        video: &google_youtube3::api::Video,
-        duration: Duration,
-    ) -> Result<bool, Error> {
+    fn is_short(&self) -> bool {
         // The API doesn't tell you if something is a short so we need to implement the logic ourselves.
         // A short is:
         //  * up to 3 minutes long
         //  * with a square or vertical aspect ratio.
         // The API also doesn't tell you the aspect ratio or the video size so divine it from the embed player size.
-        let player = video.player.as_ref().context("`player` is missing")?;
-        let embed_width = player.embed_width.context("`player.embed_width` is missing")?;
-        let embed_height = player.embed_height.context("`player.embed_height` is missing")?;
 
-        Ok(duration <= Duration::from_secs(3 * 60) && embed_width <= embed_height)
+        self.duration.map(|duration| duration <= Duration::from_secs(3 * 60)).unwrap_or(false)
+            && self.player_size.map(|(width, height)| width <= height).unwrap_or(false)
     }
 
     fn message_content(&self) -> String {
@@ -387,6 +377,14 @@ impl Video {
         }
         if !message.is_empty() {
             message.push('\n');
+        }
+        if let Some(start_time) = self.scheduled_start_time {
+            write!(
+                message,
+                "**Note**: this video premieres <t:{}:R>.\n\n",
+                start_time.timestamp(),
+            )
+            .unwrap();
         }
         message.push_str("Video: https://youtu.be/");
         message.push_str(&self.id);
@@ -478,6 +476,18 @@ impl TryFrom<google_youtube3::api::Video> for Video {
 
     fn try_from(video: google_youtube3::api::Video) -> Result<Self, Self::Error> {
         let snippet = video.snippet.context("`snippet` is missing")?;
+
+        let duration = video
+            .content_details
+            .as_ref()
+            .context("`contentDetails` is missing")?
+            .duration
+            .as_deref()
+            .map(|s| iso8601::duration(s).map_err(Error::msg))
+            .transpose()
+            .context("failed to parse the video duration")?
+            .map(Duration::from);
+
         Ok(Self {
             channel_title: snippet.channel_title.context("`channel_title` is missing")?,
             channel_id: snippet.channel_id.context("`channel_id` is missing")?,
@@ -485,26 +495,17 @@ impl TryFrom<google_youtube3::api::Video> for Video {
             title: snippet.title.context("`title` is missing")?,
             description: snippet.description.context("`description` is missing")?,
             published_at: snippet.published_at.context("`published_at` is missing")?,
-        })
-    }
-}
 
-impl TryFrom<PlaylistItem> for Video {
-    type Error = Error;
+            duration,
 
-    fn try_from(video: PlaylistItem) -> Result<Self, Self::Error> {
-        let snippet = video.snippet.context("`snippet` is missing")?;
-        Ok(Self {
-            channel_title: snippet.channel_title.context("`channel_title` is missing")?,
-            channel_id: snippet.channel_id.context("`channel_id` is missing")?,
-            id: snippet
-                .resource_id
-                .context("`resource_id` missing")?
-                .video_id
-                .context("`resource_id.video_id` is missing")?,
-            title: snippet.title.context("`title` is missing")?,
-            description: snippet.description.context("`description` is missing")?,
-            published_at: snippet.published_at.context("`published_at` is missing")?,
+            has_live_streaming_details: video.live_streaming_details.is_some(),
+            scheduled_start_time: video
+                .live_streaming_details
+                .and_then(|lsd| lsd.scheduled_start_time),
+
+            player_size: video
+                .player
+                .and_then(|player| Some((player.embed_width?, player.embed_height?))),
         })
     }
 }

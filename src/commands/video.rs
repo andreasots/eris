@@ -65,21 +65,13 @@ impl CommandHandler for New {
                 })
                 .context("channel not in cache")?;
 
-            let video_id = args.get(0).context("video ID missing")?;
-            let (_, videos) = self
-                .youtube
-                .videos()
-                .list(&vec!["snippet".into()])
-                .add_id(video_id)
-                .doit()
+            let videos = Video::fetch(&self.youtube, &[args.get(0).context("video ID missing")?])
                 .await
                 .context("failed to get the video")?;
 
-            let videos = videos.items.unwrap_or_default();
             if !videos.is_empty() {
                 for video in videos {
-                    let thread = Video::try_from(video)
-                        .context("failed to deserialize the video")?
+                    let thread = video
                         .announce(self.channel_id, channel_type, available_tags.as_deref(), discord)
                         .await
                         .context("failed to create the video thread")?;
