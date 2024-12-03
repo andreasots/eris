@@ -212,20 +212,13 @@ impl CommandHandler for Refresh {
                 return Ok(());
             };
 
-            let (_, videos) = self
-                .youtube
-                .videos()
-                .list(&vec!["snippet".into()])
-                .add_id(video_id)
-                .doit()
+            let videos = Video::fetch(&self.youtube, &[video_id])
                 .await
                 .context("failed to get the video")?;
 
-            let videos = videos.items.unwrap_or_default();
             if !videos.is_empty() {
                 for video in videos {
-                    Video::try_from(video)
-                        .context("failed to deserialize the video")?
+                    video
                         .edit(discord, &original_message, available_tags.as_deref())
                         .await
                         .context("failed to update the video thread")?;
