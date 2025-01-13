@@ -15,15 +15,22 @@ async fn disconnect(discord: &Client, guild: Id<GuildMarker>, user: Id<UserMarke
 
 pub async fn on_event(cache: &Cache, discord: &Client, event: &Event) {
     match event {
-        Event::GuildCreate(event) => {
-            let GuildCreate(ref guild) = **event;
-            let Some(afk_channel) = guild.afk_channel_id else { return };
-            for voice_state in &guild.voice_states {
-                if voice_state.channel_id == Some(afk_channel) {
-                    disconnect(discord, guild.id, voice_state.user_id).await;
+        Event::GuildCreate(event) => match &**event {
+            GuildCreate::Available(guild) => {
+                let Some(afk_channel) = guild.afk_channel_id else { return };
+                for voice_state in &guild.voice_states {
+                    if voice_state.channel_id == Some(afk_channel) {
+                        disconnect(discord, guild.id, voice_state.user_id).await;
+                    }
                 }
             }
-        }
+            GuildCreate::Unavailable(guild) => {
+                error!(
+                    guild.id = guild.id.get(),
+                    "failed to kick users from AFK channel: guild unavailable"
+                );
+            }
+        },
         Event::VoiceStateUpdate(event) => {
             let VoiceStateUpdate(ref voice_state) = **event;
             let Some(channel_id) = voice_state.channel_id else { return };
