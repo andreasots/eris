@@ -25,7 +25,7 @@ impl Cache {
         self.cache.update(event);
 
         if let Event::GuildCreate(event) = event {
-            if event.id == self.guild_id {
+            if event.id() == self.guild_id {
                 self.ready.send_replace(true);
             }
         }

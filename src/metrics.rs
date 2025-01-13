@@ -180,7 +180,12 @@ pub async fn on_event(cache: &Cache, influxdb: &InfluxDb, event: &Event) -> Resu
 
     match event {
         Event::GuildCreate(event) => {
-            let GuildCreate(ref guild) = **event;
+            let guild = match &**event {
+                GuildCreate::Available(guild) => guild,
+                GuildCreate::Unavailable(guild) => {
+                    anyhow::bail!("guild {} is unavailable", guild.id)
+                }
+            };
 
             for channel in &guild.channels {
                 if is_guild_text_channel(channel.kind) {
