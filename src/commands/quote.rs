@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 use anyhow::{Context as _, Error};
 use chrono::NaiveDate;
 use lalrpop_util::ParseError;
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 use regex::{Captures, Regex, Replacer};
 use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::sea_query::{ConditionExpression, Expr, Func, PgFunc, SimpleExpr};
@@ -515,7 +515,7 @@ impl CommandHandler for Find {
                     .await?
             };
 
-            let quote = quotes.choose(&mut rand::thread_rng());
+            let quote = quotes.choose(&mut rand::rng());
 
             let content;
             discord

@@ -3,7 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 
 use anyhow::{Context as _, Error};
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter};
 use tracing::info;
 use twilight_cache_inmemory::model::CachedMember;
@@ -85,7 +85,7 @@ impl CommandHandler for Static {
                     .await
                     .context("failed to load the responses")?;
 
-                let Some(response) = responses.choose(&mut rand::thread_rng()) else {
+                let Some(response) = responses.choose(&mut rand::rng()) else {
                     return Ok(());
                 };
 
