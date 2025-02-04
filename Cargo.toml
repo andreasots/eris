@@ -12,7 +12,7 @@ lalrpop = { version = "0.22.1", default-features = false, features = ["lexer", "
 
 [dependencies]
 anyhow = { version = "1.0.95", default-features = false, features = ["std"] }
-bytes = { version = "1.9.0", default-features = false }
+bytes = { version = "1.10.0", default-features = false }
 caseless = "0.2.2"
 chrono = { version = "0.4.39", default-features = false, features = ["std", "clock", "serde"] }
 clap = { version = "4.5.27", default-features = false, features = ["std"] }
