@@ -3764,9 +3764,9 @@ dependencies = [
 
 [[package]]
 name = "twitch_oauth2"
-version = "0.15.1"
+version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e9c9164e5275622f5bf54e703081bd48002aee79fa4ea4a36d2dec5b0c957b2"
+checksum = "eaec6e008ed2818c0d9a146ffc16b0af8491a71fc8d433ef09d79de740980a51"
 dependencies = [
  "aliri_braid",
  "async-trait",
