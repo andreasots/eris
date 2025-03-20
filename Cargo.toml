@@ -46,7 +46,7 @@ twilight-mention = "0.16.0"
 twilight-model = "0.16.0"
 twilight-util = { version = "0.16.0", default-features = false, features = ["builder", "snowflake"] }
 twilight-validate = "0.16.0"
-twitch_api = { version = "0.7.0", features = ["all", "reqwest"] }
+twitch_api = { version = "0.7.1", features = ["all", "reqwest"] }
 unicode-segmentation = "1.12.0"
 unicode-width = { version = "0.2.0", default-features = false }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
