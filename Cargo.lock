@@ -3739,9 +3739,9 @@ dependencies = [
 
 [[package]]
 name = "twitch_api"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56173e2d652430ac4ce5702f15b245fdc3dc5c37f579eca60220e7c92d2358bd"
+checksum = "758fa65710ccb4643ba36ee31115d978df06fe4f232b407e4b09582a98227ac6"
 dependencies = [
  "aliri_braid",
  "async-trait",
