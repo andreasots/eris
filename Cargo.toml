@@ -15,7 +15,7 @@ anyhow = { version = "1.0.98", default-features = false, features = ["std"] }
 bytes = { version = "1.10.1", default-features = false }
 caseless = "0.2.2"
 chrono = { version = "0.4.41", default-features = false, features = ["std", "clock", "serde"] }
-clap = { version = "4.5.42", default-features = false, features = ["std"] }
+clap = { version = "4.5.43", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.31", default-features = false, features = ["std", "sink"] }
 google-calendar3 = "6.0.0"
 google-sheets4 = "6.0.0"
