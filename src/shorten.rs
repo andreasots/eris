@@ -5,7 +5,7 @@ use unicode_segmentation::UnicodeSegmentation;
 const MARKER: &str = "[…]";
 const MARKER_LEN: usize = 3;
 
-pub fn shorten(s: &str, max_codepoints: usize) -> Cow<str> {
+pub fn shorten(s: &str, max_codepoints: usize) -> Cow<'_, str> {
     assert!(max_codepoints >= MARKER_LEN);
 
     let mut iter = s.char_indices();

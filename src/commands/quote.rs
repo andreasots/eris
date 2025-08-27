@@ -313,7 +313,7 @@ impl<'a> Ast<'a> {
     }
 }
 
-fn unescape(s: &str) -> Cow<str> {
+fn unescape(s: &str) -> Cow<'_, str> {
     static RE_ESCAPE: OnceLock<Regex> = OnceLock::new();
     let re_escape = RE_ESCAPE.get_or_init(|| Regex::new(r"\\(.)").unwrap());
 
