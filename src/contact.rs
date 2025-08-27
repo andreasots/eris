@@ -72,7 +72,7 @@ fn extract_string(cell: &CellData) -> Option<&str> {
     cell.effective_value.as_ref()?.string_value.as_deref()
 }
 
-fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(i32, Vec<Entry>)> {
+fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(i32, Vec<Entry<'_>>)> {
     let tz = spreadsheet
         .properties
         .as_ref()
