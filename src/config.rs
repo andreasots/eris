@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Context, Error};
+use atrium_api::types::string::AtIdentifier;
 use ini::Ini;
 use twilight_model::id::marker::{ChannelMarker, GuildMarker};
 use twilight_model::id::Id;
@@ -51,6 +52,8 @@ pub struct Config {
 
     pub mastodon_server: Url,
     pub mastodon_users: HashMap<String, Vec<Id<ChannelMarker>>>,
+
+    pub bsky_users: HashMap<AtIdentifier, Vec<Id<ChannelMarker>>>,
 
     pub contact_spreadsheet: Option<String>,
 
@@ -144,6 +147,25 @@ impl Config {
                             ))
                         })
                         .collect::<Result<HashMap<String, Vec<Id<ChannelMarker>>>, Error>>()
+                })
+                .transpose()?
+                .unwrap_or_default(),
+
+            bsky_users: ini
+                .section(Some("eris.bsky"))
+                .map(|section| {
+                    section
+                        .iter()
+                        .map(|(name, channels)| {
+                            Ok((
+                                name.parse().map_err(Error::msg)?,
+                                channels
+                                    .split(',')
+                                    .map(|id| Ok(str::parse(id)?))
+                                    .collect::<Result<Vec<Id<ChannelMarker>>, Error>>()?,
+                            ))
+                        })
+                        .collect::<Result<HashMap<_, _>, Error>>()
                 })
                 .transpose()?
                 .unwrap_or_default(),
