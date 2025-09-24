@@ -23,6 +23,7 @@ use twilight_model::gateway::presence::{ActivityType, MinimalActivity, Status as
 
 mod aiomas;
 mod announcements;
+mod autocrosspost;
 mod autotopic;
 mod cache;
 mod calendar;
@@ -361,6 +362,8 @@ async fn main() -> Result<(), Error> {
                             }
 
                             cache.update(&event);
+
+                            crate::autocrosspost::on_event(&cache, &discord, &event).await;
 
                             crate::disconnect_afk::on_event(&cache, &discord, &event).await;
 
