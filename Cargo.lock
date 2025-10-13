@@ -732,7 +732,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d162beedaa69905488a8da94f5ac3edb4dd4788b732fadb7bd120b2625c1976"
 dependencies = [
  "data-encoding",
- "syn 2.0.100",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -2979,9 +2979,9 @@ dependencies = [
 
 [[package]]
 name = "sea-orm-macros"
-version = "1.1.16"
+version = "1.1.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68de7a2258410fd5e6ba319a4fe6c4af7811507fc714bbd76534ae6caa60f95f"
+checksum = "b0c964f4b7f34f53decf381bc88f03187b9355e07f356ce65544626e781a9585"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
