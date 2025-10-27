@@ -34,15 +34,10 @@ const SIMILAR_MIN_UPDATE_INTERVAL: chrono::TimeDelta = match chrono::TimeDelta::
     Some(delta) => delta,
     None => panic!("SIMILAR_MIN_UPDATE_INTERVAL is invalid"),
 };
-// Start announcing Desert Bus `DESERT_BUS_ANNOUNCE_START` before the start.
-const DESERT_BUS_ANNOUNCE_START: chrono::TimeDelta = match chrono::TimeDelta::try_days(2) {
+// Assume that Desert Bus doesn't go past the end by more than `DESERT_BUS_END_SLACK`.
+const DESERT_BUS_END_SLACK: chrono::TimeDelta = match chrono::TimeDelta::try_hours(3) {
     Some(delta) => delta,
-    None => panic!("DESERT_BUS_ANNOUNCE_START is invalid"),
-};
-// Assume that Desert Bus is never longer than `DESERT_BUS_MAX_DURATION`.
-const DESERT_BUS_MAX_DURATION: chrono::TimeDelta = match chrono::TimeDelta::try_days(9) {
-    Some(delta) => delta,
-    None => panic!("DESERT_BUS_MAX_DURATION is invalid"),
+    None => panic!("DESERT_BUS_END_SLACK is invalid"),
 };
 
 struct EventDisplay<'a> {
@@ -307,66 +302,61 @@ impl Autotopic {
         now: DateTime<Utc>,
         events: &[Event],
     ) -> Result<(Vec<String>, bool), Error> {
-        let start = DesertBus::start_time();
-        let announce_start = start - DESERT_BUS_ANNOUNCE_START;
-        let announce_end = start + DESERT_BUS_MAX_DURATION;
         let mut messages = vec![];
         let mut is_dynamic = false;
 
-        if announce_start <= now && now <= announce_end {
-            if let Some(next_event_start) = events.get(0).map(|event| event.start) {
-                if next_event_start < start {
-                    return Ok((messages, is_dynamic));
-                }
-            }
+        let (start, money_raised) = match self.desertbus.fetch_current_event().await {
+            Ok((start, money_raised)) => (start, money_raised),
+            Err(error) => {
+                error!(?error, "Failed to fetch the current Desert Bus");
 
-            let money_raised = match self.desertbus.money_raised().await {
-                Ok(money_raised) => money_raised,
-                Err(error) => {
-                    error!(?error, "Failed to fetch the current Desert Bus total");
-                    messages.push(String::from("DESERT BUS?"));
-                    return Ok((messages, is_dynamic));
-                }
-            };
-            let total_hours = DesertBus::hours_raised(money_raised);
-            let duration = Duration::from_secs_f64(total_hours * 3600.0);
-            let end = start + duration;
-            if now < start {
-                messages.push(
-                    EventDisplay {
-                        event: &Event {
-                            start,
-                            summary: String::from("Desert Bus for Hope"),
-                            end,
-                            location: Some(String::from(
-                                "https://desertbus.org/ or https://twitch.tv/desertbus",
-                            )),
-                            description: None,
-                        },
-                    }
-                    .to_string(),
-                );
-                messages.push(format!(
-                    "${} raised.",
-                    money_raised.separated_string_with_fixed_place(2)
-                ));
-                is_dynamic = true;
-            } else if now <= end || self.is_desertbus_live().await? {
-                messages.push(String::from(
-                    "DESERT BUS! (https://desertbus.org/ or https://twitch.tv/desertbus)",
-                ));
-                messages.push(format!(
-                    "${} raised.",
-                    money_raised.separated_string_with_fixed_place(2)
-                ));
-                let bussed = now - start;
-                messages.push(format!(
-                    "{}:{:02} hours of {total_hours} so far.",
-                    bussed.num_hours(),
-                    bussed.num_minutes() % 60,
-                ));
-                is_dynamic = true;
+                return Ok((messages, is_dynamic));
             }
+        };
+
+        let total_hours = DesertBus::hours_raised(money_raised);
+        let duration = Duration::from_secs_f64(total_hours * 3600.0);
+        let end = start + duration;
+
+        if let Some(next_event_start) = events.get(0).map(|event| event.start) {
+            if next_event_start < start {
+                return Ok((messages, is_dynamic));
+            }
+        }
+
+        if now < start {
+            messages.push(
+                EventDisplay {
+                    event: &Event {
+                        start,
+                        summary: String::from("Desert Bus for Hope"),
+                        end,
+                        location: Some(String::from(
+                            "https://desertbus.org/ or https://twitch.tv/desertbus",
+                        )),
+                        description: None,
+                    },
+                }
+                .to_string(),
+            );
+            messages
+                .push(format!("${} raised.", money_raised.separated_string_with_fixed_place(2)));
+            is_dynamic = true;
+        } else if now <= end
+            || ((now - end) < DESERT_BUS_END_SLACK && self.is_desertbus_live().await?)
+        {
+            messages.push(String::from(
+                "DESERT BUS! (https://desertbus.org/ or https://twitch.tv/desertbus)",
+            ));
+            messages
+                .push(format!("${} raised.", money_raised.separated_string_with_fixed_place(2)));
+            let bussed = now - start;
+            messages.push(format!(
+                "{}:{:02} hours of {total_hours} so far.",
+                bussed.num_hours(),
+                bussed.num_minutes() % 60,
+            ));
+            is_dynamic = true;
         }
 
         Ok((messages, is_dynamic))
