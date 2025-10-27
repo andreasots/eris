@@ -1,12 +1,10 @@
 use std::sync::LazyLock;
 
 use anyhow::{Context, Error};
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use reqwest::Client;
 use scraper::{Html, Selector};
 use serde::Deserialize;
-
-use crate::tz::Tz;
 
 #[derive(Deserialize)]
 struct HeaderProps {
@@ -17,6 +15,8 @@ struct HeaderProps {
 #[derive(Deserialize)]
 struct Event {
     total: (f64, f64),
+    #[serde(rename = "startsAt")]
+    starts_at: (f64, DateTime<Utc>),
 }
 
 #[derive(Clone)]
@@ -32,19 +32,6 @@ impl DesertBus {
         DesertBus { client }
     }
 
-    pub fn start_time() -> DateTime<Utc> {
-        static START_TIME: LazyLock<DateTime<Utc>> = LazyLock::new(|| {
-            let tz =
-                &Tz::from_name("America/Vancouver").expect("no timezone named `America/Vancouver`");
-            tz.with_ymd_and_hms(2024, 11, 8, 15, 0, 0)
-                .single()
-                .expect("ambiguous timestamp")
-                .with_timezone(&Utc)
-        });
-
-        *START_TIME
-    }
-
     pub fn hours_raised(money_raised: f64) -> f64 {
         // money_raised = FIRST_HOUR + FIRST_HOUR * MULTIPLIER + FIRST_HOUR * MULTIPLIER.pow(2.0) + ... + FIRST_HOUR * MULTIPLIER.pow(hours)
         // money_raised = FIRST_HOUR * (1.0 - MULTIPLIER.pow(hours)) / (1.0 - MULTIPLIER)
@@ -58,7 +45,7 @@ impl DesertBus {
             .floor()
     }
 
-    pub async fn money_raised(&self) -> Result<f64, Error> {
+    pub async fn fetch_current_event(&self) -> Result<(DateTime<Utc>, f64), Error> {
         static HEADER_SELECTOR: LazyLock<Selector> =
             LazyLock::new(|| Selector::parse("astro-island[component-export='Header']").unwrap());
 
@@ -78,7 +65,7 @@ impl DesertBus {
             let Some(props) = element.attr("props") else { continue };
             let props = serde_json::from_str::<HeaderProps>(props)
                 .context("failed to parse header props")?;
-            return Ok(props.current_event.1.total.1);
+            return Ok((props.current_event.1.starts_at.1, props.current_event.1.total.1));
         }
 
         anyhow::bail!("failed to find the header component")
