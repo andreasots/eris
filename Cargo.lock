@@ -4090,11 +4090,11 @@ dependencies = [
 
 [[package]]
 name = "twilight-mention"
-version = "0.16.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e637a25046dcd3bb2926916161ca9a44dbe1966de3f1e20494fac612ccf1759"
+checksum = "b4aebfdf7f045520f52ad09d2c2cd50f138afccccbf92a2647d463d7d04e10b0"
 dependencies = [
- "twilight-model 0.16.0",
+ "twilight-model 0.17.0",
 ]
 
 [[package]]
