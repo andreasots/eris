@@ -7,9 +7,15 @@ updates:
   open-pull-requests-limit: 100
   assignees:
   - andreasots
+  groups:
+    indirect:
+      allow:
+        dependency-type: indirect
+    twilight:
+      patterns:
+        - twilight-*
   allow:
   - dependency-type: direct
-  - dependency-type: indirect
 - package-ecosystem: "github-actions"
   directory: "/"
   schedule:
