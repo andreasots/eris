@@ -8,13 +8,34 @@ updates:
   assignees:
   - andreasots
   groups:
-    indirect:
-      dependency-type: indirect
     twilight:
       patterns:
         - twilight-*
+    sea-orm:
+      patterns:
+        - sea-*
+    clap:
+      patterns:
+        - clap
+        - clap_*
+    lalrpop:
+      patterns:
+        - lalrpop
+        - lalrpop-util
+    regex:
+      patterns:
+        - regex
+        - regex-*
+        - aho-corasik
+    google:
+      patterns:
+        - google-*
+    atrium:
+     patterns:
+       - atrium-*
   allow:
   - dependency-type: direct
+  - dependency-type: indirect
 - package-ecosystem: "github-actions"
   directory: "/"
   schedule:
