@@ -9,8 +9,7 @@ updates:
   - andreasots
   groups:
     indirect:
-      allow:
-        dependency-type: indirect
+      dependency-type: indirect
     twilight:
       patterns:
         - twilight-*
