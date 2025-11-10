@@ -79,7 +79,7 @@ impl Access {
                     .into_iter()
                     .flat_map(|member| member.roles().iter())
                     .filter_map(|&role_id| cache.role(role_id))
-                    .any(|role| role.color != 0)
+                    .any(|role| role.colors.primary_color != 0)
             }),
             Access::ModOnly => cache.with(|cache| {
                 cache
