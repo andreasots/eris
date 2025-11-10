@@ -43,7 +43,7 @@ tracing = { version = "0.1.41", default-features = false, features = ["std", "at
 tracing-subscriber = { version = "0.3.20", default-features = false, features = ["fmt", "std", "chrono", "env-filter", "json", "tracing-log"] }
 twilight-cache-inmemory = { version = "0.16.0", default-features = false, features = ["permission-calculator"] }
 twilight-gateway = { version = "0.16.0", default-features = false, features = ["rustls-native-roots", "zlib-stock", "twilight-http"] }
-twilight-http = { version = "0.16.0", default-features = false, features = ["decompression", "rustls-native-roots"] }
+twilight-http = { version = "0.17.0", default-features = false, features = ["decompression", "rustls-native-roots"] }
 twilight-mention = "0.16.0"
 twilight-model = "0.16.0"
 twilight-util = { version = "0.16.0", default-features = false, features = ["builder", "snowflake"] }
