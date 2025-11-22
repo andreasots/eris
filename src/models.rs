@@ -296,8 +296,8 @@ pub mod state {
     use sea_orm::entity::prelude::*;
     use sea_orm::sea_query::OnConflict;
     use sea_orm::{DbBackend, Insert, Statement};
-    use serde::de::DeserializeOwned;
     use serde::Serialize;
+    use serde::de::DeserializeOwned;
 
     #[derive(Debug, Clone, DeriveEntityModel)]
     #[sea_orm(table_name = "state")]
@@ -382,6 +382,7 @@ pub mod user {
 
     #[derive(Debug, Clone, DeriveEntityModel)]
     #[sea_orm(table_name = "users")]
+    #[allow(clippy::struct_excessive_bools)]
     pub struct Model {
         #[sea_orm(primary_key)]
         pub id: i32,

@@ -6,15 +6,15 @@ use std::pin::Pin;
 use anyhow::{Context as _, Error};
 use chrono::Utc;
 use twilight_http::Client as DiscordClient;
-use twilight_model::channel::message::MessageFlags;
 use twilight_model::channel::Message;
+use twilight_model::channel::message::MessageFlags;
 
 use crate::cache::Cache;
 use crate::calendar::{CalendarHub, FANSTREAMS, LRR};
 use crate::command_parser::{Args, CommandHandler, Commands, Help};
 use crate::config::Config;
 use crate::time::HumanReadable;
-use crate::tz::Tz;
+use crate::tz::{LoadTimeZone, Tz};
 
 #[derive(Clone, Copy)]
 enum Mode {
@@ -106,7 +106,7 @@ impl Next {
                     &tz
                 }
                 Err(_) => {
-                    return Ok(format!("Unknown time zone: {}", crate::markdown::escape(name)))
+                    return Ok(format!("Unknown time zone: {}", crate::markdown::escape(name)));
                 }
             },
             None => &config.timezone,

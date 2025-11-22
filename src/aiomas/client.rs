@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::future::{ready, Future, Ready};
+use std::future::{Future, Ready, ready};
 use std::net::Ipv6Addr;
 #[cfg(unix)]
 use std::path::PathBuf;
@@ -109,7 +109,7 @@ impl Client {
 
         while *running.borrow() || !pending.is_empty() {
             tokio::select! {
-                _ = running.changed() => continue,
+                _ = running.changed() => (),
                 new_request = channel.recv() => {
                     match new_request {
                         Some((request, channel)) => {
@@ -121,7 +121,7 @@ impl Client {
                             if let Err(error) = sink.send((request_id, request)).await {
                                 error!(?error, "Failed to send the request");
                                 return;
-                            };
+                            }
                         },
                         None => return,
                     }
@@ -166,7 +166,7 @@ impl Service<Request> for Client {
             return Either::Left(ready(Err(
                 Error::from(error).context("failed to queue the request")
             )));
-        };
+        }
 
         Either::Right(rx.err_into())
     }

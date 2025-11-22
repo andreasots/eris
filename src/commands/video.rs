@@ -3,15 +3,15 @@ use std::future::Future;
 use std::pin::Pin;
 
 use anyhow::{Context, Error};
+use google_youtube3::YouTube;
 use google_youtube3::hyper_rustls::HttpsConnector;
 use google_youtube3::hyper_util::client::legacy::connect::HttpConnector;
-use google_youtube3::YouTube;
 use twilight_http::Client;
 use twilight_mention::Mention;
-use twilight_model::channel::message::MessageFlags;
 use twilight_model::channel::Message;
-use twilight_model::id::marker::ChannelMarker;
+use twilight_model::channel::message::MessageFlags;
 use twilight_model::id::Id;
+use twilight_model::id::marker::ChannelMarker;
 
 use crate::announcements::youtube::Video;
 use crate::cache::Cache;
@@ -24,13 +24,14 @@ pub struct New {
 }
 
 impl New {
+    #[allow(clippy::self_named_constructors)]
     pub fn new(config: &Config, youtube: YouTube<HttpsConnector<HttpConnector>>) -> Option<Self> {
         Some(Self { channel_id: config.lrr_videos_channel?, youtube })
     }
 }
 
 impl CommandHandler for New {
-    fn pattern(&self) -> &str {
+    fn pattern(&self) -> &'static str {
         r"video new (\S+)"
     }
 
@@ -69,7 +70,15 @@ impl CommandHandler for New {
                 .await
                 .context("failed to get the video")?;
 
-            if !videos.is_empty() {
+            if videos.is_empty() {
+                discord
+                    .create_message(message.channel_id)
+                    .reply(message.id)
+                    .flags(MessageFlags::SUPPRESS_EMBEDS)
+                    .content("No such video.")
+                    .await
+                    .context("failed to reply to command")?;
+            } else {
                 for video in videos {
                     let thread = video
                         .announce(self.channel_id, channel_type, available_tags.as_deref(), discord)
@@ -83,14 +92,6 @@ impl CommandHandler for New {
                         .await
                         .context("failed to reply to command")?;
                 }
-            } else {
-                discord
-                    .create_message(message.channel_id)
-                    .reply(message.id)
-                    .flags(MessageFlags::SUPPRESS_EMBEDS)
-                    .content("No such video.")
-                    .await
-                    .context("failed to reply to command")?;
             }
 
             Ok(())
@@ -110,7 +111,7 @@ impl Refresh {
 }
 
 impl CommandHandler for Refresh {
-    fn pattern(&self) -> &str {
+    fn pattern(&self) -> &'static str {
         r"video refresh(?: (\S+))?"
     }
 
@@ -121,10 +122,10 @@ impl CommandHandler for Refresh {
             summary: "Update the video thread to have up to date video information".into(),
             description: Cow::Owned(format!(
                 concat!(
-                "Update the video thread to have up to date video information. Optionally pass a ",
-                "YouTube video ID to replace the current video\n\n",
-                "Must be used in a thread in {}."
-            ),
+                    "Update the video thread to have up to date video information. Optionally pass a ",
+                    "YouTube video ID to replace the current video\n\n",
+                    "Must be used in a thread in {}."
+                ),
                 self.channel_id.mention()
             )),
             examples: Cow::Borrowed(&[Cow::Borrowed("video refresh dQw4w9WgXcQ")]),
@@ -195,7 +196,7 @@ impl CommandHandler for Refresh {
                     .context("failed to report an error")?;
 
                 return Ok(());
-            };
+            }
 
             let video_id = if let Some(video_id) = args.get(0) {
                 video_id
@@ -216,7 +217,15 @@ impl CommandHandler for Refresh {
                 .await
                 .context("failed to get the video")?;
 
-            if !videos.is_empty() {
+            if videos.is_empty() {
+                discord
+                    .create_message(message.channel_id)
+                    .reply(message.id)
+                    .flags(MessageFlags::SUPPRESS_EMBEDS)
+                    .content("No such video.")
+                    .await
+                    .context("failed to reply to command")?;
+            } else {
                 for video in videos {
                     video
                         .edit(discord, &original_message, available_tags.as_deref())
@@ -231,14 +240,6 @@ impl CommandHandler for Refresh {
                         .await
                         .context("failed to reply to command")?;
                 }
-            } else {
-                discord
-                    .create_message(message.channel_id)
-                    .reply(message.id)
-                    .flags(MessageFlags::SUPPRESS_EMBEDS)
-                    .content("No such video.")
-                    .await
-                    .context("failed to reply to command")?;
             }
 
             Ok(())

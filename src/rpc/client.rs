@@ -5,12 +5,12 @@ use std::path::PathBuf;
 use anyhow::{Context, Error};
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
+use tokio::sync::Mutex;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::watch::Receiver;
-use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
-use tower::reconnect::Reconnect;
 use tower::Service;
+use tower::reconnect::Reconnect;
 
 use crate::aiomas::client::MakeClient;
 use crate::config::Config;
@@ -92,7 +92,6 @@ impl LRRbot {
                 Ok(Err(exc)) => return Err(Error::msg(exc)),
                 Err(error) => {
                     last_error = Some(anyhow::anyhow!(error).context("failed to send the request"));
-                    continue;
                 }
             }
         }

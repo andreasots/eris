@@ -40,7 +40,7 @@ impl Voice {
 }
 
 impl CommandHandler for Voice {
-    fn pattern(&self) -> &str {
+    fn pattern(&self) -> &'static str {
         "voice (.+)"
     }
 

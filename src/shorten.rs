@@ -110,7 +110,7 @@ fn shorten_proptest() {
         let input = &input[..input.char_indices().nth(input_len).map(|(i, _)| i).unwrap()];
 
         for max_codepoints in MARKER_LEN..24 {
-            let s = shorten(&input, max_codepoints);
+            let s = shorten(input, max_codepoints);
             assert_eq!(s.chars().count(), std::cmp::min(input_len, max_codepoints));
         }
     }
@@ -154,7 +154,8 @@ mod split_to_parts {
                     "the bee of course flies anyway because bees don't care what humans think is impossible",
                 ),
                 64,
-            ), vec![
+            ),
+            vec![
                 "according to all known laws of aviation there is no way that[…]".to_string(),
                 "[…] a bee should be able to fly its wings are too small to […]".to_string(),
                 "[…]get its fat little body off the ground the bee of course […]".to_string(),
@@ -203,7 +204,8 @@ mod split_to_parts {
             split_to_parts(
                 "According to all known lawsofaviationthereisnowaythat a bee should be able to fly.",
                 32,
-            ), vec![
+            ),
+            vec![
                 "According to all known […]".to_string(),
                 "[…]lawsofaviationthereisnoway[…]".to_string(),
                 "[…]that a bee should be able[…]".to_string(),

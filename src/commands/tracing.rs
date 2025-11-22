@@ -2,11 +2,11 @@ use std::future::Future;
 use std::pin::Pin;
 
 use anyhow::{Context, Error};
-use tracing_subscriber::reload::Handle;
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::reload::Handle;
 use twilight_http::Client as DiscordClient;
-use twilight_model::channel::message::MessageFlags;
 use twilight_model::channel::Message;
+use twilight_model::channel::message::MessageFlags;
 
 use crate::cache::Cache;
 use crate::command_parser::{Access, Args, CommandHandler, Commands};
@@ -23,7 +23,7 @@ impl<S> TracingFilter<S> {
 }
 
 impl<S> CommandHandler for TracingFilter<S> {
-    fn pattern(&self) -> &str {
+    fn pattern(&self) -> &'static str {
         "tracing-filter(?: (.*))?"
     }
 
@@ -47,7 +47,7 @@ impl<S> CommandHandler for TracingFilter<S> {
         Box::pin(async move {
             let directives = args.get(0).unwrap_or("");
             let directives =
-                if !directives.is_empty() { directives } else { crate::DEFAULT_TRACING_FILTER };
+                if directives.is_empty() { crate::DEFAULT_TRACING_FILTER } else { directives };
 
             let filter =
                 EnvFilter::try_new(directives).context("failed to construct the new filter")?;

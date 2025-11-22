@@ -17,8 +17,8 @@ use sea_orm::{
 };
 use tokio::sync::OnceCell;
 use twilight_http::Client as DiscordClient;
-use twilight_model::channel::message::MessageFlags;
 use twilight_model::channel::Message;
+use twilight_model::channel::message::MessageFlags;
 use twilight_util::builder::embed::{EmbedBuilder, EmbedFieldBuilder};
 use unicode_width::UnicodeWidthStr;
 
@@ -315,7 +315,6 @@ impl<'a> Ast<'a> {
 
 fn unescape(s: &str) -> Cow<'_, str> {
     static RE_ESCAPE: OnceLock<Regex> = OnceLock::new();
-    let re_escape = RE_ESCAPE.get_or_init(|| Regex::new(r"\\(.)").unwrap());
 
     struct Expander;
 
@@ -329,6 +328,8 @@ fn unescape(s: &str) -> Cow<'_, str> {
             }
         }
     }
+
+    let re_escape = RE_ESCAPE.get_or_init(|| Regex::new(r"\\(.)").unwrap());
 
     assert!(s.starts_with('\"') && s.ends_with('\"'));
     re_escape.replace_all(&s[1..s.len() - 1], Expander)
@@ -422,7 +423,7 @@ impl Find {
 }
 
 impl CommandHandler for Find {
-    fn pattern(&self) -> &str {
+    fn pattern(&self) -> &'static str {
         "(?:find)?quote(?: (.+))?"
     }
 
@@ -546,7 +547,7 @@ impl QueryDebugger {
 }
 
 impl CommandHandler for QueryDebugger {
-    fn pattern(&self) -> &str {
+    fn pattern(&self) -> &'static str {
         "quote query-debugger(?: (.+))"
     }
 
@@ -622,7 +623,7 @@ impl Details {
 }
 
 impl CommandHandler for Details {
-    fn pattern(&self) -> &str {
+    fn pattern(&self) -> &'static str {
         r"quote details (\d+)"
     }
 
@@ -710,13 +711,13 @@ impl CommandHandler for Details {
                     EmbedFieldBuilder::new("Game name", crate::markdown::escape(&game.name)),
                 );
             }
-            if let Some(game_entry) = game_entry {
-                if let Some(display_name) = game_entry.display_name {
-                    embed = embed.field(EmbedFieldBuilder::new(
-                        "Game display name",
-                        crate::markdown::escape(&display_name),
-                    ));
-                }
+            if let Some(game_entry) = game_entry
+                && let Some(display_name) = game_entry.display_name
+            {
+                embed = embed.field(EmbedFieldBuilder::new(
+                    "Game display name",
+                    crate::markdown::escape(&display_name),
+                ));
             }
             if let Some(show) = show {
                 embed = embed.field(EmbedFieldBuilder::new("Show ID", show.id.to_string())).field(
@@ -741,7 +742,7 @@ mod test {
     use std::borrow::Cow;
 
     use super::parser::QueryParser;
-    use super::{as_ilike, unescape, Ast, Column, Op};
+    use super::{Ast, Column, Op, as_ilike, unescape};
 
     #[test]
     fn parsing() {

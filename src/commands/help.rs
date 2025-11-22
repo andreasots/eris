@@ -5,8 +5,8 @@ use std::pin::Pin;
 
 use anyhow::{Context, Error};
 use twilight_http::Client as DiscordClient;
-use twilight_model::channel::message::embed::EmbedField;
 use twilight_model::channel::Message;
+use twilight_model::channel::message::embed::EmbedField;
 use twilight_util::builder::embed::EmbedBuilder;
 
 use crate::cache::Cache;
@@ -38,14 +38,14 @@ impl Help {
 
         let mut fields = vec![];
         for cmd in commands.iter() {
-            if cmd.access().user_has_access(message.author.id, guild_id, cache) {
-                if let Some(help) = cmd.help() {
-                    fields.push(EmbedField {
-                        inline: true,
-                        name: format!("{}{}", config.command_prefix, help.name),
-                        value: help.summary.into(),
-                    });
-                }
+            if cmd.access().user_has_access(message.author.id, guild_id, cache)
+                && let Some(help) = cmd.help()
+            {
+                fields.push(EmbedField {
+                    inline: true,
+                    name: format!("{}{}", config.command_prefix, help.name),
+                    value: help.summary.into(),
+                });
             }
         }
         fields.sort_by(|a, b| a.name.cmp(&b.name));
@@ -119,7 +119,7 @@ impl Help {
 }
 
 impl CommandHandler for Help {
-    fn pattern(&self) -> &str {
+    fn pattern(&self) -> &'static str {
         r"help(?: ((?:\w+)(?: \w+)*))?"
     }
 
