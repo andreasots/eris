@@ -6,10 +6,10 @@ use anyhow::{Context as _, Error};
 use futures_util::TryStreamExt;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 use twilight_http::Client as DiscordClient;
-use twilight_model::channel::message::MessageFlags;
 use twilight_model::channel::Message;
-use twitch_api::twitch_oauth2::{AccessToken, UserToken};
+use twilight_model::channel::message::MessageFlags;
 use twitch_api::HelixClient;
+use twitch_api::twitch_oauth2::{AccessToken, UserToken};
 
 use crate::cache::Cache;
 use crate::command_parser::{Args, CommandHandler, Commands, Help};
@@ -28,7 +28,7 @@ impl Live {
 }
 
 impl CommandHandler for Live {
-    fn pattern(&self) -> &str {
+    fn pattern(&self) -> &'static str {
         "live"
     }
 

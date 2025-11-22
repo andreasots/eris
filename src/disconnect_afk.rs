@@ -2,8 +2,8 @@ use tracing::error;
 use twilight_gateway::Event;
 use twilight_http::Client;
 use twilight_model::gateway::payload::incoming::{GuildCreate, VoiceStateUpdate};
-use twilight_model::id::marker::{GuildMarker, UserMarker};
 use twilight_model::id::Id;
+use twilight_model::id::marker::{GuildMarker, UserMarker};
 
 use crate::cache::Cache;
 

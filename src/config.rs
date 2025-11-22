@@ -7,15 +7,15 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use anyhow::{anyhow, Context, Error};
+use anyhow::{Context, Error, anyhow};
 use atrium_api::types::string::AtIdentifier;
 use ini::Ini;
-use twilight_model::id::marker::{ChannelMarker, GuildMarker};
 use twilight_model::id::Id;
+use twilight_model::id::marker::{ChannelMarker, GuildMarker};
 use twitch_api::twitch_oauth2::{ClientId, ClientSecret};
 use url::Url;
 
-use crate::tz::Tz;
+use crate::tz::{LoadTimeZone, Tz};
 
 #[derive(Debug)]
 pub struct Config {
@@ -63,6 +63,7 @@ pub struct Config {
 }
 
 impl Config {
+    #[allow(clippy::too_many_lines)]
     pub fn load_from_file<P: AsRef<Path>>(filename: P) -> Result<Config, Error> {
         let ini = Ini::load_from_file(filename)?;
         Ok(Config {
@@ -196,7 +197,7 @@ impl Config {
     fn get_option_required(ini: &Ini, option: &str) -> Result<String, Error> {
         Ok(ini
             .get_from(Some("lrrbot"), option)
-            .ok_or_else(|| anyhow!("{:?} is missing", option))?
+            .ok_or_else(|| anyhow!("{option:?} is missing"))?
             .into())
     }
 

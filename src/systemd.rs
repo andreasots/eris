@@ -20,7 +20,7 @@ impl Notify {
             SocketAddr::from_abstract_name(&socket_name.as_bytes()[1..])
                 .context("failed to construct the socket address from abstract name")?
         } else {
-            anyhow::bail!("unsupported socket {socket_name:?}")
+            anyhow::bail!("unsupported socket {}", socket_name.display())
         };
 
         let std_socket = std::os::unix::net::UnixDatagram::unbound()

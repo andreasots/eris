@@ -11,8 +11,8 @@ use twilight_model::gateway::payload::incoming::{
     ChannelCreate, ChannelDelete, ChannelUpdate, GuildCreate, MessageCreate, ThreadCreate,
     ThreadDelete, ThreadUpdate, VoiceStateUpdate,
 };
-use twilight_model::id::marker::UserMarker;
 use twilight_model::id::Id;
+use twilight_model::id::marker::UserMarker;
 
 use crate::cache::Cache;
 use crate::influxdb::InfluxDb;
@@ -51,6 +51,7 @@ impl<'a> Measurement<'a> {
             category_id: channel.and_then(|c| c.parent_id.map(Id::get)),
             thread_id: thread.map(|t| t.id.get()),
             thread_name: thread.and_then(|t| t.name.as_deref()),
+            #[allow(clippy::cast_precision_loss)]
             count: count as f64,
             users: None,
             user_id: None,
@@ -65,11 +66,7 @@ impl<'a> Measurement<'a> {
             }
             write!(serialized, "{}", user.get()).unwrap();
         }
-        if !serialized.is_empty() {
-            Self { users: Some(serialized), ..self }
-        } else {
-            self
-        }
+        if serialized.is_empty() { self } else { Self { users: Some(serialized), ..self } }
     }
 
     fn user_id(self, user_id: Id<UserMarker>) -> Self {
@@ -174,298 +171,343 @@ fn is_guild_voice_channel(kind: ChannelType) -> bool {
     }
 }
 
+fn on_guild_create(
+    measurements: &mut LineProtocolBuilder<Vec<u8>>,
+    time: DateTime<Utc>,
+    event: &GuildCreate,
+) -> Result<(), Error> {
+    let guild = match event {
+        GuildCreate::Available(guild) => guild,
+        GuildCreate::Unavailable(guild) => {
+            anyhow::bail!("guild {} is unavailable", guild.id)
+        }
+    };
+
+    for channel in &guild.channels {
+        if is_guild_text_channel(channel.kind) {
+            measurements.append(
+                TEXT_CHANNELS_MEASUREMENT,
+                Measurement::new(time, "guild_create", Some(channel), None, 0),
+            );
+        }
+
+        if is_guild_voice_channel(channel.kind) {
+            measurements.append(
+                VOICE_CHANNELS_MEASUREMENT,
+                Measurement::new(
+                    time,
+                    "guild_create",
+                    Some(channel),
+                    None,
+                    guild
+                        .voice_states
+                        .iter()
+                        .filter(|vs| vs.channel_id == Some(channel.id))
+                        .count(),
+                )
+                .users(
+                    guild
+                        .voice_states
+                        .iter()
+                        .filter(|vs| vs.channel_id == Some(channel.id))
+                        .map(|state| state.user_id),
+                ),
+            );
+        }
+    }
+
+    for thread in &guild.threads {
+        if thread.thread_metadata.as_ref().is_some_and(|meta| meta.archived) {
+            continue;
+        }
+
+        let channel = guild.channels.iter().find(|c| Some(c.id) == thread.parent_id);
+
+        measurements.append(
+            TEXT_CHANNELS_MEASUREMENT,
+            Measurement::new(time, "guild_create", channel, Some(thread), 0),
+        );
+    }
+
+    Ok(())
+}
+
+fn on_channel_create(
+    measurements: &mut LineProtocolBuilder<Vec<u8>>,
+    time: DateTime<Utc>,
+    ChannelCreate(channel): &ChannelCreate,
+) {
+    if is_guild_text_channel(channel.kind) {
+        measurements.append(
+            TEXT_CHANNELS_MEASUREMENT,
+            Measurement::new(time, "channel_create", Some(channel), None, 0),
+        );
+    }
+
+    if is_guild_voice_channel(channel.kind) {
+        measurements.append(
+            VOICE_CHANNELS_MEASUREMENT,
+            Measurement::new(time, "channel_create", Some(channel), None, 0),
+        );
+    }
+}
+
+fn on_channel_update(
+    measurements: &mut LineProtocolBuilder<Vec<u8>>,
+    cache: &Cache,
+    time: DateTime<Utc>,
+    ChannelUpdate(channel): &ChannelUpdate,
+) {
+    cache.with(|cache| {
+        if is_guild_text_channel(channel.kind) {
+            measurements.append(
+                TEXT_CHANNELS_MEASUREMENT,
+                Measurement::new(time, "channel_update", Some(channel), None, 0),
+            );
+        }
+
+        if is_guild_voice_channel(channel.kind) {
+            measurements.append(
+                VOICE_CHANNELS_MEASUREMENT,
+                Measurement::new(
+                    time,
+                    "channel_update",
+                    Some(channel),
+                    None,
+                    cache.stats().channel_voice_states(channel.id).unwrap_or(0),
+                )
+                .users(
+                    cache
+                        .voice_channel_states(channel.id)
+                        .into_iter()
+                        .flatten()
+                        .map(|state| state.user_id()),
+                ),
+            );
+        }
+    });
+}
+
+fn on_channel_delete(
+    measurements: &mut LineProtocolBuilder<Vec<u8>>,
+    time: DateTime<Utc>,
+    ChannelDelete(channel): &ChannelDelete,
+) {
+    if is_guild_text_channel(channel.kind) {
+        measurements.append(
+            TEXT_CHANNELS_MEASUREMENT,
+            Measurement::new(time, "channel_delete", Some(channel), None, 0),
+        );
+    }
+
+    if is_guild_voice_channel(channel.kind) {
+        measurements.append(
+            VOICE_CHANNELS_MEASUREMENT,
+            Measurement::new(time, "channel_delete", Some(channel), None, 0),
+        );
+    }
+}
+
+fn on_thread_create(
+    measurements: &mut LineProtocolBuilder<Vec<u8>>,
+    cache: &Cache,
+    time: DateTime<Utc>,
+    ThreadCreate(thread): &ThreadCreate,
+) {
+    cache.with(|cache| {
+        let channel = thread.parent_id.and_then(|id| cache.channel(id));
+
+        measurements.append(
+            TEXT_CHANNELS_MEASUREMENT,
+            Measurement::new(time, "thread_create", channel.as_deref(), Some(thread), 0),
+        );
+    });
+}
+
+fn on_thread_update(
+    measurements: &mut LineProtocolBuilder<Vec<u8>>,
+    cache: &Cache,
+    time: DateTime<Utc>,
+    ThreadUpdate(thread): &ThreadUpdate,
+) {
+    cache.with(|cache| {
+        let channel = thread.parent_id.and_then(|id| cache.channel(id));
+
+        measurements.append(
+            TEXT_CHANNELS_MEASUREMENT,
+            Measurement::new(time, "thread_update", channel.as_deref(), Some(thread), 0),
+        );
+    });
+}
+
+fn on_thread_delete(
+    measurements: &mut LineProtocolBuilder<Vec<u8>>,
+    cache: &Cache,
+    time: DateTime<Utc>,
+    &ThreadDelete { id, parent_id, .. }: &ThreadDelete,
+) {
+    cache.with(|cache| {
+        let thread = cache.channel(id);
+        let channel = cache.channel(parent_id);
+
+        measurements.append(
+            TEXT_CHANNELS_MEASUREMENT,
+            Measurement::new(time, "thread_delete", channel.as_deref(), thread.as_deref(), 0),
+        );
+    });
+}
+
+fn on_voice_state_update(
+    measurements: &mut LineProtocolBuilder<Vec<u8>>,
+    cache: &Cache,
+    time: DateTime<Utc>,
+    // NOTE: voice state counts are off by one because this event hasn't been processed yet
+    VoiceStateUpdate(new_state): &VoiceStateUpdate,
+) {
+    cache.with(|cache| {
+        let old_state =
+            new_state.guild_id.and_then(|guild_id| cache.voice_state(new_state.user_id, guild_id));
+
+        let old_channel_id = old_state.map(|state| state.channel_id());
+
+        match (old_channel_id, new_state.channel_id) {
+            // old and new are the same, ignore (someone muted themselves or something)
+            (Some(old), Some(new)) if old == new => (),
+            // user moved voice channels
+            (Some(old_channel_id), Some(new_channel_id)) => {
+                measurements.append(
+                    VOICE_CHANNELS_MEASUREMENT,
+                    Measurement::new(
+                        time,
+                        "state_update",
+                        cache.channel(old_channel_id).as_deref(),
+                        None,
+                        cache.stats().channel_voice_states(old_channel_id).unwrap_or(1) - 1,
+                    )
+                    .users(
+                        cache
+                            .voice_channel_states(old_channel_id)
+                            .into_iter()
+                            .flatten()
+                            .map(|state| state.user_id())
+                            .filter(|&id| id != new_state.user_id),
+                    ),
+                );
+
+                measurements.append(
+                    VOICE_CHANNELS_MEASUREMENT,
+                    Measurement::new(
+                        time,
+                        "state_update",
+                        cache.channel(new_channel_id).as_deref(),
+                        None,
+                        cache.stats().channel_voice_states(new_channel_id).unwrap_or(0) + 1,
+                    )
+                    .users(
+                        cache
+                            .voice_channel_states(new_channel_id)
+                            .into_iter()
+                            .flatten()
+                            .map(|state| state.user_id())
+                            .chain(Some(new_state.user_id)),
+                    ),
+                );
+            }
+            // user joined a voice channel
+            (None, Some(channel_id)) => measurements.append(
+                VOICE_CHANNELS_MEASUREMENT,
+                Measurement::new(
+                    time,
+                    "state_update",
+                    cache.channel(channel_id).as_deref(),
+                    None,
+                    cache.stats().channel_voice_states(channel_id).unwrap_or(0) + 1,
+                )
+                .users(
+                    cache
+                        .voice_channel_states(channel_id)
+                        .into_iter()
+                        .flatten()
+                        .map(|state| state.user_id())
+                        .chain(Some(new_state.user_id)),
+                ),
+            ),
+            // user left a voice channel
+            (Some(channel_id), None) => measurements.append(
+                VOICE_CHANNELS_MEASUREMENT,
+                Measurement::new(
+                    time,
+                    "state_update",
+                    cache.channel(channel_id).as_deref(),
+                    None,
+                    cache.stats().channel_voice_states(channel_id).unwrap_or(1) - 1,
+                )
+                .users(
+                    cache
+                        .voice_channel_states(channel_id)
+                        .into_iter()
+                        .flatten()
+                        .map(|state| state.user_id())
+                        .filter(|&id| id != new_state.user_id),
+                ),
+            ),
+            // Nothing happened, probably unreachable
+            (None, None) => (),
+        }
+    });
+}
+
+fn on_message_create(
+    measurements: &mut LineProtocolBuilder<Vec<u8>>,
+    cache: &Cache,
+    time: DateTime<Utc>,
+    MessageCreate(message): &MessageCreate,
+) {
+    cache.with(|cache| {
+        let (channel, thread) = match cache.channel(message.channel_id) {
+            Some(channel) => {
+                if let ChannelType::Private | ChannelType::Group = channel.kind {
+                    // don't collect stats on direct messages
+                    return;
+                }
+
+                if channel.kind.is_guild() && channel.kind.is_thread() {
+                    (channel.parent_id.and_then(|id| cache.channel(id)), Some(channel))
+                } else {
+                    (Some(channel), None)
+                }
+            }
+            _ => (None, None),
+        };
+
+        measurements.append(
+            TEXT_CHANNELS_MEASUREMENT,
+            Measurement::new(time, "message", channel.as_deref(), thread.as_deref(), 1)
+                .user_id(message.author.id),
+        );
+    });
+}
+
 pub async fn on_event(cache: &Cache, influxdb: &InfluxDb, event: &Event) -> Result<(), Error> {
     let mut measurements = LineProtocolBuilder::new();
     let time = Utc::now();
 
     match event {
-        Event::GuildCreate(event) => {
-            let guild = match &**event {
-                GuildCreate::Available(guild) => guild,
-                GuildCreate::Unavailable(guild) => {
-                    anyhow::bail!("guild {} is unavailable", guild.id)
-                }
-            };
+        Event::GuildCreate(event) => on_guild_create(&mut measurements, time, event)?,
 
-            for channel in &guild.channels {
-                if is_guild_text_channel(channel.kind) {
-                    measurements.append(
-                        TEXT_CHANNELS_MEASUREMENT,
-                        Measurement::new(time, "guild_create", Some(channel), None, 0),
-                    );
-                }
+        Event::ChannelCreate(event) => on_channel_create(&mut measurements, time, event),
+        Event::ChannelUpdate(event) => on_channel_update(&mut measurements, cache, time, event),
+        Event::ChannelDelete(event) => on_channel_delete(&mut measurements, time, event),
 
-                if is_guild_voice_channel(channel.kind) {
-                    measurements.append(
-                        VOICE_CHANNELS_MEASUREMENT,
-                        Measurement::new(
-                            time,
-                            "guild_create",
-                            Some(channel),
-                            None,
-                            guild
-                                .voice_states
-                                .iter()
-                                .filter(|vs| vs.channel_id == Some(channel.id))
-                                .count(),
-                        )
-                        .users(
-                            guild
-                                .voice_states
-                                .iter()
-                                .filter(|vs| vs.channel_id == Some(channel.id))
-                                .map(|state| state.user_id),
-                        ),
-                    );
-                }
-            }
-
-            for thread in &guild.threads {
-                if thread.thread_metadata.as_ref().is_some_and(|meta| meta.archived) {
-                    continue;
-                }
-
-                let channel = guild.channels.iter().find(|c| Some(c.id) == thread.parent_id);
-
-                measurements.append(
-                    TEXT_CHANNELS_MEASUREMENT,
-                    Measurement::new(time, "guild_create", channel, Some(thread), 0),
-                );
-            }
-        }
-
-        Event::ChannelCreate(event) => {
-            let ChannelCreate(ref channel) = **event;
-
-            if is_guild_text_channel(channel.kind) {
-                measurements.append(
-                    TEXT_CHANNELS_MEASUREMENT,
-                    Measurement::new(time, "channel_create", Some(channel), None, 0),
-                );
-            }
-
-            if is_guild_voice_channel(channel.kind) {
-                measurements.append(
-                    VOICE_CHANNELS_MEASUREMENT,
-                    Measurement::new(time, "channel_create", Some(channel), None, 0),
-                );
-            }
-        }
-        Event::ChannelUpdate(event) => {
-            let ChannelUpdate(ref channel) = **event;
-
-            cache.with(|cache| {
-                if is_guild_text_channel(channel.kind) {
-                    measurements.append(
-                        TEXT_CHANNELS_MEASUREMENT,
-                        Measurement::new(time, "channel_update", Some(channel), None, 0),
-                    );
-                }
-
-                if is_guild_voice_channel(channel.kind) {
-                    measurements.append(
-                        VOICE_CHANNELS_MEASUREMENT,
-                        Measurement::new(
-                            time,
-                            "channel_update",
-                            Some(channel),
-                            None,
-                            cache.stats().channel_voice_states(channel.id).unwrap_or(0),
-                        )
-                        .users(
-                            cache
-                                .voice_channel_states(channel.id)
-                                .into_iter()
-                                .flatten()
-                                .map(|state| state.user_id()),
-                        ),
-                    );
-                }
-            });
-        }
-        Event::ChannelDelete(event) => {
-            let ChannelDelete(ref channel) = **event;
-
-            if is_guild_text_channel(channel.kind) {
-                measurements.append(
-                    TEXT_CHANNELS_MEASUREMENT,
-                    Measurement::new(time, "channel_delete", Some(channel), None, 0),
-                );
-            }
-
-            if is_guild_voice_channel(channel.kind) {
-                measurements.append(
-                    VOICE_CHANNELS_MEASUREMENT,
-                    Measurement::new(time, "channel_delete", Some(channel), None, 0),
-                );
-            }
-        }
-
-        Event::ThreadCreate(event) => {
-            let ThreadCreate(ref thread) = **event;
-
-            cache.with(|cache| {
-                let channel = thread.parent_id.and_then(|id| cache.channel(id));
-
-                measurements.append(
-                    TEXT_CHANNELS_MEASUREMENT,
-                    Measurement::new(time, "thread_create", channel.as_deref(), Some(thread), 0),
-                );
-            });
-        }
-        Event::ThreadUpdate(event) => {
-            let ThreadUpdate(ref thread) = **event;
-
-            cache.with(|cache| {
-                let channel = thread.parent_id.and_then(|id| cache.channel(id));
-
-                measurements.append(
-                    TEXT_CHANNELS_MEASUREMENT,
-                    Measurement::new(time, "thread_update", channel.as_deref(), Some(thread), 0),
-                );
-            });
-        }
-        &Event::ThreadDelete(ThreadDelete { id, parent_id, .. }) => {
-            cache.with(|cache| {
-                let thread = cache.channel(id);
-                let channel = cache.channel(parent_id);
-
-                measurements.append(
-                    TEXT_CHANNELS_MEASUREMENT,
-                    Measurement::new(
-                        time,
-                        "thread_delete",
-                        channel.as_deref(),
-                        thread.as_deref(),
-                        0,
-                    ),
-                );
-            });
-        }
+        Event::ThreadCreate(event) => on_thread_create(&mut measurements, cache, time, event),
+        Event::ThreadUpdate(event) => on_thread_update(&mut measurements, cache, time, event),
+        Event::ThreadDelete(event) => on_thread_delete(&mut measurements, cache, time, event),
 
         Event::VoiceStateUpdate(event) => {
-            cache.with(|cache| {
-                // NOTE: voice state counts are off by one because this event hasn't been processed yet
-                let VoiceStateUpdate(ref new_state) = **event;
-                let old_state = new_state
-                    .guild_id
-                    .and_then(|guild_id| cache.voice_state(new_state.user_id, guild_id));
-
-                let old_channel_id = old_state.map(|state| state.channel_id());
-
-                match (old_channel_id, new_state.channel_id) {
-                    // old and new are the same, ignore (someone muted themselves or something)
-                    (Some(old), Some(new)) if old == new => (),
-                    // user moved voice channels
-                    (Some(old_channel_id), Some(new_channel_id)) => {
-                        measurements.append(
-                            VOICE_CHANNELS_MEASUREMENT,
-                            Measurement::new(
-                                time,
-                                "state_update",
-                                cache.channel(old_channel_id).as_deref(),
-                                None,
-                                cache.stats().channel_voice_states(old_channel_id).unwrap_or(1) - 1,
-                            )
-                            .users(
-                                cache
-                                    .voice_channel_states(old_channel_id)
-                                    .into_iter()
-                                    .flatten()
-                                    .map(|state| state.user_id())
-                                    .filter(|&id| id != new_state.user_id),
-                            ),
-                        );
-
-                        measurements.append(
-                            VOICE_CHANNELS_MEASUREMENT,
-                            Measurement::new(
-                                time,
-                                "state_update",
-                                cache.channel(new_channel_id).as_deref(),
-                                None,
-                                cache.stats().channel_voice_states(new_channel_id).unwrap_or(0) + 1,
-                            )
-                            .users(
-                                cache
-                                    .voice_channel_states(new_channel_id)
-                                    .into_iter()
-                                    .flatten()
-                                    .map(|state| state.user_id())
-                                    .chain(Some(new_state.user_id)),
-                            ),
-                        );
-                    }
-                    // user joined a voice channel
-                    (None, Some(channel_id)) => measurements.append(
-                        VOICE_CHANNELS_MEASUREMENT,
-                        Measurement::new(
-                            time,
-                            "state_update",
-                            cache.channel(channel_id).as_deref(),
-                            None,
-                            cache.stats().channel_voice_states(channel_id).unwrap_or(0) + 1,
-                        )
-                        .users(
-                            cache
-                                .voice_channel_states(channel_id)
-                                .into_iter()
-                                .flatten()
-                                .map(|state| state.user_id())
-                                .chain(Some(new_state.user_id)),
-                        ),
-                    ),
-                    // user left a voice channel
-                    (Some(channel_id), None) => measurements.append(
-                        VOICE_CHANNELS_MEASUREMENT,
-                        Measurement::new(
-                            time,
-                            "state_update",
-                            cache.channel(channel_id).as_deref(),
-                            None,
-                            cache.stats().channel_voice_states(channel_id).unwrap_or(1) - 1,
-                        )
-                        .users(
-                            cache
-                                .voice_channel_states(channel_id)
-                                .into_iter()
-                                .flatten()
-                                .map(|state| state.user_id())
-                                .filter(|&id| id != new_state.user_id),
-                        ),
-                    ),
-                    // Nothing happened, probably unreachable
-                    (None, None) => (),
-                }
-            });
+            on_voice_state_update(&mut measurements, cache, time, event);
         }
 
-        Event::MessageCreate(event) => {
-            let MessageCreate(ref message) = **event;
-
-            cache.with(|cache| {
-                let (channel, thread) = if let Some(channel) = cache.channel(message.channel_id) {
-                    if let ChannelType::Private | ChannelType::Group = channel.kind {
-                        // don't collect stats on direct messages
-                        return;
-                    }
-
-                    if channel.kind.is_guild() && channel.kind.is_thread() {
-                        (channel.parent_id.and_then(|id| cache.channel(id)), Some(channel))
-                    } else {
-                        (Some(channel), None)
-                    }
-                } else {
-                    (None, None)
-                };
-
-                measurements.append(
-                    TEXT_CHANNELS_MEASUREMENT,
-                    Measurement::new(time, "message", channel.as_deref(), thread.as_deref(), 1)
-                        .user_id(message.author.id),
-                );
-            });
-        }
+        Event::MessageCreate(event) => on_message_create(&mut measurements, cache, time, event),
 
         _ => (),
     }

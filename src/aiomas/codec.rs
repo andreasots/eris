@@ -27,7 +27,7 @@ impl<'de> Deserialize<'de> for FrameType {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<FrameType, D::Error> {
         struct FrameTypeVisitor;
 
-        impl<'de> Visitor<'de> for FrameTypeVisitor {
+        impl Visitor<'_> for FrameTypeVisitor {
             type Value = FrameType;
 
             fn expecting(&self, f: &mut Formatter) -> FmtResult {
@@ -63,7 +63,7 @@ async fn decode_response(buf: BytesMut) -> Result<(u64, Result<Value, Exception>
         (FrameType::Exception, request_id, payload) => {
             Ok((request_id, Err(serde_json::from_value(payload)?)))
         }
-        (ty, _, _) => anyhow::bail!("response type {:?} invalid", ty),
+        (ty, _, _) => anyhow::bail!("response type {ty:?} invalid"),
     }
 }
 
@@ -81,14 +81,14 @@ async fn encode_response(
 async fn decode_request(buf: BytesMut) -> Result<(u64, Request), Error> {
     match serde_json::from_slice::<Frame<Request>>(&buf)? {
         (FrameType::Request, request_id, payload) => Ok((request_id, payload)),
-        (ty, _, _) => anyhow::bail!("request type {:?} invalid", ty),
+        (ty, _, _) => anyhow::bail!("request type {ty:?} invalid"),
     }
 }
 
 pub fn client<T: AsyncRead + AsyncWrite>(
     io: T,
 ) -> impl Stream<Item = Result<(u64, Result<Value, Exception>), Error>>
-       + Sink<(u64, Request), Error = Error> {
++ Sink<(u64, Request), Error = Error> {
     LengthDelimitedCodec::builder()
         .big_endian()
         .length_field_length(4)
@@ -101,7 +101,7 @@ pub fn client<T: AsyncRead + AsyncWrite>(
 pub fn server<T: AsyncRead + AsyncWrite>(
     io: T,
 ) -> impl Stream<Item = Result<(u64, Request), Error>>
-       + Sink<(u64, Result<Value, Exception>), Error = Error> {
++ Sink<(u64, Result<Value, Exception>), Error = Error> {
     LengthDelimitedCodec::builder()
         .big_endian()
         .length_field_length(4)

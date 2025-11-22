@@ -8,8 +8,8 @@ use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFil
 use tracing::info;
 use twilight_cache_inmemory::model::CachedMember;
 use twilight_http::Client as DiscordClient;
-use twilight_model::channel::message::MessageFlags;
 use twilight_model::channel::Message;
+use twilight_model::channel::message::MessageFlags;
 
 use crate::cache::Cache;
 use crate::command_parser::{Args, CommandHandler, Commands};
@@ -38,7 +38,7 @@ impl Static {
 }
 
 impl CommandHandler for Static {
-    fn pattern(&self) -> &str {
+    fn pattern(&self) -> &'static str {
         r"(.*)"
     }
 

@@ -4,7 +4,7 @@ version = "0.2.0"
 authors = ["Andreas Ots <qrpth@qrpth.eu>"]
 license = "Apache-2.0"
 readme = "README.md"
-edition = "2021"
+edition = "2024"
 build = "build.rs"
 
 [build-dependencies]

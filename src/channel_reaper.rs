@@ -34,7 +34,7 @@ pub async fn channel_reaper(
                     let Some(guild_channels) = cache.guild_channels(config.guild) else { return vec![] };
                     guild_channels.iter()
                         .copied()
-                        .flat_map(|channel_id| cache.channel(channel_id))
+                        .filter_map(|channel_id| cache.channel(channel_id))
                         .filter(|channel| channel.kind == ChannelType::GuildVoice)
                         .filter(|channel| channel.name.as_deref().unwrap_or("").starts_with(&config.temp_channel_prefix))
                         .filter(|channel| {

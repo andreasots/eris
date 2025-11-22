@@ -6,22 +6,22 @@ use anyhow::{Context, Error};
 use chrono::{DateTime, Utc};
 use sea_orm::{DatabaseConnection, EntityTrait};
 use separator::FixedPlaceSeparatable;
-use tokio::sync::watch::Receiver;
 use tokio::sync::RwLock;
+use tokio::sync::watch::Receiver;
 use tracing::error;
 use twilight_http::Client as DiscordClient;
+use twitch_api::HelixClient;
 use twitch_api::helix::streams::GetStreamsRequest;
 use twitch_api::twitch_oauth2::AppAccessToken;
 use twitch_api::types::UserNameRef;
-use twitch_api::HelixClient;
 
 use crate::cache::Cache;
 use crate::calendar::{CalendarHub, Event};
 use crate::config::Config;
 use crate::desertbus::DesertBus;
 use crate::models::{game, game_entry, show};
-use crate::rpc::client::HeaderInfo;
 use crate::rpc::LRRbot;
+use crate::rpc::client::HeaderInfo;
 use crate::shorten::shorten;
 
 const TOPIC_MAX_LEN: usize = 1024;
@@ -44,7 +44,7 @@ struct EventDisplay<'a> {
     event: &'a Event,
 }
 
-impl<'a> fmt::Display for EventDisplay<'a> {
+impl fmt::Display for EventDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "<t:{}:R>: {} ", self.event.start.timestamp(), self.event.summary)?;
 
@@ -151,11 +151,7 @@ impl Autotopic {
 
         let now = Utc::now();
 
-        if !is_dynamic {
-            if old_topic_static_prefix == new_topic_static_prefix {
-                return Ok(());
-            }
-        } else {
+        if is_dynamic {
             let distance =
                 levenshtein::levenshtein(old_topic_static_prefix, new_topic_static_prefix);
             if distance == 0
@@ -164,6 +160,8 @@ impl Autotopic {
             {
                 return Ok(());
             }
+        } else if old_topic_static_prefix == new_topic_static_prefix {
+            return Ok(());
         }
 
         self.discord
@@ -254,11 +252,11 @@ impl Autotopic {
                     .context("failed to get the next scheduled stream")?;
 
             let (desertbus, desertbus_is_dynamic) = self.desertbus(now, &events).await?;
-            if !desertbus.is_empty() {
+            if desertbus.is_empty() {
+                messages.extend(events.iter().map(|event| EventDisplay { event }.to_string()));
+            } else {
                 messages.extend(desertbus);
                 is_dynamic |= desertbus_is_dynamic;
-            } else {
-                messages.extend(events.iter().map(|event| EventDisplay { event }.to_string()));
             }
         }
 
@@ -318,10 +316,10 @@ impl Autotopic {
         let duration = Duration::from_secs_f64(total_hours * 3600.0);
         let end = start + duration;
 
-        if let Some(next_event_start) = events.get(0).map(|event| event.start) {
-            if next_event_start < start {
-                return Ok((messages, is_dynamic));
-            }
+        if let Some(next_event_start) = events.first().map(|event| event.start)
+            && next_event_start < start
+        {
+            return Ok((messages, is_dynamic));
         }
 
         if now < start {

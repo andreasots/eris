@@ -5,9 +5,9 @@ use std::time::Duration;
 
 use anyhow::{Context, Error};
 use chrono::{DateTime, Utc};
+use google_youtube3::YouTube;
 use google_youtube3::hyper_rustls::HttpsConnector;
 use google_youtube3::hyper_util::client::legacy::connect::HttpConnector;
-use google_youtube3::YouTube;
 use regex::Regex;
 use sea_orm::DatabaseConnection;
 use tokio::sync::watch::Receiver;
@@ -15,8 +15,8 @@ use tracing::{error, info, warn};
 use twilight_http::Client as DiscordClient;
 use twilight_model::channel::forum::ForumTag;
 use twilight_model::channel::{Channel, ChannelType, Message};
-use twilight_model::id::marker::{ChannelMarker, GuildMarker, TagMarker};
 use twilight_model::id::Id;
+use twilight_model::id::marker::{ChannelMarker, GuildMarker, TagMarker};
 use twilight_validate::channel::CHANNEL_NAME_LENGTH_MAX;
 
 use crate::cache::Cache;
@@ -107,7 +107,7 @@ impl VideoPoster {
         Ok(Self { db, cache, channel_id, playlists, discord, youtube })
     }
 
-    fn state_key(&self, channel_id: &str) -> String {
+    fn state_key(channel_id: &str) -> String {
         format!("eris.announcements.youtube.{channel_id}.announced_videos")
     }
 
@@ -139,7 +139,7 @@ impl VideoPoster {
                 Ok((_, playlist)) => {
                     if let Some(items) = playlist.items {
                         let announced =
-                            state::get::<HashSet<String>>(&self.state_key(channel_id), &self.db)
+                            state::get::<HashSet<String>>(&Self::state_key(channel_id), &self.db)
                                 .await
                                 .with_context(|| {
                                     format!(
@@ -191,7 +191,7 @@ impl VideoPoster {
             }
 
             state::insert_fifo_cache(
-                self.state_key(&video.channel_id),
+                Self::state_key(&video.channel_id),
                 &video.id,
                 MAX_STATE_ENTRIES,
                 &self.db,
@@ -348,8 +348,7 @@ impl Video {
     fn is_livestream(&self) -> bool {
         // Livestreams and premieres both have `liveStreamingDetails` set but livestreams have the duration set to zero
         // until it becomes a VOD. There doesn't seem to be a way to differentiate between a VOD and a premiere.
-        self.has_live_streaming_details
-            && self.duration.map(|duration| duration.is_zero()).unwrap_or(false)
+        self.has_live_streaming_details && self.duration.is_some_and(|duration| duration.is_zero())
     }
 
     fn is_short(&self) -> bool {
@@ -359,8 +358,8 @@ impl Video {
         //  * with a square or vertical aspect ratio.
         // The API also doesn't tell you the aspect ratio or the video size so divine it from the embed player size.
 
-        self.duration.map(|duration| duration <= Duration::from_secs(3 * 60)).unwrap_or(false)
-            && self.player_size.map(|(width, height)| width <= height).unwrap_or(false)
+        self.duration.is_some_and(|duration| duration <= Duration::from_secs(3 * 60))
+            && self.player_size.is_some_and(|(width, height)| width <= height)
     }
 
     fn message_content(&self) -> String {
