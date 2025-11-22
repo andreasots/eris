@@ -8,7 +8,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use anyhow::{Context, Error};
-use futures_util::{future, FutureExt, Sink, SinkExt, Stream, StreamExt, TryStreamExt};
+use futures_util::{FutureExt, Sink, SinkExt, Stream, StreamExt, TryStreamExt, future};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 #[cfg(not(unix))]
@@ -48,7 +48,7 @@ where
             return future::ready(Err(String::from("function takes no keyword arguments"))).boxed();
         }
 
-        if args.len() != 0 {
+        if !args.is_empty() {
             return future::ready(Err(format!(
                 "function takes no arguments ({} given)",
                 args.len()
@@ -94,15 +94,15 @@ where
         }
 
         let mut iter = args.into_iter();
-        let arg0 = match serde_json::from_value(iter.next().unwrap()) {
+        let arg = match serde_json::from_value(iter.next().unwrap()) {
             Ok(arg) => arg,
             Err(err) => {
                 return future::ready(Err(format!("failed to deserialize argument 0: {err:?}")))
-                    .boxed()
+                    .boxed();
             }
         };
 
-        self(arg0)
+        self(arg)
             .then(|res| async move {
                 match res {
                     Ok(val) => serde_json::to_value(val)

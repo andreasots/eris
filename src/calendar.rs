@@ -5,7 +5,7 @@ use google_calendar3::hyper_rustls::HttpsConnector;
 use google_calendar3::hyper_util::client::legacy::connect::HttpConnector;
 use tracing::info;
 
-use crate::tz::Tz;
+use crate::tz::{LoadTimeZone, Tz};
 
 pub const LRR: &str = "loadingreadyrun.com_72jmf1fn564cbbr84l048pv1go@group.calendar.google.com";
 pub const FANSTREAMS: &str = "caffeinatedlemur@gmail.com";

@@ -8,8 +8,8 @@ use sea_orm::DatabaseConnection;
 use tokio::sync::watch::Receiver;
 use tracing::{error, info};
 use twilight_http::Client as DiscordClient;
-use twilight_model::id::marker::ChannelMarker;
 use twilight_model::id::Id;
+use twilight_model::id::marker::ChannelMarker;
 use url::Url;
 
 use crate::config::Config;
@@ -150,7 +150,7 @@ impl TootAnnouncer {
                     if toot
                         .in_reply_to_account_id
                         .as_deref()
-                        .map_or(true, |user_id| self.users.contains_key(user_id))
+                        .is_none_or(|user_id| self.users.contains_key(user_id))
                     {
                         let message = if let Some(ref boosted_toot) = toot.reblog {
                             format!(
@@ -169,17 +169,15 @@ impl TootAnnouncer {
                         for channel in channels.iter().copied() {
                             if let Some(boosted_user_id) =
                                 toot.reblog.as_deref().map(|toot| toot.account.id.as_str())
+                                && let Some(channels) = self.users.get(boosted_user_id)
+                                && channels.contains(&channel)
                             {
-                                if let Some(channels) = self.users.get(boosted_user_id) {
-                                    if channels.contains(&channel) {
-                                        info!(
-                                            ?channel,
-                                            msg = message.as_str(),
-                                            "Skipping posting a boost because the target already gets posted to this channel"
-                                        );
-                                        continue;
-                                    }
-                                }
+                                info!(
+                                    ?channel,
+                                    msg = message.as_str(),
+                                    "Skipping posting a boost because the target already gets posted to this channel"
+                                );
+                                continue;
                             }
 
                             let message = self

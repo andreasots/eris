@@ -8,15 +8,15 @@ use regex::{Captures, Regex, RegexSet};
 use sea_orm::{DeriveActiveEnum, EnumIter};
 use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
-use tracing::{error, info, Instrument};
+use tracing::{Instrument, error, info};
 use twilight_gateway::Event;
 use twilight_http::Client as DiscordClient;
-use twilight_model::channel::message::MessageFlags;
 use twilight_model::channel::Message;
+use twilight_model::channel::message::MessageFlags;
 use twilight_model::gateway::payload::incoming::MessageCreate;
 use twilight_model::guild::Permissions;
-use twilight_model::id::marker::{ChannelMarker, GuildMarker, MessageMarker, UserMarker};
 use twilight_model::id::Id;
+use twilight_model::id::marker::{ChannelMarker, GuildMarker, MessageMarker, UserMarker};
 
 use crate::cache::Cache;
 use crate::config::Config;

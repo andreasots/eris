@@ -6,8 +6,8 @@ use tokio::sync::RwLock;
 use tracing::error;
 use twilight_http::Client as DiscordClient;
 use twilight_model::channel::message::MessageFlags;
-use twitch_api::twitch_oauth2::AppAccessToken;
 use twitch_api::HelixClient;
+use twitch_api::twitch_oauth2::AppAccessToken;
 
 use crate::aiomas::server::Route;
 use crate::config::Config;
@@ -79,7 +79,7 @@ async fn stream_up_inner(
         message.push(')');
     }
     message.push_str("! <https://twitch.tv/");
-    message.push_str(&channel.broadcaster_login.as_str());
+    message.push_str(channel.broadcaster_login.as_str());
     message.push('>');
 
     let message = discord

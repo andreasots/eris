@@ -17,8 +17,8 @@ use reqwest::Client as HttpClient;
 use sea_orm::DatabaseConnection;
 use tokio::sync::watch::Receiver;
 use twilight_http::Client as DiscordClient;
-use twilight_model::id::marker::ChannelMarker;
 use twilight_model::id::Id;
+use twilight_model::id::marker::ChannelMarker;
 
 use crate::config::Config;
 use crate::models::state;
@@ -30,11 +30,7 @@ fn parse_post_id_from_uri(url: &str) -> Option<&str> {
 
     let (start, post_id) = url.rsplit_once('/')?;
 
-    if start.ends_with("/app.bsky.feed.post") {
-        Some(post_id)
-    } else {
-        None
-    }
+    if start.ends_with("/app.bsky.feed.post") { Some(post_id) } else { None }
 }
 
 struct SkeetAnnouncer {
@@ -55,20 +51,20 @@ impl SkeetAnnouncer {
         let mut users: HashMap<Did, Vec<Id<ChannelMarker>>> =
             HashMap::with_capacity(config.bsky_users.len());
 
-        for (user, channels) in config.bsky_users.iter() {
+        for (user, channels) in &config.bsky_users {
             let did = match user {
                 AtIdentifier::Did(did) => did.clone(),
-                id => {
+                AtIdentifier::Handle(handle) => {
                     let profile = client
                         .service
                         .app
                         .bsky
                         .actor
                         .get_profile(Object::from(get_profile::ParametersData {
-                            actor: id.clone(),
+                            actor: handle.clone().into(),
                         }))
                         .await
-                        .with_context(|| format!("failed to look up {id:?}"))?;
+                        .with_context(|| format!("failed to look up {handle:?}"))?;
 
                     profile.data.did
                 }
@@ -100,13 +96,12 @@ impl SkeetAnnouncer {
                 .map(Vec::as_slice)
                 .unwrap_or_default()
                 .contains(&channel),
-            Union::Refs(ReplyRefParentRefs::NotFoundPost(_)) => false,
-            Union::Unknown(_) => false,
+            Union::Refs(ReplyRefParentRefs::NotFoundPost(_)) | Union::Unknown(_) => false,
         }
     }
 
     async fn post_skeets(&self) -> Result<(), Error> {
-        for (user, channels) in self.users.iter() {
+        for (user, channels) in &self.users {
             let state_key =
                 format!("eris.announcements.bsky.{}.last_skeet_indexed_at", user.as_ref());
 
@@ -137,7 +132,7 @@ impl SkeetAnnouncer {
             }
             skeets.sort_by_key(|skeet| *skeet.post.indexed_at.as_ref());
 
-            // Don't send an avalanche of toots when first activated.
+            // Don't send an avalanche of skeets when first activated.
             if last_skeet_indexed_at.is_some() {
                 for skeet in skeets {
                     let Some(post_id) = parse_post_id_from_uri(&skeet.post.uri) else {
@@ -221,8 +216,9 @@ impl SkeetAnnouncer {
             } else {
                 let last_skeet_indexed_at = skeets
                     .last()
-                    .map(|skeet| *skeet.post.indexed_at.as_ref())
-                    .unwrap_or(DateTime::<FixedOffset>::MIN_UTC.fixed_offset());
+                    .map_or(DateTime::<FixedOffset>::MIN_UTC.fixed_offset(), |skeet| {
+                        *skeet.post.indexed_at.as_ref()
+                    });
 
                 state::set(state_key, last_skeet_indexed_at, &self.db)
                     .await
@@ -244,7 +240,7 @@ pub async fn post_skeets(
         ReqwestClientBuilder::new("https://public.api.bsky.app").client(http_client).build(),
     );
 
-    let annoucer = match SkeetAnnouncer::new(config, db, discord, client).await {
+    let announcer = match SkeetAnnouncer::new(config, db, discord, client).await {
         Ok(res) => res,
         Err(error) => {
             tracing::error!(?error, "failed to initialize the skeet announcer");
@@ -258,7 +254,7 @@ pub async fn post_skeets(
         tokio::select! {
             _ = running.changed() => break,
             _ = timer.tick() => {
-                if let Err(error) = annoucer.post_skeets().await {
+                if let Err(error) = announcer.post_skeets().await {
                     tracing::error!(?error, "Failed to announce new skeets");
                 }
             }

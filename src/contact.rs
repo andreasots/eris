@@ -3,13 +3,13 @@ use std::time::Duration;
 
 use anyhow::{Context, Error};
 use chrono::NaiveDate;
+use google_sheets4::Sheets;
 use google_sheets4::api::{
     BatchUpdateSpreadsheetRequest, CellData, CreateDeveloperMetadataRequest, DeveloperMetadata,
     DeveloperMetadataLocation, DimensionRange, Request, Spreadsheet,
 };
 use google_sheets4::hyper_rustls::HttpsConnector;
 use google_sheets4::hyper_util::client::legacy::connect::HttpConnector;
-use google_sheets4::Sheets;
 use tokio::sync::watch::Receiver;
 use tracing::{error, info};
 use twilight_http::Client as DiscordClient;
@@ -19,7 +19,7 @@ use twilight_validate::embed::{AUTHOR_NAME_LENGTH, DESCRIPTION_LENGTH};
 
 use crate::config::Config;
 use crate::shorten::{shorten, split_to_parts};
-use crate::tz::Tz;
+use crate::tz::{LoadTimeZone, Tz};
 
 const SENT_KEY: &str = "lrrbot.sent";
 
@@ -32,7 +32,7 @@ pub async fn post_messages(
     if config.contact_spreadsheet.is_none() {
         info!("Contact spreadsheet not set");
         return;
-    };
+    }
 
     let mut timer = tokio::time::interval(Duration::from_secs(60));
 
@@ -80,7 +80,7 @@ fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(i32, Vec<Entry<'_>>)> 
         .and_then(|tz| Tz::from_name(tz).ok())
         .unwrap_or_else(Tz::utc);
     let sheets = spreadsheet.sheets.as_ref()?;
-    let sheet = sheets.get(0)?;
+    let sheet = sheets.first()?;
     let sheet_id = sheet.properties.as_ref()?.sheet_id?;
 
     let mut rows = vec![];
@@ -107,7 +107,7 @@ fn find_unsent_rows(spreadsheet: &Spreadsheet) -> Option<(i32, Vec<Entry<'_>>)> 
             let values = row.values.as_ref();
 
             let timestamp =
-                values.and_then(|row| row.get(0)).and_then(|cell| extract_timestamp(cell, &tz));
+                values.and_then(|row| row.first()).and_then(|cell| extract_timestamp(cell, &tz));
             let message = values.and_then(|row| row.get(1)).and_then(extract_string);
             let username = values.and_then(|row| row.get(2)).and_then(extract_string);
 

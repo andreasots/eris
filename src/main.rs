@@ -1,16 +1,19 @@
+#![deny(unsafe_code)]
+#![warn(clippy::pedantic)]
+
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{Context as _, Error};
 use futures_util::stream::{FuturesUnordered, StreamExt as _};
+use google_calendar3::CalendarHub;
 use google_calendar3::common::Client as HyperClient;
 use google_calendar3::hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
-use google_calendar3::hyper_util::client::legacy::connect::HttpConnector;
 use google_calendar3::hyper_util::client::legacy::Builder as HyperClientBuilder;
+use google_calendar3::hyper_util::client::legacy::connect::HttpConnector;
 use google_calendar3::hyper_util::rt::TokioExecutor;
 use google_calendar3::yup_oauth2::authenticator::{Authenticator, ServiceAccountAuthenticator};
-use google_calendar3::CalendarHub;
 use google_sheets4::Sheets;
 use google_youtube3::YouTube;
 use tokio::sync::RwLock;
@@ -191,10 +194,10 @@ async fn main() -> Result<(), Error> {
     let mut rpc_server = {
         #[cfg(unix)]
         let server = {
-            if let Err(err) = tokio::fs::remove_file(&config.eris_socket).await {
-                if err.kind() != std::io::ErrorKind::NotFound {
-                    return Err(Error::from(err).context("failed to remove the socket file"));
-                }
+            if let Err(err) = tokio::fs::remove_file(&config.eris_socket).await
+                && err.kind() != std::io::ErrorKind::NotFound
+            {
+                return Err(Error::from(err).context("failed to remove the socket file"));
             }
 
             crate::aiomas::server::Server::new(&config.eris_socket)
@@ -311,12 +314,14 @@ async fn main() -> Result<(), Error> {
 
     let shard_config = twilight_gateway::Config::new(config.discord_botsecret.clone(), intents);
     let presence = UpdatePresencePayload::new(
-        vec![MinimalActivity {
-            kind: ActivityType::Listening,
-            name: format!("{}help || v{}", config.command_prefix, env!("CARGO_PKG_VERSION")),
-            url: Some("https://lrrbot.com/".into()),
-        }
-        .into()],
+        vec![
+            MinimalActivity {
+                kind: ActivityType::Listening,
+                name: format!("{}help || v{}", config.command_prefix, env!("CARGO_PKG_VERSION")),
+                url: Some("https://lrrbot.com/".into()),
+            }
+            .into(),
+        ],
         false,
         None,
         PresenceStatus::Online,
@@ -347,18 +352,12 @@ async fn main() -> Result<(), Error> {
                     res = shard.next_event(EventTypeFlags::all()) => match res {
                         Some(Ok(event)) => {
                             #[cfg(target_os = "linux")]
-                            if let Some(sd_notify) = sd_notify.as_ref() {
-                                if let Err(error) = sd_notify.feed_watchdog().await {
-                                    tracing::warn!(?error, "failed to feed the systemd watchdog");
-                                }
+                            if let Some(sd_notify) = sd_notify.as_ref() && let Err(error) = sd_notify.feed_watchdog().await {
+                                tracing::warn!(?error, "failed to feed the systemd watchdog");
                             }
 
-                            if let Some(ref influxdb) = influxdb {
-                                if let Err(error) =
-                                    crate::metrics::on_event(&cache, influxdb, &event).await
-                                {
-                                    tracing::error!(?error, "failed to collect metrics");
-                                }
+                            if let Some(ref influxdb) = influxdb && let Err(error) = crate::metrics::on_event(&cache, influxdb, &event).await {
+                                tracing::error!(?error, "failed to collect metrics");
                             }
 
                             cache.update(&event);
@@ -391,10 +390,10 @@ async fn main() -> Result<(), Error> {
     }));
 
     #[cfg(target_os = "linux")]
-    if let Some(sd_notify) = sd_notify.as_ref() {
-        if let Err(error) = sd_notify.ready().await {
-            tracing::warn!(?error, "failed to notify systemd that the bot is up");
-        }
+    if let Some(sd_notify) = sd_notify.as_ref()
+        && let Err(error) = sd_notify.ready().await
+    {
+        tracing::warn!(?error, "failed to notify systemd that the bot is up");
     }
 
     if let Some(Err(error)) = tasks.next().await {
