@@ -98,11 +98,11 @@ pub type Tz = chrono_tz::Tz;
 #[cfg(not(unix))]
 impl LoadTimeZone for Tz {
     fn from_name(name: &str) -> Result<Self, Error> {
-        Ok(Self(name.parse().map_err(Error::msg)?))
+        Ok(name.parse().map_err(Error::msg)?)
     }
 
     fn from_name_case_insensitive(name: &str) -> Result<Self, Error> {
-        Ok(Self(chrono_tz::Tz::from_str_insensitive(name).map_err(Error::msg)?))
+        Ok(chrono_tz::Tz::from_str_insensitive(name).map_err(Error::msg)?)
     }
 
     fn utc() -> Self {
