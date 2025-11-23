@@ -71,7 +71,7 @@ impl CommandHandler for Time {
                 .reply(message.id)
                 .content(&format!(
                     "Current moonbase time: {}",
-                    Utc::now().with_timezone(&&config.timezone).format(self.format)
+                    Utc::now().with_timezone(&config.timezone).format(self.format)
                 ))
                 .await
                 .context("failed to reply to command")?;

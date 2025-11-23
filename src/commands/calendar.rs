@@ -149,7 +149,7 @@ impl Next {
                 result.push(')');
             }
             result.push_str(" on ");
-            write!(result, "{}", event.start.with_timezone(&tz).format("%a %e %b %I:%M %p %Z"))
+            write!(result, "{}", event.start.with_timezone(tz).format("%a %e %b %I:%M %p %Z"))
                 .context("failed to write to string")?;
 
             result.push_str(" (");
