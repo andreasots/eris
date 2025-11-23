@@ -1,5 +1,5 @@
 use anyhow::{Context, Error};
-use chrono::{DateTime, TimeDelta, Utc};
+use chrono::{DateTime, TimeDelta, TimeZone, Utc};
 use google_calendar3::api::EventDateTime;
 use google_calendar3::hyper_rustls::HttpsConnector;
 use google_calendar3::hyper_util::client::legacy::connect::HttpConnector;
@@ -43,10 +43,8 @@ fn parse_timestamp(timestamp: &EventDateTime, timezone: &Tz) -> Result<DateTime<
     if let Some(timestamp) = timestamp.date_time {
         Ok(timestamp)
     } else if let Some(date) = timestamp.date {
-        Ok(date
-            .and_hms_opt(0, 0, 0)
-            .context("midnight is invalid?")?
-            .and_local_timezone(timezone)
+        Ok(timezone
+            .from_local_datetime(&date.and_hms_opt(0, 0, 0).context("midnight is invalid?")?)
             .earliest()
             .ok_or_else(|| Error::msg("invalid timestamp: midnight doesn't exist in time zone"))?
             .with_timezone(&Utc))

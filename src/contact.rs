@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Error};
-use chrono::NaiveDate;
+use chrono::{NaiveDate, TimeZone};
 use google_sheets4::Sheets;
 use google_sheets4::api::{
     BatchUpdateSpreadsheetRequest, CellData, CreateDeveloperMetadataRequest, DeveloperMetadata,
@@ -61,8 +61,8 @@ fn extract_timestamp(cell: &CellData, tz: &Tz) -> Option<Timestamp> {
     let epoch = NaiveDate::from_ymd_opt(1899, 12, 30)?.and_hms_opt(0, 0, 0)?;
     let offset = Duration::from_secs_f64(cell.effective_value.as_ref()?.number_value? * 86400.0);
     let timestamp = epoch + offset;
-    let micros = timestamp
-        .and_local_timezone(tz)
+    let micros = tz
+        .from_local_datetime(&timestamp)
         .earliest()
         .map_or_else(|| timestamp.and_utc().timestamp_micros(), |ts| ts.timestamp_micros());
     Timestamp::from_micros(micros).ok()

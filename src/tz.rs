@@ -1,13 +1,14 @@
 use anyhow::Error;
+use chrono::TimeZone;
 
-pub trait LoadTimeZone: Sized {
+pub trait LoadTimeZone: TimeZone + Sized {
     fn from_name(name: &str) -> Result<Self, Error>;
     fn from_name_case_insensitive(name: &str) -> Result<Self, Error>;
     fn utc() -> Self;
 }
 
 #[cfg(unix)]
-pub type Tz = tzfile::Tz;
+pub type Tz = tzfile::ArcTz;
 
 #[cfg(unix)]
 mod unix {
@@ -28,7 +29,7 @@ mod unix {
 
         match tzfile::Tz::parse(name, &source) {
             Err(tzfile::Error::InvalidMagic) => anyhow::bail!("no such timezone"),
-            res => Ok(res.context("invalid zone file")?),
+            res => Ok(Tz::new(res.context("invalid zone file")?)),
         }
     }
 
@@ -86,7 +87,7 @@ mod unix {
         }
 
         fn utc() -> Self {
-            chrono::Utc.into()
+            Tz::new(chrono::Utc.into())
         }
     }
 }
