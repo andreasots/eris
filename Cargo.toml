@@ -40,7 +40,7 @@ tokio = { version = "1.48.0", default-features = false, features = ["net", "fs",
 tokio-util = { version = "0.7.17", default-features = false, features = ["codec"] }
 tower = { version = "0.5.2", default-features = false, features = ["reconnect"] }
 tracing = { version = "0.1.43", default-features = false, features = ["std", "attributes", "max_level_trace", "release_max_level_debug"] }
-tracing-subscriber = { version = "0.3.20", default-features = false, features = ["fmt", "std", "chrono", "env-filter", "json", "tracing-log"] }
+tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt", "std", "chrono", "env-filter", "json", "tracing-log"] }
 twilight-cache-inmemory = { version = "0.17.0", default-features = false, features = ["permission-calculator"] }
 twilight-gateway = { version = "0.17.0", default-features = false, features = ["rustls-native-roots", "zlib", "twilight-http"] }
 twilight-http = { version = "0.17.0", default-features = false, features = ["decompression", "rustls-native-roots"] }
