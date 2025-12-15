@@ -3924,9 +3924,9 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "twilight-cache-inmemory"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e30c60181c900c1121000fbd769c547ec437bb3fe61c8f8cdb0f4356b6afbd48"
+checksum = "3d205ec8d1fc62db874cc7af787cc5919a6d8513974159de950764917c563f30"
 dependencies = [
  "bitflags",
  "dashmap",
@@ -3937,9 +3937,9 @@ dependencies = [
 
 [[package]]
 name = "twilight-gateway"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ade57432c8ba31126ce40af996622864ccde1b95c95d538414d4c23191f4171"
+checksum = "59267541c31f888c1587da5e7cbab182ae6efd98faedd9ea2e35a4eef43ff204"
 dependencies = [
  "bitflags",
  "fastrand",
@@ -3968,9 +3968,9 @@ dependencies = [
 
 [[package]]
 name = "twilight-http"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb36574ad2d30e1dbb39876265c66d37ee60969ffdcc1f0ebb9ace2ca42d74ff"
+checksum = "05b868001d7bfb953732b3f1cd92f63cb88cd2ea902f590b1d084c66aea60e48"
 dependencies = [
  "brotli-decompressor",
  "fastrand",
@@ -3992,9 +3992,9 @@ dependencies = [
 
 [[package]]
 name = "twilight-http-ratelimiting"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3c0fa6e3578e0f6dc4636eed55e3c0dd51b5898de2b7200f7fec025656c1148"
+checksum = "0515b0c30814068a7540fcb5f58b634259ca453fa335d42c3b2c8f2b06ac6a59"
 dependencies = [
  "hashbrown 0.16.1",
  "tokio",
@@ -4013,9 +4013,9 @@ dependencies = [
 
 [[package]]
 name = "twilight-model"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "416247a86048c1909954c95c64ca4c7fbbcb44c36e9cbed8c008e7e40988f610"
+checksum = "2bf6bb7b93a7f765d89b3388cc710c0ae16104579e06bb30ea1ee6bd41420a8b"
 dependencies = [
  "bitflags",
  "serde",
