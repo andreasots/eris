@@ -81,6 +81,7 @@ pub async fn get_next_event(
     let (_, res) = client
         .events()
         .list(calendar_id)
+        .add_scope("https://www.googleapis.com/auth/calendar.events.readonly")
         .max_results(10)
         .order_by("startTime")
         .single_events(true)

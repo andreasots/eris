@@ -14,6 +14,7 @@ use google_calendar3::hyper_util::client::legacy::Builder as HyperClientBuilder;
 use google_calendar3::hyper_util::client::legacy::connect::HttpConnector;
 use google_calendar3::hyper_util::rt::TokioExecutor;
 use google_calendar3::yup_oauth2::authenticator::{Authenticator, ServiceAccountAuthenticator};
+use google_calendar3::yup_oauth2::client::CustomHyperClientBuilder;
 use google_sheets4::Sheets;
 use google_youtube3::YouTube;
 use tokio::sync::RwLock;
@@ -78,10 +79,13 @@ async fn create_google_client(
         google_calendar3::yup_oauth2::read_service_account_key(service_account_path)
             .await
             .context("failed to read the Google service account key")?;
-    let auth = ServiceAccountAuthenticator::with_client(auth, builder.build(connector.clone()))
-        .build()
-        .await
-        .context("failed to create the Google service account authenticator")?;
+    let auth = ServiceAccountAuthenticator::with_client(
+        auth,
+        CustomHyperClientBuilder::from(builder.build(connector.clone())),
+    )
+    .build()
+    .await
+    .context("failed to create the Google service account authenticator")?;
 
     Ok((builder.build(connector), auth))
 }

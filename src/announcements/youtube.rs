@@ -156,7 +156,12 @@ impl VideoPoster {
                         );
                     }
                 }
-                Err(error) => error!(?error, "playlist request failed"),
+                Err(error) => error!(
+                    ?error,
+                    channel.id = channel_id,
+                    playlist.id = playlist_id,
+                    "playlist request failed"
+                ),
             }
         }
 
