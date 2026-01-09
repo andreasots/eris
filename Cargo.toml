@@ -22,7 +22,7 @@ futures-util = { version = "0.3.31", default-features = false, features = ["std"
 google-calendar3 = { version = "7.0.0", features = ["yup-oauth2-service-account"] }
 google-sheets4 = { version = "7.0.0", features = ["yup-oauth2-service-account"] }
 google-youtube3 = { version = "7.0.0", features = ["yup-oauth2-service-account"] }
-html5ever = "0.36.1"
+html5ever = "0.37.0"
 influxdb-line-protocol = "2.0.0"
 iso8601 = "0.6.3"
 lalrpop-util = { version = "0.22.2", features = ["std", "lexer", "unicode"], default-features = false }
