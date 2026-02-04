@@ -17,7 +17,7 @@ atrium-xrpc-client = { version = "0.5.15", default-features = false, features = 
 bytes = { version = "1.11.0", default-features = false }
 caseless = "0.2.2"
 chrono = { version = "0.4.43", default-features = false, features = ["std", "clock", "serde"] }
-clap = { version = "4.5.56", default-features = false, features = ["std"] }
+clap = { version = "4.5.57", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.31", default-features = false, features = ["std", "sink"] }
 google-calendar3 = { version = "7.0.0", features = ["yup-oauth2-service-account"] }
 google-sheets4 = { version = "7.0.0", features = ["yup-oauth2-service-account"] }
