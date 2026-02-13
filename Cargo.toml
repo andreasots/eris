@@ -8,7 +8,7 @@ edition = "2024"
 build = "build.rs"
 
 [build-dependencies]
-lalrpop = { version = "0.22.2", default-features = false, features = ["lexer", "unicode"] }
+lalrpop = { version = "0.23.0", default-features = false, features = ["lexer", "unicode"] }
 
 [dependencies]
 anyhow = { version = "1.0.100", default-features = false, features = ["std"] }
@@ -25,7 +25,7 @@ google-youtube3 = { version = "7.0.0", features = ["yup-oauth2-service-account"]
 html5ever = "0.38.0"
 influxdb-line-protocol = "2.0.0"
 iso8601 = "0.6.3"
-lalrpop-util = { version = "0.22.2", features = ["std", "lexer", "unicode"], default-features = false }
+lalrpop-util = { version = "0.23.0", features = ["std", "lexer", "unicode"], default-features = false }
 levenshtein = "1.0.5"
 rand = { version = "0.9.2", default-features = false, features = ["std", "std_rng", "thread_rng"] }
 regex = { version = "1.12.3", default-features = false, features = ["perf", "std", "unicode"] }
