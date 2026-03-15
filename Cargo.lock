@@ -280,9 +280,9 @@ dependencies = [
 
 [[package]]
 name = "bit-set"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a07f2fecdb245788ffcf67b1e6102090772d1572e859a176a270a8bd50d75d12"
+checksum = "34ddef2995421ab6a5c779542c81ee77c115206f4ad9d5a8e05f4ff49716a3dd"
 dependencies = [
  "bit-vec",
 ]
