@@ -12,7 +12,7 @@ lalrpop = { version = "0.23.1", default-features = false, features = ["lexer", "
 
 [dependencies]
 anyhow = { version = "1.0.102", default-features = false, features = ["std"] }
-atrium-api = { version = "0.25.7", default-features = false, features = ["namespace-appbsky"] }
+atrium-api = { version = "0.25.8", default-features = false, features = ["namespace-appbsky"] }
 atrium-xrpc-client = { version = "0.5.15", default-features = false, features = ["reqwest"] }
 bytes = { version = "1.11.1", default-features = false }
 caseless = "0.2.2"
