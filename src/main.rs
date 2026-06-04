@@ -134,6 +134,11 @@ async fn main() -> Result<(), Error> {
         )
         .get_matches();
 
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .ok()
+        .context("failed to install the Rustls crypto provider")?;
+
     let mut tasks = FuturesUnordered::new();
     let (running_tx, mut running_rx) = tokio::sync::watch::channel(true);
 

@@ -11,9 +11,8 @@ use atrium_api::app::bsky::feed::get_author_feed;
 use atrium_api::client::AtpServiceClient;
 use atrium_api::types::string::{AtIdentifier, Did};
 use atrium_api::types::{Object, Union};
-use atrium_xrpc_client::reqwest::{ReqwestClient, ReqwestClientBuilder};
+use atrium_api::xrpc::{HttpClient, XrpcClient};
 use chrono::{DateTime, FixedOffset};
-use reqwest::Client as HttpClient;
 use sea_orm::DatabaseConnection;
 use tokio::sync::watch::Receiver;
 use twilight_http::Client as DiscordClient;
@@ -22,6 +21,34 @@ use twilight_model::id::marker::ChannelMarker;
 
 use crate::config::Config;
 use crate::models::state;
+
+struct ReqwestXrpcClient {
+    client: reqwest::Client,
+    base_uri: String,
+}
+
+impl HttpClient for ReqwestXrpcClient {
+    async fn send_http(
+        &self,
+        request: atrium_api::xrpc::http::Request<Vec<u8>>,
+    ) -> Result<
+        atrium_api::xrpc::http::Response<Vec<u8>>,
+        Box<dyn std::error::Error + Send + Sync + 'static>,
+    > {
+        let response = self.client.execute(request.try_into()?).await?;
+        let mut builder = atrium_api::xrpc::http::Response::builder().status(response.status());
+        for (key, value) in response.headers() {
+            builder = builder.header(key, value);
+        }
+        builder.body(response.bytes().await?.to_vec()).map_err(From::from)
+    }
+}
+
+impl XrpcClient for ReqwestXrpcClient {
+    fn base_uri(&self) -> String {
+        self.base_uri.clone()
+    }
+}
 
 fn parse_post_id_from_uri(url: &str) -> Option<&str> {
     if !url.starts_with("at://") {
@@ -36,7 +63,7 @@ fn parse_post_id_from_uri(url: &str) -> Option<&str> {
 struct SkeetAnnouncer {
     db: DatabaseConnection,
     discord: Arc<DiscordClient>,
-    client: AtpServiceClient<ReqwestClient>,
+    client: AtpServiceClient<ReqwestXrpcClient>,
 
     users: HashMap<Did, Vec<Id<ChannelMarker>>>,
 }
@@ -46,7 +73,7 @@ impl SkeetAnnouncer {
         config: Arc<Config>,
         db: DatabaseConnection,
         discord: Arc<DiscordClient>,
-        client: AtpServiceClient<ReqwestClient>,
+        client: AtpServiceClient<ReqwestXrpcClient>,
     ) -> Result<Self, Error> {
         let mut users: HashMap<Did, Vec<Id<ChannelMarker>>> =
             HashMap::with_capacity(config.bsky_users.len());
@@ -234,11 +261,12 @@ pub async fn post_skeets(
     config: Arc<Config>,
     db: DatabaseConnection,
     discord: Arc<DiscordClient>,
-    http_client: HttpClient,
+    http_client: reqwest::Client,
 ) {
-    let client = AtpServiceClient::new(
-        ReqwestClientBuilder::new("https://public.api.bsky.app").client(http_client).build(),
-    );
+    let client = AtpServiceClient::new(ReqwestXrpcClient {
+        client: http_client,
+        base_uri: "https://public.api.bsky.app".into(),
+    });
 
     let announcer = match SkeetAnnouncer::new(config, db, discord, client).await {
         Ok(res) => res,
