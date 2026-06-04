@@ -227,7 +227,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9d1c0ebd71047b85ccfcad936ded56179af24beb60239ab590c549d2325e679"
 dependencies = [
  "atrium-xrpc",
- "reqwest",
+ "reqwest 0.12.28",
 ]
 
 [[package]]
@@ -711,7 +711,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ccc2776f0c61eca1ca32528f85548abd1a4be8fb53d1b21c013e4f18da1e7090"
 dependencies = [
  "data-encoding",
- "syn 1.0.109",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -855,7 +855,7 @@ dependencies = [
  "levenshtein",
  "rand 0.10.1",
  "regex",
- "reqwest",
+ "reqwest 0.12.28",
  "rust-ini",
  "sea-orm",
  "separator",
@@ -2455,7 +2455,7 @@ dependencies = [
  "rustc-hash",
  "rustls",
  "socket2",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
  "web-time",
@@ -2476,7 +2476,7 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "slab",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tinyvec",
  "tracing",
  "web-time",
@@ -2690,6 +2690,35 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "webpki-roots 1.0.4",
+]
+
+[[package]]
+name = "reqwest"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "219c5811de6525e5416c7d5d53bb656d3afdbc6c5af816e0802bcfa42dbdc1c3"
+dependencies = [
+ "base64",
+ "bytes",
+ "futures-core",
+ "http",
+ "http-body",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "js-sys",
+ "log",
+ "percent-encoding",
+ "pin-project-lite",
+ "sync_wrapper",
+ "tokio",
+ "tower 0.5.3",
+ "tower-http",
+ "tower-service",
+ "url",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
@@ -2907,7 +2936,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "strum",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "time",
  "tracing",
  "url",
@@ -3334,7 +3363,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "smallvec",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
  "tracing",
@@ -3418,7 +3447,7 @@ dependencies = [
  "smallvec",
  "sqlx-core",
  "stringprep",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tracing",
  "whoami",
 ]
@@ -3456,7 +3485,7 @@ dependencies = [
  "smallvec",
  "sqlx-core",
  "stringprep",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tracing",
  "whoami",
 ]
@@ -3481,7 +3510,7 @@ dependencies = [
  "serde",
  "serde_urlencoded",
  "sqlx-core",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tracing",
  "url",
 ]
@@ -3635,11 +3664,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.17"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f63587ca0f12b72a0600bcba1d40081f830876000bb46dd2337a3051618f4fc8"
+checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
 dependencies = [
- "thiserror-impl 2.0.17",
+ "thiserror-impl 2.0.18",
 ]
 
 [[package]]
@@ -3655,9 +3684,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.17"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ff15c8ecd7de3849db632e14d18d2571fa09dfc5ed93479bc4485c7a517c913"
+checksum = "ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4101,9 +4130,9 @@ dependencies = [
 
 [[package]]
 name = "twitch_api"
-version = "0.7.2"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "758fa65710ccb4643ba36ee31115d978df06fe4f232b407e4b09582a98227ac6"
+checksum = "15a232246d430ce75d77fb271aa9f9a1f731294b6394d78c86c111613745775e"
 dependencies = [
  "aliri_braid",
  "async-trait",
@@ -4113,7 +4142,7 @@ dependencies = [
  "http",
  "hyper",
  "once_cell",
- "reqwest",
+ "reqwest 0.13.4",
  "serde",
  "serde_derive",
  "serde_json",
@@ -4130,24 +4159,25 @@ dependencies = [
 
 [[package]]
 name = "twitch_oauth2"
-version = "0.15.2"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eaec6e008ed2818c0d9a146ffc16b0af8491a71fc8d433ef09d79de740980a51"
+checksum = "08dc2f82af87d9794d20176d02b6b4e2f5301f59ba3faa0d6da61b33cd9ba620"
 dependencies = [
  "aliri_braid",
- "async-trait",
  "base64",
  "displaydoc",
+ "futures",
  "http",
  "once_cell",
- "rand 0.8.5",
- "reqwest",
+ "rand 0.10.1",
+ "reqwest 0.13.4",
  "serde",
  "serde_derive",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "twitch_types",
  "url",
+ "web-time",
 ]
 
 [[package]]
@@ -4522,7 +4552,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4886,7 +4916,7 @@ dependencies = [
  "seahash",
  "serde",
  "serde_json",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "time",
  "tokio",
  "url",
