@@ -11,12 +11,13 @@ use tokio::task::JoinHandle;
 use tracing::{Instrument, error, info};
 use twilight_gateway::Event;
 use twilight_http::Client as DiscordClient;
+use twilight_mention::Mention;
 use twilight_model::channel::Message;
 use twilight_model::channel::message::MessageFlags;
 use twilight_model::gateway::payload::incoming::MessageCreate;
 use twilight_model::guild::Permissions;
 use twilight_model::id::Id;
-use twilight_model::id::marker::{ChannelMarker, GuildMarker, MessageMarker, UserMarker};
+use twilight_model::id::marker::{ChannelMarker, MessageMarker, UserMarker};
 
 use crate::cache::Cache;
 use crate::config::Config;
@@ -64,30 +65,23 @@ pub enum Access {
 }
 
 impl Access {
-    pub fn user_has_access(
-        self,
-        user_id: Id<UserMarker>,
-        guild_id: Id<GuildMarker>,
-        cache: &Cache,
-    ) -> bool {
+    pub fn author_has_access(self, message: &Message, cache: &Cache) -> bool {
         match self {
             Access::All => true,
             Access::SubOnly => cache.with(|cache| {
-                cache
-                    .member(guild_id, user_id)
-                    .as_deref()
+                message
+                    .member
+                    .as_ref()
                     .into_iter()
-                    .flat_map(|member| member.roles().iter())
+                    .flat_map(|member| member.roles.iter())
                     .filter_map(|&role_id| cache.role(role_id))
                     .any(|role| role.colors.primary_color != 0)
             }),
-            Access::ModOnly => cache.with(|cache| {
-                cache
-                    .permissions()
-                    .root(user_id, guild_id)
-                    .map(|permissions| permissions.contains(Permissions::ADMINISTRATOR))
-                    .unwrap_or(false)
-            }),
+            Access::ModOnly => message
+                .member
+                .as_ref()
+                .and_then(|member| member.permissions)
+                .is_some_and(|permissions| permissions.contains(Permissions::ADMINISTRATOR)),
             Access::OwnerOnly => {
                 #[allow(clippy::unreadable_literal)]
                 const OWNERS: [Id<UserMarker>; 3] = [
@@ -96,7 +90,7 @@ impl Access {
                     Id::new(144128240389324800), // qrpth
                 ];
                 // TODO: transfer LRRbot to a team and check against team members
-                OWNERS.into_iter().any(|id| id == user_id)
+                OWNERS.into_iter().any(|id| id == message.author.id)
             }
         }
     }
@@ -197,7 +191,7 @@ impl CommandParser {
 
                             let guild_id = message.guild_id.unwrap_or(config.guild);
                             let access = handler.access();
-                            if !access.user_has_access(message.author.id, guild_id, &cache) {
+                            if !access.author_has_access(&message, &cache) {
                                 info!(?access, guild.id = guild_id.get(), "refusing access");
 
                                 if let Err(error) =
@@ -291,10 +285,15 @@ impl Builder {
         self
     }
 
-    fn expand_pattern(prefix: &str, pattern: &str) -> Result<Regex, Error> {
+    fn expand_pattern(
+        prefix: &str,
+        user_id: Id<UserMarker>,
+        pattern: &str,
+    ) -> Result<Regex, Error> {
         let prefix = regex::escape(prefix);
+        let user_mention = regex::escape(&user_id.mention().to_string());
         let expanded = pattern.replace(' ', r"(?:\s+)");
-        Regex::new(&format!(r"^\s*{prefix}\s*{expanded}\s*$")).map_err(|err| {
+        Regex::new(&format!(r"^\s*(?:{prefix}|{user_mention})\s*{expanded}\s*$")).map_err(|err| {
             Error::new(err).context(format!("failed to compile pattern {pattern:?}"))
         })
     }
@@ -304,12 +303,14 @@ impl Builder {
         cache: Arc<Cache>,
         config: Arc<Config>,
         discord: Arc<DiscordClient>,
+        user_id: Id<UserMarker>,
     ) -> Result<CommandParser, Error> {
         let handlers = self
             .handlers
             .into_iter()
             .map(|handler| {
-                let pattern = Self::expand_pattern(&config.command_prefix, handler.pattern())?;
+                let pattern =
+                    Self::expand_pattern(&config.command_prefix, user_id, handler.pattern())?;
                 Ok((pattern, handler))
             })
             .collect::<Result<Vec<_>, Error>>()

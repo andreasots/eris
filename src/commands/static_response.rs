@@ -6,7 +6,6 @@ use anyhow::{Context as _, Error};
 use rand::seq::IndexedRandom;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter};
 use tracing::info;
-use twilight_cache_inmemory::model::CachedMember;
 use twilight_http::Client as DiscordClient;
 use twilight_model::channel::Message;
 use twilight_model::channel::message::MessageFlags;
@@ -49,7 +48,7 @@ impl CommandHandler for Static {
     fn handle<'a>(
         &'a self,
         cache: &'a Cache,
-        config: &'a Config,
+        _: &'a Config,
         discord: &'a DiscordClient,
         _: Commands<'a>,
         message: &'a Message,
@@ -77,8 +76,7 @@ impl CommandHandler for Static {
                 return Ok(());
             };
 
-            let guild_id = message.guild_id.unwrap_or(config.guild);
-            if command.access.user_has_access(message.author.id, guild_id, cache) {
+            if command.access.author_has_access(&message, cache) {
                 let responses = command
                     .find_related(command_response::Entity)
                     .all(&self.db)
@@ -91,15 +89,12 @@ impl CommandHandler for Static {
 
                 let vars = HashMap::from([(
                     "user".to_string(),
-                    cache.with(|cache| {
-                        message
-                            .guild_id
-                            .and_then(|guild_id| cache.member(guild_id, message.author.id))
-                            .as_deref()
-                            .and_then(CachedMember::nick)
-                            .unwrap_or(&message.author.name)
-                            .to_string()
-                    }),
+                    message
+                        .member
+                        .as_ref()
+                        .and_then(|member| member.nick.as_deref())
+                        .unwrap_or(&message.author.name)
+                        .to_string(),
                 )]);
 
                 let response = strfmt::strfmt(&response.response, &vars)

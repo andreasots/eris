@@ -34,11 +34,9 @@ impl Help {
             "for those see [LRRbot's website](https://lrrbot.com/help#help-section-text).",
         ));
 
-        let guild_id = message.guild_id.unwrap_or(config.guild);
-
         let mut fields = vec![];
         for cmd in commands.iter() {
-            if cmd.access().user_has_access(message.author.id, guild_id, cache)
+            if cmd.access().author_has_access(&message, cache)
                 && let Some(help) = cmd.help()
             {
                 fields.push(EmbedField {
