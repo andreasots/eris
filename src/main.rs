@@ -284,6 +284,14 @@ async fn main() -> Result<(), Error> {
         http_client.clone(),
     )));
 
+    let current_user = discord
+        .current_user()
+        .await
+        .context("failed to send the get current user request")?
+        .model()
+        .await
+        .context("failed to parse the get current user request response")?;
+
     let command_parser = crate::command_parser::CommandParser::builder()
         .command(crate::commands::calendar::Next::fan(calendar.clone()))
         .command(crate::commands::calendar::Next::lrr(calendar.clone()))
@@ -301,7 +309,7 @@ async fn main() -> Result<(), Error> {
         .command(crate::commands::quote::Find::new(db.clone()))
         // this is the last command on purpose to avoid conflicts
         .command(crate::commands::static_response::Static::new(db.clone()))
-        .build(cache.clone(), config.clone(), discord.clone())
+        .build(cache.clone(), config.clone(), discord.clone(), current_user.id)
         .context("failed to build the command parser")?;
 
     #[cfg(target_os = "linux")]
@@ -314,8 +322,6 @@ async fn main() -> Result<(), Error> {
     };
 
     let intents = Intents::GUILDS
-        | Intents::GUILD_MEMBERS
-        | Intents::GUILD_EMOJIS_AND_STICKERS
         | Intents::GUILD_VOICE_STATES
         | Intents::GUILD_MESSAGES
         | Intents::DIRECT_MESSAGES
