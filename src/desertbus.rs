@@ -18,6 +18,7 @@ struct HeaderProps {
 
 #[derive(Deserialize)]
 struct Event {
+    name: (f64, String),
     total: (f64, f64),
     #[serde(rename = "startsAt")]
     starts_at: (f64, DateTime<Utc>),
@@ -158,7 +159,7 @@ impl DesertBus {
             .floor()
     }
 
-    pub async fn fetch_current_event(&self) -> Result<(DateTime<Utc>, f64), Error> {
+    pub async fn fetch_current_event(&self) -> Result<(String, DateTime<Utc>, f64), Error> {
         let html = self
             .client
             .get("https://desertbus.org/")
@@ -176,6 +177,10 @@ impl DesertBus {
         let props =
             serde_json::from_str::<HeaderProps>(&header).context("failed to parse header props")?;
 
-        return Ok((props.current_event.1.starts_at.1, props.current_event.1.total.1));
+        return Ok((
+            props.current_event.1.name.1,
+            props.current_event.1.starts_at.1,
+            props.current_event.1.total.1,
+        ));
     }
 }

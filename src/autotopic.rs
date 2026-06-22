@@ -303,8 +303,8 @@ impl Autotopic {
         let mut messages = vec![];
         let mut is_dynamic = false;
 
-        let (start, money_raised) = match self.desertbus.fetch_current_event().await {
-            Ok((start, money_raised)) => (start, money_raised),
+        let (name, start, money_raised) = match self.desertbus.fetch_current_event().await {
+            Ok((name, start, money_raised)) => (name, start, money_raised),
             Err(error) => {
                 error!(?error, "Failed to fetch the current Desert Bus");
 
@@ -312,7 +312,8 @@ impl Autotopic {
             }
         };
 
-        let total_hours = DesertBus::hours_raised(money_raised);
+        let total_hours =
+            if name.contains("Express") { 24.0 } else { DesertBus::hours_raised(money_raised) };
         let duration = Duration::from_secs_f64(total_hours * 3600.0);
         let end = start + duration;
 
@@ -327,7 +328,7 @@ impl Autotopic {
                 EventDisplay {
                     event: &Event {
                         start,
-                        summary: String::from("Desert Bus for Hope"),
+                        summary: name,
                         end,
                         location: Some(String::from(
                             "https://desertbus.org/ or https://twitch.tv/desertbus",
