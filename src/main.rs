@@ -1,4 +1,3 @@
-#![deny(unsafe_code)]
 #![warn(clippy::pedantic)]
 
 use std::borrow::Cow;
@@ -42,11 +41,15 @@ mod influxdb;
 mod markdown;
 mod metrics;
 mod models;
+#[cfg(feature = "ocr")]
+mod ocr_spam_filter;
 mod rpc;
 mod shorten;
 mod shutdown;
 #[cfg(target_os = "linux")]
 mod systemd;
+#[cfg(feature = "ocr")]
+mod tesseract;
 mod time;
 mod token_renewal;
 mod tz;
@@ -292,6 +295,18 @@ async fn main() -> Result<(), Error> {
         .await
         .context("failed to parse the get current user request response")?;
 
+    #[cfg(feature = "ocr")]
+    let tesseract = deadpool::managed::Pool::builder(crate::tesseract::Tesseract::new())
+        .build()
+        .context("failed to build the Tesseract pool")?;
+
+    #[cfg(feature = "ocr")]
+    let ocr_rules = crate::ocr_spam_filter::RuleSet::load(&db)
+        .await
+        .context("failed to read OCR spam rules")?;
+    #[cfg(feature = "ocr")]
+    let ocr_rules = Arc::new(RwLock::new(ocr_rules));
+
     let command_parser = crate::command_parser::CommandParser::builder()
         .command(crate::commands::calendar::Next::fan(calendar.clone()))
         .command(crate::commands::calendar::Next::lrr(calendar.clone()))
@@ -304,13 +319,36 @@ async fn main() -> Result<(), Error> {
         .command(crate::commands::tracing::TracingFilter::new(reload_handle.clone()))
         .command_opt(crate::commands::video::New::new(&config, youtube.clone()))
         .command_opt(crate::commands::video::Refresh::new(&config, youtube.clone()))
-        .command(crate::commands::voice::Voice::new())
+        .command(crate::commands::voice::Voice::new());
+
+    #[cfg(feature = "ocr")]
+    let command_parser = command_parser
+        .command(crate::commands::ocr::RulesAdd::new(db.clone(), ocr_rules.clone()))
+        .command(crate::commands::ocr::RulesRemove::new(db.clone(), ocr_rules.clone()))
+        .command(crate::commands::ocr::RulesList::new(ocr_rules.clone()))
+        .command(crate::commands::ocr::Test::new(
+            http_client.clone(),
+            ocr_rules.clone(),
+            tesseract.clone(),
+        ));
+
+    let command_parser = command_parser
         // this command is after all other quote commands to avoid conflicts
         .command(crate::commands::quote::Find::new(db.clone()))
         // this is the last command on purpose to avoid conflicts
         .command(crate::commands::static_response::Static::new(db.clone()))
         .build(cache.clone(), config.clone(), discord.clone(), current_user.id)
         .context("failed to build the command parser")?;
+
+    #[cfg(feature = "ocr")]
+    let ocr_spam_filter = crate::ocr_spam_filter::OcrSpamFilter::new(
+        config.clone(),
+        discord.clone(),
+        http_client.clone(),
+        tesseract,
+        ocr_rules,
+    )
+    .context("failed to construct the image spam filter")?;
 
     #[cfg(target_os = "linux")]
     let sd_notify = match crate::systemd::Notify::new() {
@@ -355,6 +393,8 @@ async fn main() -> Result<(), Error> {
         let influxdb = influxdb.clone();
         let mut running_rx = running_rx.clone();
         let handler_tx = handler_tx.clone();
+        #[cfg(feature = "ocr")]
+        let ocr_spam_filter = ocr_spam_filter.clone();
         #[cfg(target_os = "linux")]
         let sd_notify = sd_notify.clone();
 
@@ -376,6 +416,9 @@ async fn main() -> Result<(), Error> {
                             }
 
                             cache.update(&event);
+
+                            #[cfg(feature = "ocr")]
+                            ocr_spam_filter.on_event(&event).await;
 
                             crate::autocrosspost::on_event(&cache, &discord, &event).await;
 

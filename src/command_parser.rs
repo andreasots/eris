@@ -73,15 +73,19 @@ impl Access {
                     .member
                     .as_ref()
                     .into_iter()
-                    .flat_map(|member| member.roles.iter())
-                    .filter_map(|&role_id| cache.role(role_id))
+                    .flat_map(|member| member.roles.iter().copied())
+                    .filter_map(|role_id| cache.role(role_id))
                     .any(|role| role.colors.primary_color != 0)
             }),
-            Access::ModOnly => message
-                .member
-                .as_ref()
-                .and_then(|member| member.permissions)
-                .is_some_and(|permissions| permissions.contains(Permissions::ADMINISTRATOR)),
+            Access::ModOnly => cache.with(|cache| {
+                message
+                    .member
+                    .as_ref()
+                    .into_iter()
+                    .flat_map(|member| member.roles.iter().copied())
+                    .filter_map(|role_id| cache.role(role_id))
+                    .any(|role| role.permissions.contains(Permissions::ADMINISTRATOR))
+            }),
             Access::OwnerOnly => {
                 #[allow(clippy::unreadable_literal)]
                 const OWNERS: [Id<UserMarker>; 3] = [

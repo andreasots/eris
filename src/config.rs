@@ -48,6 +48,8 @@ pub struct Config {
     pub mods_channel: Id<ChannelMarker>,
     pub general_channel: Id<ChannelMarker>,
     pub lrr_videos_channel: Option<Id<ChannelMarker>>,
+    #[cfg(feature = "ocr")]
+    pub logs_channel: Id<ChannelMarker>,
     pub guild: Id<GuildMarker>,
 
     pub mastodon_server: Url,
@@ -128,6 +130,9 @@ impl Config {
                     .unwrap_or(Id::new(288920509272555520))
             },
             lrr_videos_channel: Config::get_option_parsed(&ini, "discord_channel_lrr_videos")?,
+            #[cfg(feature = "ocr")]
+            logs_channel: Config::get_option_parsed(&ini, "discord_channel_logs")?
+                .unwrap_or(Id::new(1225885095848841317)),
             guild: Config::get_option_parsed(&ini, "discord_serverid")?
                 .unwrap_or(Id::new(288920509272555520)),
 
