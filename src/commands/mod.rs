@@ -1,6 +1,8 @@
 pub mod calendar;
 pub mod help;
 pub mod live;
+#[cfg(feature = "ocr")]
+pub mod ocr;
 pub mod quote;
 pub mod static_response;
 pub mod time;
