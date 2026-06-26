@@ -99,7 +99,7 @@ impl CommandHandler for RulesAdd {
             usage: "ocr rules add <PATTERN>".into(),
             summary: "Add a new OCR spam rule".into(),
             description: "Add a new OCR spam rule.".into(),
-            examples: Cow::Borrowed(&[Cow::Borrowed("ocr rule add crypto(currency)? casino")]),
+            examples: Cow::Borrowed(&[Cow::Borrowed("ocr rules add crypto(currency)? casino")]),
         })
     }
 
@@ -161,7 +161,7 @@ impl CommandHandler for RulesRemove {
             usage: "ocr rules add <PATTERN>".into(),
             summary: "Remove an OCR spam rule".into(),
             description: "Remove an OCR spam rule.".into(),
-            examples: Cow::Borrowed(&[Cow::Borrowed("ocr rule remove crypto(currency)? casino")]),
+            examples: Cow::Borrowed(&[Cow::Borrowed("ocr rules remove crypto(currency)? casino")]),
         })
     }
 
