@@ -1,7 +1,9 @@
 use std::collections::{HashMap, hash_map::Entry};
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{Context, Error};
+use chrono::Utc;
 use deadpool::managed::Pool;
 use image::ImageFormat;
 use regex::{Regex, RegexSet};
@@ -144,8 +146,8 @@ impl OcrSpamFilter {
         }
     }
 
-    pub async fn on_event(&self, event: &Event) {
-        let message = match event {
+    pub async fn on_event(self, event: Event) {
+        let message = match &event {
             Event::MessageCreate(event) => &event.0,
             Event::MessageUpdate(event) => &event.0,
             _ => return,
@@ -253,6 +255,16 @@ impl OcrSpamFilter {
             if let Err(error) = self.discord.delete_message(message.channel_id, message.id).await {
                 tracing::error!(?error, "failed to delete the spam message");
             }
+            let reaction_time = Duration::from_micros(
+                (Utc::now().timestamp_micros() - message.timestamp.as_micros()) as u64,
+            );
+            tracing::info!(
+                ?reaction_time,
+                message.id = message.id.get(),
+                message.author.id = message.author.id.get(),
+                message.author.name = message.author.name,
+                "spam detected",
+            );
         }
     }
 }
