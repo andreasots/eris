@@ -18,6 +18,7 @@ reqwest = { version = "0.13.4", features = ["blocking"], optional = true }
 [dependencies]
 anyhow = { version = "1.0.102", default-features = false, features = ["std"] }
 atrium-api = { version = "0.25.8", default-features = false, features = ["namespace-appbsky"] }
+aws-lc-rs = { version = "1.17.1", default-features = false }
 bytes = { version = "1.11.1", default-features = false }
 caseless = "0.2.2"
 chrono = { version = "0.4.45", default-features = false, features = ["std", "clock", "serde"] }
