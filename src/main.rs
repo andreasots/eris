@@ -418,7 +418,7 @@ async fn main() -> Result<(), Error> {
                             cache.update(&event);
 
                             #[cfg(feature = "ocr")]
-                            ocr_spam_filter.on_event(&event).await;
+                            let _ = handler_tx.send(tokio::spawn(ocr_spam_filter.clone().on_event(event.clone()))).await;
 
                             crate::autocrosspost::on_event(&cache, &discord, &event).await;
 
