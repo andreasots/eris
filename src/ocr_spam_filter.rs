@@ -1,10 +1,12 @@
+use std::collections::{HashMap, hash_map::Entry};
 use std::sync::Arc;
 
 use anyhow::{Context, Error};
 use deadpool::managed::Pool;
+use image::ImageFormat;
 use regex::{Regex, RegexSet};
 use sea_orm::DatabaseConnection;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 use twilight_gateway::Event;
 use twilight_http::Client as DiscordClient;
 use twilight_mention::Mention;
@@ -86,9 +88,12 @@ pub struct OcrSpamFilter {
     http: reqwest::Client,
     tesseract: Pool<Tesseract>,
     rules: Arc<RwLock<RuleSet>>,
+    cache: Arc<Mutex<HashMap<[u8; Self::HASH_ALGO.output_len], (ImageFormat, String)>>>,
 }
 
 impl OcrSpamFilter {
+    const HASH_ALGO: &'static aws_lc_rs::digest::Algorithm = &aws_lc_rs::digest::SHA256;
+
     pub fn new(
         config: Arc<Config>,
         discord: Arc<DiscordClient>,
@@ -96,7 +101,14 @@ impl OcrSpamFilter {
         tesseract: Pool<Tesseract>,
         rules: Arc<RwLock<RuleSet>>,
     ) -> Result<Self, Error> {
-        Ok(Self { config, discord, http, tesseract, rules })
+        Ok(Self {
+            config,
+            discord,
+            http,
+            tesseract,
+            rules,
+            cache: Arc::new(Mutex::new(HashMap::new())),
+        })
     }
 
     async fn download(&self, url: &str) -> Result<Vec<u8>, Error> {
@@ -112,6 +124,24 @@ impl OcrSpamFilter {
             .await
             .context("failed to download the image")?
             .into())
+    }
+
+    async fn extract_text(&self, image: &[u8]) -> Result<(ImageFormat, String), Error> {
+        let hash = aws_lc_rs::digest::digest(Self::HASH_ALGO, image)
+            .as_ref()
+            .try_into()
+            .context("wrong hash algo output size")?;
+        let mut cache = self.cache.lock().await;
+        match cache.entry(hash) {
+            Entry::Occupied(entry) => Ok(entry.get().clone()),
+            Entry::Vacant(entry) => {
+                let mut tesseract =
+                    self.tesseract.get().await.context("failed to get a Tesseract instance")?;
+                let res = crate::tesseract::extract_text(&mut tesseract, image)
+                    .context("failed to extract text from image")?;
+                Ok(entry.insert(res).clone())
+            }
+        }
     }
 
     pub async fn on_event(&self, event: &Event) {
@@ -148,15 +178,7 @@ impl OcrSpamFilter {
                 }
             };
 
-            let mut tesseract = match self.tesseract.get().await {
-                Ok(tesseract) => tesseract,
-                Err(error) => {
-                    tracing::error!(?error, "failed to get a Tesseract instance");
-                    break;
-                }
-            };
-
-            match crate::tesseract::extract_text(&mut tesseract, &image) {
+            match self.extract_text(&image).await {
                 Ok((format, text)) => {
                     let rules = self.rules.read().await;
                     let matched_rules = rules.matches(&text);
