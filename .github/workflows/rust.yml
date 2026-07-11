@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
       - name: Install dependencies (Linux)
-        run: sudo apt-get install -y libleptonica-dev libtesseract-dev
+        run: sudo apt-get update && sudo apt-get install -y libleptonica-dev libtesseract-dev
         if: runner.os == 'Linux'
       - name: Build
         run: cargo build --verbose --release --all --target ${{ matrix.target }} ${{ matrix.cargo-extra-args }}
