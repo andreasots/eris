@@ -1989,13 +1989,13 @@ dependencies = [
 
 [[package]]
 name = "inherent"
-version = "1.0.13"
+version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c727f80bfa4a6c6e2508d2f05b6f4bfce242030bd88ed15ae5331c5b5d30fba7"
+checksum = "bee2c455ca60511a054699102d40ce7153621cb2429558f9eaa600e4499b5984"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.118",
+ "syn 3.0.2",
 ]
 
 [[package]]
