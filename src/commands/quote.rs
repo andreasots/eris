@@ -10,10 +10,10 @@ use lalrpop_util::ParseError;
 use rand::seq::IndexedRandom;
 use regex::{Captures, Regex, Replacer};
 use sea_orm::sea_query::extension::postgres::PgExpr;
-use sea_orm::sea_query::{ConditionExpression, Expr, Func, PgFunc, SimpleExpr};
+use sea_orm::sea_query::{Expr, Func, PgFunc, SimpleExpr};
 use sea_orm::{
     ColumnTrait, Condition, ConnectionTrait, DatabaseBackend, DatabaseConnection, EntityTrait,
-    ModelTrait, QueryFilter, QuerySelect, QueryTrait, Statement,
+    ExprTrait, ModelTrait, QueryFilter, QuerySelect, QueryTrait, Statement,
 };
 use tokio::sync::OnceCell;
 use twilight_http::Client as DiscordClient;
@@ -197,21 +197,21 @@ impl<'a> Ast<'a> {
         }
     }
 
-    fn to_condition(&self) -> Result<ConditionExpression, Error> {
+    fn to_condition(&self) -> Result<Condition, Error> {
         match self {
             Ast::Or { exprs } => {
                 let mut cond = Condition::any();
                 for node in exprs {
                     cond = cond.add(node.to_condition()?);
                 }
-                Ok(cond.into())
+                Ok(cond)
             }
             Ast::And { exprs } => {
                 let mut cond = Condition::all();
                 for node in exprs {
                     cond = cond.add(node.to_condition()?);
                 }
-                Ok(cond.into())
+                Ok(cond)
             }
             Ast::Column { column, op, term } => match column {
                 Column::Id => {
@@ -245,7 +245,7 @@ impl<'a> Ast<'a> {
                     Ok(single_predicate(quote::Column::Context, *op, &term[..], |c, v| {
                         c.is_not_null().and(
                             Expr::expr(PgFunc::to_tsvector(
-                                Func::coalesce([Expr::col(c).into(), Expr::val("").into()]),
+                                Func::coalesce([Expr::col(c), Expr::val("")]),
                                 ENGLISH.get().copied(),
                             ))
                             .matches(PgFunc::plainto_tsquery(Expr::val(v), ENGLISH.get().copied())),
@@ -300,10 +300,7 @@ impl<'a> Ast<'a> {
             },
             Ast::Bare(term) => Ok(Expr::expr(PgFunc::to_tsvector(
                 Expr::col(quote::Column::Quote).concatenate(Expr::val(" ")).concatenate(
-                    Func::coalesce([
-                        Expr::col(quote::Column::Context).into(),
-                        Expr::val("").into(),
-                    ]),
+                    Func::coalesce([Expr::col(quote::Column::Context), Expr::val("")]),
                 ),
                 ENGLISH.get().copied(),
             ))
@@ -398,7 +395,7 @@ async fn load_regconfig(conn: &DatabaseConnection) -> Result<(), Error> {
     ENGLISH
         .get_or_try_init::<Error, _, _>(|| async {
             let row = conn
-                .query_one(Statement::from_sql_and_values(
+                .query_one_raw(Statement::from_sql_and_values(
                     DatabaseBackend::Postgres,
                     "SELECT 'english'::REGCONFIG::OID AS english",
                     [],

@@ -354,7 +354,7 @@ pub mod state {
         conn: &DatabaseConnection,
     ) -> Result<(), Error> {
         // TODO: do this with sea-orm. Currently there is no way to reference `EXCLUDED.value`.
-        conn.execute(Statement::from_sql_and_values(
+        conn.execute_raw(Statement::from_sql_and_values(
             DbBackend::Postgres,
             "
                     INSERT INTO state(key, value)
