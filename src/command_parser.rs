@@ -68,24 +68,30 @@ impl Access {
     pub fn author_has_access(self, message: &Message, cache: &Cache) -> bool {
         match self {
             Access::All => true,
-            Access::SubOnly => cache.with(|cache| {
-                message
-                    .member
-                    .as_ref()
-                    .into_iter()
-                    .flat_map(|member| member.roles.iter().copied())
-                    .filter_map(|role_id| cache.role(role_id))
-                    .any(|role| role.colors.primary_color != 0)
-            }),
-            Access::ModOnly => cache.with(|cache| {
-                message
-                    .member
-                    .as_ref()
-                    .into_iter()
-                    .flat_map(|member| member.roles.iter().copied())
-                    .filter_map(|role_id| cache.role(role_id))
-                    .any(|role| role.permissions.contains(Permissions::ADMINISTRATOR))
-            }),
+            Access::SubOnly => {
+                Self::ModOnly.author_has_access(message, cache)
+                    || cache.with(|cache| {
+                        message
+                            .member
+                            .as_ref()
+                            .into_iter()
+                            .flat_map(|member| member.roles.iter().copied())
+                            .filter_map(|role_id| cache.role(role_id))
+                            .any(|role| role.colors.primary_color != 0)
+                    })
+            }
+            Access::ModOnly => {
+                Self::OwnerOnly.author_has_access(message, cache)
+                    || cache.with(|cache| {
+                        message
+                            .member
+                            .as_ref()
+                            .into_iter()
+                            .flat_map(|member| member.roles.iter().copied())
+                            .filter_map(|role_id| cache.role(role_id))
+                            .any(|role| role.permissions.contains(Permissions::ADMINISTRATOR))
+                    })
+            }
             Access::OwnerOnly => {
                 #[allow(clippy::unreadable_literal)]
                 const OWNERS: [Id<UserMarker>; 3] = [
