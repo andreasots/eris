@@ -35,7 +35,6 @@ mod command_parser;
 mod commands;
 mod config;
 mod contact;
-mod desertbus;
 mod disconnect_afk;
 mod influxdb;
 mod markdown;
@@ -191,8 +190,6 @@ async fn main() -> Result<(), Error> {
         .transpose()
         .context("failed to create the InfluxDB client")?;
 
-    let desertbus = crate::desertbus::DesertBus::new(http_client.clone());
-
     let discord = DiscordClient::builder()
         .token(config.discord_botsecret.clone())
         // prevent any mentions by default
@@ -263,7 +260,6 @@ async fn main() -> Result<(), Error> {
         calendar.clone(),
         config.clone(),
         db.clone(),
-        desertbus.clone(),
         discord.clone(),
         helix.clone(),
         helix_token.clone(),

@@ -5,7 +5,6 @@ use std::time::Duration;
 use anyhow::{Context, Error};
 use chrono::{DateTime, Utc};
 use sea_orm::{DatabaseConnection, EntityTrait};
-use separator::FixedPlaceSeparatable;
 use tokio::sync::RwLock;
 use tokio::sync::watch::Receiver;
 use tracing::error;
@@ -18,7 +17,6 @@ use twitch_api::types::UserNameRef;
 use crate::cache::Cache;
 use crate::calendar::{CalendarHub, Event};
 use crate::config::Config;
-use crate::desertbus::DesertBus;
 use crate::models::{game, game_entry, show};
 use crate::rpc::LRRbot;
 use crate::rpc::client::HeaderInfo;
@@ -27,18 +25,6 @@ use crate::shorten::shorten;
 const TOPIC_MAX_LEN: usize = 1024;
 // Hopefully normal messages don't contain this sequence.
 const DYNAMIC_TAIL_SEPARATOR: &str = " \u{2009}\u{200A}\u{200B}";
-// Don't update the topic if the old and new topics have a Levenshtein distance below `SIMILARITY_THRESHOLD`.
-const SIMILARITY_THRESHOLD: usize = 5;
-// But even then update the topic every `SIMILAR_MIN_UPDATE_INTERVAL`.
-const SIMILAR_MIN_UPDATE_INTERVAL: chrono::TimeDelta = match chrono::TimeDelta::try_minutes(30) {
-    Some(delta) => delta,
-    None => panic!("SIMILAR_MIN_UPDATE_INTERVAL is invalid"),
-};
-// Assume that Desert Bus doesn't go past the end by more than `DESERT_BUS_END_SLACK`.
-const DESERT_BUS_END_SLACK: chrono::TimeDelta = match chrono::TimeDelta::try_hours(3) {
-    Some(delta) => delta,
-    None => panic!("DESERT_BUS_END_SLACK is invalid"),
-};
 
 struct EventDisplay<'a> {
     event: &'a Event,
@@ -68,7 +54,6 @@ pub async fn autotopic(
     calendar: CalendarHub,
     config: Arc<Config>,
     db: DatabaseConnection,
-    desertbus: DesertBus,
     discord: Arc<DiscordClient>,
     helix: HelixClient<'static, reqwest::Client>,
     helix_token: Arc<RwLock<AppAccessToken>>,
@@ -76,7 +61,7 @@ pub async fn autotopic(
 ) {
     let mut timer = tokio::time::interval(Duration::from_secs(60));
     let mut autotopic =
-        Autotopic::new(cache, calendar, config, db, desertbus, discord, helix, helix_token, lrrbot);
+        Autotopic::new(cache, calendar, config, db, discord, helix, helix_token, lrrbot);
 
     loop {
         tokio::select! {
@@ -97,7 +82,6 @@ struct Autotopic {
     calendar: CalendarHub,
     config: Arc<Config>,
     db: DatabaseConnection,
-    desertbus: DesertBus,
     discord: Arc<DiscordClient>,
     helix: HelixClient<'static, reqwest::Client>,
     helix_token: Arc<RwLock<AppAccessToken>>,
@@ -110,7 +94,6 @@ impl Autotopic {
         calendar: CalendarHub,
         config: Arc<Config>,
         db: DatabaseConnection,
-        desertbus: DesertBus,
         discord: Arc<DiscordClient>,
         helix: HelixClient<'static, reqwest::Client>,
         helix_token: Arc<RwLock<AppAccessToken>>,
@@ -122,7 +105,6 @@ impl Autotopic {
             calendar,
             config,
             db,
-            desertbus,
             discord,
             helix,
             helix_token,
@@ -130,7 +112,7 @@ impl Autotopic {
         }
     }
 
-    async fn set_topic(&mut self, new_topic: &str, is_dynamic: bool) -> Result<(), Error> {
+    async fn set_topic(&mut self, new_topic: &str) -> Result<(), Error> {
         self.cache.wait_until_ready().await;
 
         let new_topic = shorten(new_topic, TOPIC_MAX_LEN);
@@ -151,16 +133,7 @@ impl Autotopic {
 
         let now = Utc::now();
 
-        if is_dynamic {
-            let distance =
-                levenshtein::levenshtein(old_topic_static_prefix, new_topic_static_prefix);
-            if distance == 0
-                || distance < SIMILARITY_THRESHOLD
-                    && self.last_updated.is_some_and(|t| (now - t) < SIMILAR_MIN_UPDATE_INTERVAL)
-            {
-                return Ok(());
-            }
-        } else if old_topic_static_prefix == new_topic_static_prefix {
+        if old_topic_static_prefix == new_topic_static_prefix {
             return Ok(());
         }
 
@@ -188,7 +161,6 @@ impl Autotopic {
         });
 
         let mut messages = vec![];
-        let mut is_dynamic = false;
 
         let game = if let Some(game) = header.current_game {
             game::Entity::find_by_id(game.id)
@@ -251,13 +223,7 @@ impl Autotopic {
                     .await
                     .context("failed to get the next scheduled stream")?;
 
-            let (desertbus, desertbus_is_dynamic) = self.desertbus(now, &events).await?;
-            if desertbus.is_empty() {
-                messages.extend(events.iter().map(|event| EventDisplay { event }.to_string()));
-            } else {
-                messages.extend(desertbus);
-                is_dynamic |= desertbus_is_dynamic;
-            }
+            messages.extend(events.iter().map(|event| EventDisplay { event }.to_string()));
         }
 
         let mut topic = messages.join(" ");
@@ -268,7 +234,7 @@ impl Autotopic {
             topic.push_str(&advice);
         }
 
-        self.set_topic(&topic, is_dynamic).await.context("failed to update the topic")?;
+        self.set_topic(&topic).await.context("failed to update the topic")?;
 
         Ok(())
     }
@@ -293,84 +259,5 @@ impl Autotopic {
                     )
                 },
             ))
-    }
-
-    async fn desertbus(
-        &self,
-        now: DateTime<Utc>,
-        events: &[Event],
-    ) -> Result<(Vec<String>, bool), Error> {
-        let mut messages = vec![];
-        let mut is_dynamic = false;
-
-        let (name, start, money_raised) = match self.desertbus.fetch_current_event().await {
-            Ok((name, start, money_raised)) => (name, start, money_raised),
-            Err(error) => {
-                error!(?error, "Failed to fetch the current Desert Bus");
-
-                return Ok((messages, is_dynamic));
-            }
-        };
-
-        let total_hours =
-            if name.contains("Express") { 24.0 } else { DesertBus::hours_raised(money_raised) };
-        let duration = Duration::from_secs_f64(total_hours * 3600.0);
-        let end = start + duration;
-
-        if let Some(next_event_start) = events.first().map(|event| event.start)
-            && next_event_start < start
-        {
-            return Ok((messages, is_dynamic));
-        }
-
-        if now < start {
-            messages.push(
-                EventDisplay {
-                    event: &Event {
-                        start,
-                        summary: name,
-                        end,
-                        location: Some(String::from(
-                            "https://desertbus.org/ or https://twitch.tv/desertbus",
-                        )),
-                        description: None,
-                    },
-                }
-                .to_string(),
-            );
-            messages
-                .push(format!("${} raised.", money_raised.separated_string_with_fixed_place(2)));
-            is_dynamic = true;
-        } else if now <= end
-            || ((now - end) < DESERT_BUS_END_SLACK && self.is_desertbus_live().await?)
-        {
-            messages.push(String::from(
-                "DESERT BUS! (https://desertbus.org/ or https://twitch.tv/desertbus)",
-            ));
-            messages
-                .push(format!("${} raised.", money_raised.separated_string_with_fixed_place(2)));
-            let bussed = now - start;
-            messages.push(format!(
-                "{}:{:02} hours of {total_hours} so far.",
-                bussed.num_hours(),
-                bussed.num_minutes() % 60,
-            ));
-            is_dynamic = true;
-        }
-
-        Ok((messages, is_dynamic))
-    }
-
-    async fn is_desertbus_live(&self) -> Result<bool, Error> {
-        Ok(!self
-            .helix
-            .req_get(
-                GetStreamsRequest::user_logins([UserNameRef::from_str("desertbus")].as_ref()),
-                &*self.helix_token.read().await,
-            )
-            .await
-            .context("failed to get the stream")?
-            .data
-            .is_empty())
     }
 }
