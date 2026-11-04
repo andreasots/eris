@@ -1178,7 +1178,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c54e03a951783e8b327515db3f2a2fd0e3bed362a96b066f341ce66ed49b4ead"
 dependencies = [
  "data-encoding",
- "syn 3.0.9",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -2675,9 +2675,9 @@ dependencies = [
 
 [[package]]
 name = "libz-ng-sys"
-version = "1.1.30"
+version = "1.1.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbace61184843c17c2507bcaff9e5e723eac1058af7dc67f3e26c1a2ab3fc9a2"
+checksum = "5744ce2ea938839ed4541cb8736d222d70ba50f324ec74127a7c40ffc3c25c67"
 dependencies = [
  "cmake",
  "libc",
