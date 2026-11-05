@@ -47,13 +47,13 @@ tokio-util = { version = "0.7.18", default-features = false, features = ["codec"
 tower = { version = "0.5.3", default-features = false, features = ["reconnect"] }
 tracing = { version = "0.1.44", default-features = false, features = ["std", "attributes", "max_level_trace", "release_max_level_debug"] }
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "std", "chrono", "env-filter", "json", "tracing-log"] }
-twilight-cache-inmemory = { version = "0.17.1", default-features = false, features = ["permission-calculator"] }
-twilight-gateway = { version = "0.17.1", default-features = false, features = ["rustls-native-roots", "zlib", "twilight-http"] }
-twilight-http = { version = "0.17.1", default-features = false, features = ["decompression", "rustls-native-roots"] }
-twilight-mention = "0.17.0"
-twilight-model = "0.17.1"
-twilight-util = { version = "0.17.0", default-features = false, features = ["builder", "snowflake"] }
-twilight-validate = "0.17.0"
+twilight-cache-inmemory = { version = "0.18.0", default-features = false, features = ["permission-calculator"] }
+twilight-gateway = { version = "0.18.0", default-features = false, features = ["rustls-native-roots", "zlib", "twilight-http"] }
+twilight-http = { version = "0.18.0", default-features = false, features = ["decompression", "rustls-native-roots"] }
+twilight-mention = "0.18.0"
+twilight-model = "0.18.0"
+twilight-util = { version = "0.18.0", default-features = false, features = ["builder", "snowflake"] }
+twilight-validate = "0.18.0"
 twitch_api = { version = "0.8.0", features = ["all", "reqwest"] }
 unicode-segmentation = "1.13.3"
 unicode-width = { version = "0.2.2", default-features = false }
