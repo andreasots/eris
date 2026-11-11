@@ -18,7 +18,7 @@ use google_sheets4::Sheets;
 use google_youtube3::YouTube;
 use tokio::sync::RwLock;
 use tracing_subscriber::EnvFilter;
-use twilight_gateway::{EventTypeFlags, Intents, StreamExt as _};
+use twilight_gateway::{EventTypeFlags, Intents, Shard, StreamExt as _};
 use twilight_http::Client as DiscordClient;
 use twilight_model::channel::message::AllowedMentions;
 use twilight_model::gateway::payload::outgoing::update_presence::UpdatePresencePayload;
@@ -355,34 +355,46 @@ async fn main() -> Result<(), Error> {
         }
     };
 
+    let connection_info = discord
+        .gateway()
+        .authed()
+        .await
+        .context("failed to fetch the gateway info")?
+        .model()
+        .await
+        .context("failed to parse the gateway info")?;
+
     let intents = Intents::GUILDS
         | Intents::GUILD_VOICE_STATES
         | Intents::GUILD_MESSAGES
         | Intents::DIRECT_MESSAGES
         | Intents::MESSAGE_CONTENT;
 
-    let shard_config = twilight_gateway::Config::new(config.discord_botsecret.clone(), intents);
-    let presence = UpdatePresencePayload::new(
-        vec![
-            MinimalActivity {
-                kind: ActivityType::Listening,
-                name: format!("{}help || v{}", config.command_prefix, env!("CARGO_PKG_VERSION")),
-                url: Some("https://lrrbot.com/".into()),
-            }
-            .into(),
-        ],
-        false,
-        None,
-        PresenceStatus::Online,
-    )
-    .context("failed to construct the presence")?;
-    let shards = twilight_gateway::create_recommended(&discord, shard_config, |_, builder| {
-        builder.presence(presence.clone()).build()
-    })
-    .await
-    .context("failed to create the shards")?;
+    let shard_config =
+        twilight_gateway::ConfigBuilder::new(config.discord_botsecret.clone(), intents)
+            .presence(
+                UpdatePresencePayload::new(
+                    vec![
+                        MinimalActivity {
+                            kind: ActivityType::Listening,
+                            name: format!(
+                                "{}help || v{}",
+                                config.command_prefix,
+                                env!("CARGO_PKG_VERSION")
+                            ),
+                            url: Some("https://lrrbot.com/".into()),
+                        }
+                        .into(),
+                    ],
+                    false,
+                    None,
+                    PresenceStatus::Online,
+                )
+                .context("failed to construct the presence")?,
+            )
+            .build();
 
-    for mut shard in shards {
+    for shard_id in twilight_gateway::bucket(0, 1, connection_info.shards) {
         let cache = cache.clone();
         let command_parser = command_parser.clone();
         let discord = discord.clone();
@@ -393,9 +405,10 @@ async fn main() -> Result<(), Error> {
         let ocr_spam_filter = ocr_spam_filter.clone();
         #[cfg(target_os = "linux")]
         let sd_notify = sd_notify.clone();
+        let shard_config = shard_config.clone();
 
         tasks.push(tokio::spawn(async move {
-            let shard_id = shard.id();
+            let mut shard = Shard::with_config(shard_id, shard_config);
 
             loop {
                 tokio::select! {

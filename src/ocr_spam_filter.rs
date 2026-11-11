@@ -148,7 +148,7 @@ impl OcrSpamFilter {
 
     pub async fn on_event(self, event: Event) {
         let message = match &event {
-            Event::MessageCreate(event) => &event.0,
+            Event::MessageCreate(event) => &event.message,
             Event::MessageUpdate(event) => &event.0,
             _ => return,
         };
@@ -226,6 +226,7 @@ impl OcrSpamFilter {
                         .timestamp(message.timestamp);
                     embeds.push(embed.build());
                     attachments.push(Attachment {
+                        title: None,
                         description: Some(
                             crate::shorten::shorten(
                                 &text,
@@ -236,6 +237,9 @@ impl OcrSpamFilter {
                         file: image,
                         filename,
                         id: attachments.len() as u64,
+                        duration_secs: None,
+                        waveform: None,
+                        is_spoiler: None,
                     });
                 }
                 Err(error) => tracing::error!(?error, "failed to check {url:?} for spam"),
