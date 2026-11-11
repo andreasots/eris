@@ -461,7 +461,7 @@ fn on_message_create(
     measurements: &mut LineProtocolBuilder<Vec<u8>>,
     cache: &Cache,
     time: DateTime<Utc>,
-    MessageCreate(message): &MessageCreate,
+    message: &MessageCreate,
 ) {
     cache.with(|cache| {
         let (channel, thread) = match cache.channel(message.channel_id) {

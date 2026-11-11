@@ -14,7 +14,6 @@ use twilight_http::Client as DiscordClient;
 use twilight_mention::Mention;
 use twilight_model::channel::Message;
 use twilight_model::channel::message::MessageFlags;
-use twilight_model::gateway::payload::incoming::MessageCreate;
 use twilight_model::guild::Permissions;
 use twilight_model::id::Id;
 use twilight_model::id::marker::{ChannelMarker, MessageMarker, UserMarker};
@@ -167,8 +166,7 @@ impl CommandParser {
     }
 
     pub async fn on_event(&self, handler_tx: &Sender<JoinHandle<()>>, event: &Event) {
-        let Event::MessageCreate(event) = event else { return };
-        let MessageCreate(ref message) = **event;
+        let message = if let Event::MessageCreate(event) = event { &event.message } else { return };
 
         if message.author.bot {
             return;
