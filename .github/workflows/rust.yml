@@ -31,6 +31,10 @@ jobs:
       - name: Install dependencies (Linux)
         run: sudo apt-get update && sudo apt-get install -y libleptonica-dev libtesseract-dev
         if: runner.os == 'Linux'
+      # Make sure that `bindgen` uses the default Clang even if there are newer versions installed.
+      - name: Set LIBCLANG_PATH
+        run: "echo LIBCLANG_PATH=$(clang --version | sed -n '/InstalledDir: /s/InstalledDir: //p')/../lib >> $GITHUB_ENV"
+        if: runner.os == 'Linux'
       - name: Build
         run: cargo build --verbose --release --all --target ${{ matrix.target }} ${{ matrix.cargo-extra-args }}
       - name: Run tests
